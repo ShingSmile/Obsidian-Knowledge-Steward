@@ -5,6 +5,7 @@ import hashlib
 from pathlib import Path
 
 from app.config import Settings
+from app.context.assembly import build_digest_context_bundle
 from app.contracts.workflow import (
     DigestSourceNote,
     DigestWorkflowResult,
@@ -20,6 +21,7 @@ from app.indexing.store import connect_sqlite, initialize_index_db
 
 DIGEST_SOURCE_LIMIT = 6
 PREFERRED_DIGEST_NOTE_TYPES = ("daily_note", "summary_note")
+DIGEST_CONTEXT_TOKEN_BUDGET = 2000
 
 
 def run_minimal_digest(*, settings: Settings) -> DigestWorkflowResult:
@@ -39,6 +41,10 @@ def run_minimal_digest(*, settings: Settings) -> DigestWorkflowResult:
             fallback_reason="no_indexed_notes",
         )
 
+    context_bundle = build_digest_context_bundle(
+        source_notes=source_notes,
+        token_budget=DIGEST_CONTEXT_TOKEN_BUDGET,
+    )
     return DigestWorkflowResult(
         digest_markdown=_build_digest_markdown(
             source_notes=source_notes,
@@ -48,6 +54,10 @@ def run_minimal_digest(*, settings: Settings) -> DigestWorkflowResult:
         source_note_count=len(source_notes),
         fallback_used=fallback_reason is not None,
         fallback_reason=fallback_reason,
+        context_bundle_summary={
+            "evidence_count": len(context_bundle.evidence_items),
+            "assembly_notes": context_bundle.assembly_notes,
+        },
     )
 
 

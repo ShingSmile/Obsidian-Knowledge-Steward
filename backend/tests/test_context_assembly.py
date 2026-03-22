@@ -2,11 +2,16 @@ from __future__ import annotations
 
 import unittest
 
-from app.context.assembly import build_ask_context_bundle, build_ingest_context_bundle
+from app.context.assembly import (
+    build_ask_context_bundle,
+    build_digest_context_bundle,
+    build_ingest_context_bundle,
+)
 from app.context.render import render_tool_selection_prompt
 from app.contracts.workflow import (
     ContextBundle,
     ContextEvidenceItem,
+    DigestSourceNote,
     ProposalEvidence,
     RetrievedChunkCandidate,
     WorkflowAction,
@@ -68,6 +73,49 @@ class ContextContractTests(unittest.TestCase):
 
 
 class ContextAssemblyTests(unittest.TestCase):
+    def test_build_digest_context_bundle_preserves_recent_note_order(self) -> None:
+        source_notes = [
+            DigestSourceNote(
+                note_id="digest-note-1",
+                path="Recent-A.md",
+                title="Recent-A",
+                note_type="daily_note",
+                template_family="daily",
+                daily_note_date="2026-03-14",
+                source_mtime_ns=30,
+                task_count=1,
+            ),
+            DigestSourceNote(
+                note_id="digest-note-2",
+                path="Recent-B.md",
+                title="Recent-B",
+                note_type="summary_note",
+                template_family="summary",
+                daily_note_date="2026-03-13",
+                source_mtime_ns=20,
+                task_count=0,
+            ),
+            DigestSourceNote(
+                note_id="digest-note-3",
+                path="Recent-C.md",
+                title="Recent-C",
+                note_type="generic_note",
+                template_family="default",
+                daily_note_date=None,
+                source_mtime_ns=10,
+                task_count=2,
+            ),
+        ]
+
+        bundle = build_digest_context_bundle(
+            source_notes=source_notes,
+            token_budget=500,
+        )
+
+        self.assertGreaterEqual(len(bundle.evidence_items), 2)
+        self.assertEqual(bundle.evidence_items[0].source_path, "Recent-A.md")
+        self.assertEqual(bundle.evidence_items[1].source_path, "Recent-B.md")
+
     def test_build_ingest_context_bundle_orders_findings_before_related_candidates(
         self,
     ) -> None:

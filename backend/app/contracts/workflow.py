@@ -323,6 +323,7 @@ class DigestWorkflowResult(BaseModel):
     source_note_count: int = 0
     fallback_used: bool = False
     fallback_reason: str | None = None
+    context_bundle_summary: dict[str, object] = Field(default_factory=dict)
 
 
 class WorkflowInvokeRequest(BaseModel):

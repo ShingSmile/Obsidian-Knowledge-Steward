@@ -6,6 +6,7 @@ from app.context.safety import detect_safety_flags
 from app.contracts.workflow import (
     ContextBundle,
     ContextEvidenceItem,
+    DigestSourceNote,
     ProposalEvidence,
     RetrievedChunkCandidate,
     ToolExecutionResult,
@@ -169,5 +170,57 @@ def build_ingest_context_bundle(
                 *(candidate.text for candidate in deduped_related),
             ]
         ),
+        assembly_notes=assembly_notes,
+    )
+
+
+def build_digest_context_bundle(
+    *,
+    source_notes: list[DigestSourceNote],
+    token_budget: int,
+) -> ContextBundle:
+    evidence_items: list[ContextEvidenceItem] = []
+    consumed = 0
+    trimmed_removed = 0
+
+    for note in source_notes:
+        evidence_text = (
+            f"title={note.title}; "
+            f"note_type={note.note_type}; "
+            f"daily_note_date={note.daily_note_date or ''}; "
+            f"task_count={note.task_count}"
+        )
+        evidence_chars = len(note.path) + len(evidence_text)
+        if token_budget > 0 and consumed + evidence_chars > token_budget:
+            trimmed_removed += 1
+            continue
+        evidence_items.append(
+            ContextEvidenceItem(
+                source_path=note.path,
+                chunk_id=note.note_id,
+                heading_path=None,
+                text=evidence_text,
+                score=None,
+                source_kind="digest",
+            )
+        )
+        consumed += evidence_chars
+
+    assembly_notes = [
+        "ordered:source_notes",
+        f"source_notes:{len(source_notes)}",
+        f"digest_evidence:{len(evidence_items)}",
+    ]
+    if trimmed_removed:
+        assembly_notes.append(f"trimmed_for_budget:{trimmed_removed}")
+
+    return ContextBundle(
+        user_intent="Assemble digest context from selected source notes",
+        workflow_action=WorkflowAction.DAILY_DIGEST,
+        evidence_items=evidence_items,
+        tool_results=[],
+        allowed_tool_names=[],
+        token_budget=token_budget,
+        safety_flags=_collect_text_flags(item.text for item in evidence_items),
         assembly_notes=assembly_notes,
     )

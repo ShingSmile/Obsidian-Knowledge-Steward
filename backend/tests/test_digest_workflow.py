@@ -17,9 +17,26 @@ from app.indexing.ingest import ingest_vault
 from app.indexing.store import connect_sqlite, load_proposal
 from app.main import invoke_workflow, list_pending_approvals_endpoint
 from app.observability.runtime_trace import query_run_trace_events_in_db
+from app.services.digest import run_minimal_digest
 
 
 class DigestWorkflowTests(unittest.TestCase):
+    def test_run_minimal_digest_records_context_bundle_summary(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_root = Path(temp_dir)
+            vault_path = self._build_digest_vault_fixture(temp_root)
+            db_path = temp_root / "knowledge_steward.sqlite3"
+            ingest_vault(vault_path=vault_path, db_path=db_path)
+            settings = replace(
+                get_settings(),
+                sample_vault_dir=vault_path,
+                index_db_path=db_path,
+            )
+
+            result = run_minimal_digest(settings=settings)
+
+            self.assertGreaterEqual(result.context_bundle_summary["evidence_count"], 1)
+
     def test_invoke_digest_graph_returns_structured_digest_and_trace_events(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_root = Path(temp_dir)
