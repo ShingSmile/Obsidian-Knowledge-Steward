@@ -227,6 +227,50 @@ class EvalRunnerTests(unittest.TestCase):
                 ),
             )
 
+    def test_run_eval_reports_tool_and_guardrail_scenario_metrics(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            output_path = Path(temp_dir) / "tool_guardrail_eval_result.json"
+            completed = subprocess.run(
+                [
+                    sys.executable,
+                    str(EVAL_SCRIPT),
+                    "--case-id",
+                    "ask_fixture_tool_call_load_excerpt_success",
+                    "--case-id",
+                    "ask_fixture_invalid_tool_request_downgrades",
+                    "--case-id",
+                    "ask_fixture_injection_guardrail_refusal",
+                    "--output",
+                    str(output_path),
+                ],
+                cwd=ROOT_DIR,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+
+            if completed.returncode != 0:
+                self.fail(
+                    "run_eval tool/guardrail cases failed unexpectedly.\n"
+                    f"stdout:\n{completed.stdout}\n"
+                    f"stderr:\n{completed.stderr}"
+                )
+
+            payload = json.loads(output_path.read_text(encoding="utf-8"))
+            scenario_overview = payload["summary"]["benchmark_overview"][
+                "question_answering"
+            ]["scenario_overview"]["tool_and_guardrail"]
+            self.assertEqual(payload["summary"]["selected_case_count"], 3)
+            self.assertEqual(scenario_overview["selected_case_count"], 3)
+            self.assertEqual(
+                scenario_overview["core_metrics"]["tool_call_breakdown"]["attempted"],
+                2,
+            )
+            self.assertIn(
+                "guardrail:possible_injection_detected",
+                scenario_overview["failure_type_breakdown"],
+            )
+
     def test_run_eval_reports_metric_overview_for_hybrid_and_governance_cases(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             output_path = Path(temp_dir) / "hybrid_governance_eval_result.json"

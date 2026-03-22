@@ -160,6 +160,123 @@
       }
     },
     {
+      "case_id": "ask_fixture_tool_call_load_excerpt_success",
+      "scenario": "tool_and_guardrail",
+      "fixture": "ask_basic",
+      "description": "tool decision 请求 load_note_excerpt 且工具执行成功时，应保留 generated_answer 并记录 allow guardrail。",
+      "request": {
+        "action_type": "ask_qa",
+        "user_query": "Roadmap"
+      },
+      "setup": {
+        "provider_mode": "mocked_cloud",
+        "mock_tool_call_decision": {
+          "requested": true,
+          "tool_name": "load_note_excerpt",
+          "arguments": {
+            "note_path": "Roadmap.md",
+            "max_chars": 160
+          },
+          "rationale": "Load the roadmap excerpt before answering."
+        },
+        "mock_provider_answer": "Roadmap 当前只记录问答结果的引用要求。[1]"
+      },
+      "expected": {
+        "http_status": 200,
+        "workflow_status": "completed",
+        "message_contains": "grounded answer",
+        "approval_required": false,
+        "ask_result": {
+          "mode": "generated_answer",
+          "model_fallback_used": false,
+          "provider_name": "openai-compatible",
+          "tool_call_attempted": true,
+          "tool_call_used": "load_note_excerpt",
+          "guardrail_action": "allow",
+          "min_citation_count": 1,
+          "min_retrieved_candidate_count": 1,
+          "answer_contains": [
+            "当前只记录问答结果的引用要求",
+            "[1]"
+          ]
+        }
+      }
+    },
+    {
+      "case_id": "ask_fixture_invalid_tool_request_downgrades",
+      "scenario": "tool_and_guardrail",
+      "fixture": "ask_basic",
+      "description": "tool decision 请求不存在的工具时，应在 ask service guardrail 中降级为 retrieval_only。",
+      "request": {
+        "action_type": "ask_qa",
+        "user_query": "Roadmap"
+      },
+      "setup": {
+        "provider_mode": "mocked_cloud",
+        "mock_tool_call_decision": {
+          "requested": true,
+          "tool_name": "bogus_tool",
+          "arguments": {},
+          "rationale": "Attempt an unsupported tool."
+        }
+      },
+      "expected": {
+        "http_status": 200,
+        "workflow_status": "completed",
+        "message_contains": "retrieval-only fallback",
+        "approval_required": false,
+        "ask_result": {
+          "mode": "retrieval_only",
+          "model_fallback_used": false,
+          "tool_call_attempted": true,
+          "tool_call_used": "bogus_tool",
+          "guardrail_action": "downgrade_to_retrieval_only",
+          "min_citation_count": 1,
+          "min_retrieved_candidate_count": 1,
+          "answer_contains": [
+            "当前未使用模型生成答案",
+            "[1]"
+          ]
+        }
+      }
+    },
+    {
+      "case_id": "ask_fixture_injection_guardrail_refusal",
+      "scenario": "tool_and_guardrail",
+      "fixture": "ask_prompt_injection",
+      "description": "候选上下文命中 prompt injection safety flag 时，即使 provider 返回可解析答案，也应保守降级为 retrieval_only。",
+      "request": {
+        "action_type": "ask_qa",
+        "user_query": "Injection"
+      },
+      "setup": {
+        "provider_mode": "mocked_cloud",
+        "mock_tool_call_decision": {
+          "requested": false
+        },
+        "mock_provider_answer": "该笔记包含需要警惕的可疑指令文本。[1]"
+      },
+      "expected": {
+        "http_status": 200,
+        "workflow_status": "completed",
+        "message_contains": "retrieval-only fallback",
+        "approval_required": false,
+        "ask_result": {
+          "mode": "retrieval_only",
+          "model_fallback_used": false,
+          "tool_call_attempted": false,
+          "tool_call_used": null,
+          "guardrail_action": "possible_injection_detected",
+          "min_citation_count": 1,
+          "min_retrieved_candidate_count": 1,
+          "answer_contains": [
+            "当前未使用模型生成答案",
+            "[1]"
+          ]
+        }
+      }
+    },
+    {
       "case_id": "ask_fixture_no_hits",
       "scenario": "ask",
       "fixture": "ask_basic",
