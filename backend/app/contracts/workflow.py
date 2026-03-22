@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Any
+from typing import Any, Literal
 from uuid import uuid4
 
 from pydantic import BaseModel, Field
@@ -12,6 +12,68 @@ class WorkflowAction(str, Enum):
     ASK_QA = "ask_qa"
     INGEST_STEWARD = "ingest_steward"
     DAILY_DIGEST = "daily_digest"
+
+
+class ContextEvidenceItem(BaseModel):
+    source_path: str
+    chunk_id: str | None = None
+    heading_path: str | None = None
+    text: str
+    score: float | None = None
+    source_kind: Literal["retrieval", "tool", "proposal", "digest"]
+
+
+class ContextBundle(BaseModel):
+    user_intent: str
+    workflow_action: WorkflowAction
+    evidence_items: list[ContextEvidenceItem] = Field(default_factory=list)
+    tool_results: list["ToolExecutionResult"] = Field(default_factory=list)
+    allowed_tool_names: list[str] = Field(default_factory=list)
+    token_budget: int
+    safety_flags: list[str] = Field(default_factory=list)
+    assembly_notes: list[str] = Field(default_factory=list)
+
+
+class ToolSpec(BaseModel):
+    name: str
+    purpose: str
+    allowed_workflows: list[WorkflowAction]
+    input_schema: dict[str, object]
+    output_schema: dict[str, object]
+    risk_level: str
+    read_only: bool = True
+
+
+class ToolCallDecision(BaseModel):
+    requested: bool
+    tool_name: str | None = None
+    arguments: dict[str, object] = Field(default_factory=dict)
+    rationale: str | None = None
+
+
+class ToolExecutionResult(BaseModel):
+    tool_name: str
+    ok: bool
+    data: dict[str, object] = Field(default_factory=dict)
+    error: str | None = None
+    allow_context_reentry: bool = True
+
+
+ContextBundle.model_rebuild()
+
+
+class GuardrailAction(str, Enum):
+    ALLOW = "allow"
+    DOWNGRADE_TO_RETRIEVAL_ONLY = "downgrade_to_retrieval_only"
+    REFUSE_STRONG_CLAIM = "refuse_strong_claim"
+    TOOL_RESULT_INSUFFICIENT = "tool_result_insufficient"
+    POSSIBLE_INJECTION_DETECTED = "possible_injection_detected"
+
+
+class GuardrailOutcome(BaseModel):
+    action: GuardrailAction
+    reasons: list[str] = Field(default_factory=list)
+    applied: bool = False
 
 
 class RunStatus(str, Enum):
