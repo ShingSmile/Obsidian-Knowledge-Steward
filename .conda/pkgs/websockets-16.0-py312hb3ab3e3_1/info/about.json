@@ -1,0 +1,16 @@
+{
+  "channels": [
+    "https://conda.anaconda.org/conda-forge/"
+  ],
+  "description": "websockets is a library for developing WebSocket servers and clients in\nPython. It implements RFC 6455 with a focus on correctness and simplicity.\nIt passes the Autobahn Testsuite. Built on top of asyncio, Python's\nstandard asynchronous I/O framework, it provides a straightforward API\nbased on coroutines, making it easy to write highly concurrent\napplications.",
+  "dev_url": "https://github.com/aaugustin/websockets",
+  "doc_url": "https://websockets.readthedocs.io/en/stable/index.html",
+  "extra": {
+    "flow_run_id": "azure_20260110.6.1",
+    "remote_url": "https://github.com/conda-forge/websockets-feedstock",
+    "sha": "59a20716f92a4460ff90a97a69f98c5b55b8f82b"
+  },
+  "home": "https://websockets.readthedocs.io/en/stable/index.html",
+  "license": "BSD-3-Clause",
+  "summary": "A library for developing WebSocket servers and clients in Python."
+}

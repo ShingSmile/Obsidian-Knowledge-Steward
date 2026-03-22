@@ -1,0 +1,24 @@
+{
+  "build": "pyh8b19718_0",
+  "build_number": 0,
+  "channel": "https://mirrors.tuna.tsinghua.edu.cn/anaconda/cloud/conda-forge/noarch",
+  "constrains": [],
+  "depends": [
+    "python >=3.10,<3.13.0a0",
+    "setuptools",
+    "wheel"
+  ],
+  "fn": "pip-26.0.1-pyh8b19718_0.conda",
+  "license": "MIT",
+  "license_family": "MIT",
+  "md5": "67bdec43082fd8a9cffb9484420b39a2",
+  "name": "pip",
+  "noarch": "python",
+  "package_type": "noarch_python",
+  "sha256": "8e1497814a9997654ed7990a79c054ea5a42545679407acbc6f7e809c73c9120",
+  "size": 1181790,
+  "subdir": "noarch",
+  "timestamp": 1770270305000,
+  "url": "https://mirrors.tuna.tsinghua.edu.cn/anaconda/cloud/conda-forge/noarch/pip-26.0.1-pyh8b19718_0.conda",
+  "version": "26.0.1"
+}

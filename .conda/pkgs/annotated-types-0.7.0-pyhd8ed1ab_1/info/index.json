@@ -1,0 +1,16 @@
+{
+  "arch": null,
+  "build": "pyhd8ed1ab_1",
+  "build_number": 1,
+  "depends": [
+    "python >=3.9",
+    "typing-extensions >=4.0.0"
+  ],
+  "license": "MIT",
+  "name": "annotated-types",
+  "noarch": "python",
+  "platform": null,
+  "subdir": "noarch",
+  "timestamp": 1733247158254,
+  "version": "0.7.0"
+}

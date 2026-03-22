@@ -1,0 +1,15 @@
+{
+  "channels": [
+    "https://conda.anaconda.org/conda-forge/"
+  ],
+  "dev_url": "https://github.com/pydantic/pydantic-extra-types",
+  "doc_url": "https://docs.pydantic.dev/",
+  "extra": {
+    "flow_run_id": "azure_20260202.1.1",
+    "remote_url": "https://github.com/conda-forge/pydantic-extra-types-feedstock",
+    "sha": "f16ee3ecce7433ab35f3db006a0ecf4097f72fcb"
+  },
+  "home": "https://github.com/pydantic/pydantic-extra-types",
+  "license": "MIT",
+  "summary": "A place for pydantic types that probably shouldn't exist in the main pydantic lib."
+}

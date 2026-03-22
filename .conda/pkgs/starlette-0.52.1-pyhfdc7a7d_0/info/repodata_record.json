@@ -1,0 +1,24 @@
+{
+  "build": "pyhfdc7a7d_0",
+  "build_number": 0,
+  "channel": "https://mirrors.tuna.tsinghua.edu.cn/anaconda/cloud/conda-forge/noarch",
+  "constrains": [],
+  "depends": [
+    "anyio >=3.6.2,<5",
+    "python >=3.10",
+    "typing_extensions >=4.10.0",
+    "python"
+  ],
+  "fn": "starlette-0.52.1-pyhfdc7a7d_0.conda",
+  "license": "BSD-3-Clause",
+  "md5": "7ee23ae71c6c1e2f2fe9ea7cf00f1a8e",
+  "name": "starlette",
+  "noarch": "python",
+  "package_type": "noarch_python",
+  "sha256": "ab0d09eaee2e35a969e7fca3b5b2fdba35c1f2abb8eb8c66245485155d41868e",
+  "size": 64896,
+  "subdir": "noarch",
+  "timestamp": 1768919444000,
+  "url": "https://mirrors.tuna.tsinghua.edu.cn/anaconda/cloud/conda-forge/noarch/starlette-0.52.1-pyhfdc7a7d_0.conda",
+  "version": "0.52.1"
+}

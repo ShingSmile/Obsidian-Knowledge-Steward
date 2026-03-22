@@ -1,0 +1,1509 @@
+# TASK_QUEUE
+
+本文件是会话级任务的唯一队列来源。
+所有新会话必须先绑定本文件中的一个任务项，再开始执行。
+
+## Queue Rules
+
+- 一个会话只能绑定一个 `scope=medium` 的任务项。
+- `small` 任务只能作为当前任务的伴随改动或 `derived_tasks` 存在，不能单独开启一个新会话。
+- `large` 任务必须先拆分为多个 `medium` 任务后才能开工。
+- 历史启动会话如在规则建立前已跨越多个中等粒度问题，允许保留为 `scope=large` 的历史例外项，但后续不再新增此类任务。
+- 会话结束后必须同步更新：
+  - 本文件中的任务状态、`session_id`、备注和派生子任务
+  - `docs/SESSION_LOG.md`
+- 若本次会话改变了架构、主路线、模块边界或任务规划，还必须同步更新 `docs/PROJECT_MASTER_PLAN.md`
+
+## Status Conventions
+
+- `planned`：已进入队列，但尚未绑定会话
+- `in_progress`：已绑定会话，当前正在执行
+- `blocked`：存在明确阻塞，不能继续推进
+- `completed`：已完成并达到验收标准
+- `cancelled`：被废弃或被其他任务替代
+
+## Scope Conventions
+
+- `small`：轻量修补、伴随修正、文档同步，不单独占用一个会话
+- `medium`：默认会话粒度，必须具备明确输入、输出和验收标准
+- `large`：需要先拆分的大任务，只允许作为历史例外或拆分入口存在
+
+## Task Fields
+
+- `task_id`：任务唯一标识，稳定不复用，例如 `TASK-003`
+- `session_id`：当前已绑定的会话 ID；未分配则留空
+- `title`：任务标题，必须可直接说明本次要解决什么
+- `category`：任务类型，例如 `Bootstrap`、`Infra`、`Retrieval`、`Workflow`、`Docs`
+- `priority`：优先级，使用 `P0 / P1 / P2`
+- `status`：使用本文件定义的稳定状态值
+- `scope`：使用 `small / medium / large`
+- `goal`：本任务完成后应达到的结果
+- `out_of_scope`：本任务明确不做的内容，防止会话范围失控
+- `acceptance_criteria`：可验证的验收标准
+- `depends_on`：依赖的 `task_id` 列表
+- `related_files`：当前最相关的文件或目录
+- `derived_tasks`：从当前任务自然拆出的轻量后续项或新任务建议
+- `notes`：补充说明、风险、历史背景、阻塞原因
+
+## Historical Tasks
+
+### TASK-001
+
+- `task_id`: `TASK-001`
+- `session_id`: `SES-20260311-01`
+- `title`: 启动会话：主文档、双端基线、解析器与参考实现对照
+- `category`: `Bootstrap`
+- `priority`: `P0`
+- `status`: `completed`
+- `scope`: `large`
+- `goal`: 将项目从“只有实现指南的空仓”推进到“有主文档、插件/后端基线、样本解析器和参考实现对照”的状态。
+- `out_of_scope`:
+  - 不实现完整索引存储
+  - 不实现真实 ask / ingest / digest graph
+  - 不实现 HITL 写回闭环
+- `acceptance_criteria`:
+  - `docs/PROJECT_MASTER_PLAN.md` 建立并可作为单一事实来源
+  - `backend/` 与 `plugin/` 基线目录存在
+  - `/health` 与 `/workflows/invoke` 可返回占位结果
+  - `sample_vault/` 可被解析出 note type、模板类型、任务数与 wikilink
+  - `references/ObsidianRAG/` 已被拉取并完成结构对照
+- `depends_on`: []
+- `related_files`:
+  - `docs/PROJECT_MASTER_PLAN.md`
+  - `README.md`
+  - `backend/app/main.py`
+  - `backend/app/graphs/state.py`
+  - `backend/app/indexing/parser.py`
+  - `plugin/src/main.ts`
+  - `references/ObsidianRAG/`
+- `derived_tasks`:
+  - `TASK-003`
+  - `TASK-004`
+  - `TASK-005`
+  - `TASK-006`
+  - `TASK-007`
+  - `TASK-008`
+  - `TASK-009`
+- `notes`: 这是规则建立前的历史启动会话，保留为 `scope=large` 的例外项；后续不再允许同类会话。
+
+### TASK-002
+
+- `task_id`: `TASK-002`
+- `session_id`: `SES-20260312-01`
+- `title`: 将会话级任务队列从主文档迁移到 `docs/TASK_QUEUE.md`
+- `category`: `Docs`
+- `priority`: `P0`
+- `status`: `completed`
+- `scope`: `medium`
+- `goal`: 把原本耦合在 `docs/PROJECT_MASTER_PLAN.md` 中的会话任务明细迁移到独立队列文件，并建立稳定的任务字段与维护规则。
+- `out_of_scope`:
+  - 不调整整体架构路线
+  - 不重排与任务队列无关的主文档章节
+  - 不推进任何代码功能实现
+- `acceptance_criteria`:
+  - 新建 `docs/TASK_QUEUE.md`
+  - 主文档不再保留具体会话任务明细
+  - 所有原指向主文档会话队列的引用都改为指向 `docs/TASK_QUEUE.md`
+  - 任务项使用稳定字段，不依赖主文档章节编号
+- `depends_on`:
+  - `TASK-001`
+- `related_files`:
+  - `docs/PROJECT_MASTER_PLAN.md`
+  - `docs/TASK_QUEUE.md`
+  - `docs/SESSION_LOG.md`
+- `derived_tasks`: []
+- `notes`: 这是队列治理任务，本身不应延伸成新的功能开发。
+
+## Planned Tasks
+
+### TASK-003
+
+- `task_id`: `TASK-003`
+- `session_id`: `SES-20260312-03`
+- `title`: 收敛 Python 开发环境与统一启动入口
+- `category`: `Infra`
+- `priority`: `P0`
+- `status`: `completed`
+- `scope`: `medium`
+- `goal`: 在 `backend/.venv` 与工作区 conda 并存的现状下，明确唯一推荐开发环境、统一启动命令，并消除 README 与真实运行方式不一致的问题。
+- `out_of_scope`:
+  - 不实现检索与索引能力
+  - 不改动插件功能边界
+  - 不新增 LangGraph 工作流
+- `acceptance_criteria`:
+  - 明确唯一推荐环境路线，例如 `conda` 或 `venv/uv`
+  - `README.md` 与 `backend/README.md` 的启动命令一致
+  - 给出后端最小验证命令，并确认可复现
+  - 对非推荐环境给出保留或废弃说明
+- `depends_on`:
+  - `TASK-001`
+- `related_files`:
+  - `README.md`
+  - `backend/README.md`
+  - `backend/environment.yml`
+  - `backend/app/main.py`
+  - `backend/.env.example`
+- `derived_tasks`:
+  - `small: 在允许本地 GUI / Obsidian 的环境中补做插件 dev 模式与新后端入口联调记录`
+- `notes`: 当前最大风险不是缺少依赖文件，而是“存在两套环境痕迹却没有唯一入口”。2026-03-12 已新增 `backend/environment.yml` 和 `python -m app.main` 统一入口，并将 README 收敛到工作区本地 conda prefix；同日已在提权环境中完成 `python -m app.main` 启动与 `/health` 命中验证，因此任务转为 `completed`。
+
+### TASK-004
+
+- `task_id`: `TASK-004`
+- `session_id`: `SES-20260312-04`
+- `title`: 设计并落地 `note/chunk` 的 SQLite schema
+- `category`: `Retrieval`
+- `priority`: `P0`
+- `status`: `completed`
+- `scope`: `medium`
+- `goal`: 为后续 ingest、FTS、hybrid retrieval 和审计关联提供稳定的结构化存储骨架。
+- `out_of_scope`:
+  - 不接入 embedding provider
+  - 不实现 reranker
+  - 不做 UI 改造
+- `acceptance_criteria`:
+  - 明确 `note` / `chunk` 基本表结构
+  - 明确核心索引字段与约束，例如 `path`、`hash`、`heading_path`、`chunk_type`
+  - 给出初始化或迁移入口
+  - 与 `backend/app/indexing/parser.py` 的输出字段可以对齐
+- `depends_on`:
+  - `TASK-003`
+- `related_files`:
+  - `docs/PROJECT_MASTER_PLAN.md`
+  - `backend/app/indexing/models.py`
+  - `backend/app/indexing/parser.py`
+  - `backend/app/indexing/store.py`
+  - `backend/app/config.py`
+  - `backend/tests/test_indexing_store.py`
+- `derived_tasks`:
+  - `TASK-005`
+  - `TASK-006`
+- `notes`: 首版只需要支撑最小 ingest 与最小 ask，不必一次性把所有审计表都做全。2026-03-12 已新增 `backend/app/indexing/store.py`，落地 versioned SQLite schema、`note/chunk` 记录映射和 `python -m app.indexing.store` 初始化入口，并用 `backend/tests/test_indexing_store.py` 验证表结构与 parser 字段对齐，因此任务转为 `completed`。
+
+### TASK-005
+
+- `task_id`: `TASK-005`
+- `session_id`: `SES-20260314-01`
+- `title`: 实现 ingest pipeline：将 Markdown 解析结果写入 SQLite
+- `category`: `Retrieval`
+- `priority`: `P0`
+- `status`: `completed`
+- `scope`: `medium`
+- `goal`: 基于现有 parser，把 `sample_vault/` 的 note 与 chunk 结果写入数据库，形成最小可用 ingest 链路。
+- `out_of_scope`:
+  - 不做增量索引优化
+  - 不接入向量存储
+  - 不改 ask 接口
+- `acceptance_criteria`:
+  - 至少能对 `sample_vault/` 执行一次全量 ingest
+  - 数据库中存在 note 与 chunk 记录
+  - 重复执行时不会产生明显脏重复
+  - 有最小验证命令或脚本
+- `depends_on`:
+  - `TASK-004`
+- `related_files`:
+  - `backend/app/indexing/ingest.py`
+  - `backend/app/indexing/store.py`
+  - `backend/app/indexing/parser.py`
+  - `backend/app/indexing/models.py`
+  - `backend/app/services/sample_vault.py`
+  - `backend/tests/test_indexing_ingest.py`
+- `derived_tasks`:
+  - `TASK-006`
+- `notes`: 首版允许只做全量 ingest，增量更新留到后续任务。2026-03-14 已新增 `backend/app/indexing/ingest.py`，打通 `sample_vault/` 全量遍历、`note/chunk` 写库、重复执行幂等覆盖与最小统计输出，并用 `backend/tests/test_indexing_ingest.py` 验证首次写入和旧 chunk 替换，因此任务转为 `completed`。
+
+### TASK-006
+
+- `task_id`: `TASK-006`
+- `session_id`: `SES-20260314-02`
+- `title`: 实现 SQLite FTS5 检索
+- `category`: `Retrieval`
+- `priority`: `P0`
+- `status`: `completed`
+- `scope`: `medium`
+- `goal`: 基于已入库的 note/chunk 数据提供最小全文召回能力，为后续 metadata filter 和 ask 链路打底。
+- `out_of_scope`:
+  - 不接入向量检索
+  - 不接入 rerank
+  - 不实现最终答案生成
+- `acceptance_criteria`:
+  - 能用 query 返回 top-k chunk candidate
+  - 返回结果包含最小必要字段，例如 path、chunk_id、score、snippet
+  - 至少覆盖标题与正文的基本全文匹配
+  - 有最小 bad case 抽样验证
+- `depends_on`:
+  - `TASK-005`
+- `related_files`:
+  - `backend/app/indexing/`
+  - `backend/app/retrieval/`
+  - `backend/app/main.py`
+- `derived_tasks`:
+  - `TASK-007`
+  - `TASK-008`
+  - `small: 评估 chunk_fts 的增量同步或漂移检测，避免大 Vault 长期全库重建`
+- `notes`: 这是最小 ask 链路的第一步，不要求首版就做 hybrid fusion。2026-03-14 已新增 `backend/app/retrieval/sqlite_fts.py`，落地 SQLite FTS5 虚表、top-k chunk candidate 查询、snippet 输出与最小 query 归一化；同时在 `backend/app/indexing/store.py` 增加 schema v2 和 FTS 重建入口，并让 ingest 在写库完成后统一重建 FTS 索引。`backend/tests/test_retrieval_fts.py` 已覆盖标题/正文匹配、标点噪声与空 query bad case，任务转为 `completed`。
+
+### TASK-007
+
+- `task_id`: `TASK-007`
+- `session_id`: `SES-20260314-03`
+- `title`: 实现 metadata filter 与 candidate 标准格式
+- `category`: `Retrieval`
+- `priority`: `P0`
+- `status`: `completed`
+- `scope`: `medium`
+- `goal`: 在 FTS 检索结果之上补 path、note_type、时间等基础过滤能力，并统一 candidate 数据结构。
+- `out_of_scope`:
+  - 不做 cross-encoder rerank
+  - 不做复杂 query parser
+  - 不做写回 proposal
+- `acceptance_criteria`:
+  - 支持至少一组基础 metadata 过滤条件
+  - candidate 结构对后续 answer generation 可直接复用
+  - 对过滤过严时有 fallback 策略
+- `depends_on`:
+  - `TASK-006`
+- `related_files`:
+  - `backend/app/contracts/workflow.py`
+  - `backend/app/retrieval/sqlite_fts.py`
+  - `backend/app/indexing/store.py`
+  - `backend/app/indexing/parser.py`
+  - `backend/tests/test_retrieval_fts.py`
+- `derived_tasks`:
+  - `TASK-008`
+  - `small: 抽样校正 summary_note / template_family 的模板识别规则，减少 metadata filter 的误回退`
+- `notes`: 当前 `sample_vault/` 几乎没有 frontmatter，因此首版过滤应更多依赖 path、template_family、note_type、mtime。2026-03-14 已在 `backend/app/contracts/workflow.py` 新增 `RetrievalMetadataFilter`、`RetrievedChunkCandidate` 与 `RetrievalSearchResponse`，并在 `backend/app/retrieval/sqlite_fts.py` 中落地 path / note_type / template_family / 时间过滤、filter 归一化、过滤过严时退回纯 FTS 的 fallback 与 CLI 参数；`backend/tests/test_retrieval_fts.py` 已覆盖 filter 命中、path 过滤、fallback 与 bad case，任务转为 `completed`。真实 `sample_vault` 验证同时暴露出 `summary_note` 识别仍不稳定，因此登记一个轻量派生项用于后续规则收敛。
+
+### TASK-008
+
+- `task_id`: `TASK-008`
+- `session_id`: `SES-20260314-04`
+- `title`: 跑通最小 `/ask` 链路与引用式响应
+- `category`: `Retrieval`
+- `priority`: `P0`
+- `status`: `completed`
+- `scope`: `medium`
+- `goal`: 在不引入完整 graph 的前提下，让 ask 能返回基于候选片段的最小引用式响应，形成真正可演示的问答兜底链路。
+- `out_of_scope`:
+  - 不接入完整 LangGraph ask graph
+  - 不做 streaming 优化
+  - 不做写回或审批
+- `acceptance_criteria`:
+  - `/ask` 或 `/workflows/invoke` 至少有一条真实问答链路
+  - 返回结果附带引用路径或 chunk 来源
+  - 在模型不可用时有“仅检索结果” fallback
+  - 有最小命令级验证
+- `depends_on`:
+  - `TASK-007`
+- `related_files`:
+  - `backend/app/main.py`
+  - `backend/app/services/ask.py`
+  - `backend/app/contracts/workflow.py`
+  - `backend/app/retrieval/sqlite_fts.py`
+  - `backend/tests/test_ask_workflow.py`
+  - `plugin/src/contracts.ts`
+- `derived_tasks`:
+  - `TASK-009`
+  - `small: 为 generated_answer 增加引用编号与 groundedness 校验，避免模型输出与 citations 脱节`
+  - `small: 评估是否需要 `/ask/stream``
+- `notes`: 这是从“基线骨架”走向“最小可演示能力”的关键切片。2026-03-14 已在 `backend/app/services/ask.py` 中复用 `TASK-007` 的标准 candidate 输出，落地 `generated_answer / retrieval_only / no_hits` 三种 ask 返回模式，并让 `backend/app/main.py` 中的 `/workflows/invoke` 对 `ask_qa` 返回真实 `ask_result`、citation 和 retrieval/model 双层 fallback；`backend/tests/test_ask_workflow.py` 已覆盖空 query、retrieval-only fallback、metadata filter 回退和模型成功分支的 mock 验证，因此任务转为 `completed`。当前仍未验证真实 provider 联网调用，也未补 ask graph、引用编号程序校验和插件 ask UI。
+
+### TASK-009
+
+- `task_id`: `TASK-009`
+- `session_id`: `SES-20260314-05`
+- `title`: 实现 `ask_graph` 骨架与 `thread_id` 贯通
+- `category`: `Workflow`
+- `priority`: `P1`
+- `status`: `completed`
+- `scope`: `medium`
+- `goal`: 在最小 ask API 已可运行的前提下，引入 `ask_graph`、统一 `thread_id` 协议和基础 tracing 钩子，为后续 ingest/digest graph 铺路。
+- `out_of_scope`:
+  - 不实现 ingest graph
+  - 不实现 digest graph
+  - 不接入 HITL 写回
+- `acceptance_criteria`:
+  - 新增 `ask_graph` 文件与最小节点骨架
+  - `thread_id` 在 API、state 与 graph 入口之间一致
+  - 有最小 tracing 钩子或占位 trace 事件
+  - 现有 ask 行为不因 graph 接入而回退
+- `depends_on`:
+  - `TASK-008`
+- `related_files`:
+  - `backend/app/graphs/state.py`
+  - `backend/app/graphs/ask_graph.py`
+  - `backend/app/contracts/workflow.py`
+  - `backend/app/main.py`
+  - `backend/tests/test_ask_workflow.py`
+  - `backend/pyproject.toml`
+  - `backend/environment.yml`
+- `derived_tasks`:
+  - `TASK-010`
+  - `small: 明确 ask graph 与 ingest graph 的共享 state 字段`
+- `notes`: 这一步的重点是“状态与协议”，不是把 LangGraph 接得很花。2026-03-14 已新增 `backend/app/graphs/ask_graph.py`，用最小三节点 graph 把 ask 从普通 API 分支升级到 graph 入口，并在 `backend/app/main.py` 中统一 `thread_id` / `run_id` 生成与 ask graph 调用；同时在 `backend/app/graphs/state.py` 中补齐 ask graph 所需状态字段，在 `backend/tests/test_ask_workflow.py` 中验证显式 `thread_id` 透传、trace event 发出与 ask 结果不回退，并将 `langgraph` 补进 `backend/pyproject.toml` 与 `backend/environment.yml`。由于 `conda env update` 受外部源连接失败和 `NoWritablePkgsDirError` 阻塞，本次改用工作区本地 `pip` 完成 `langgraph` 安装并验证导入成功，因此任务转为 `completed`。当时尚未实现 checkpoint、持久化 trace、ingest/digest graph 和 citation 程序校验；其中 ask 路径的 JSONL trace 已在后续 `TASK-010` 中补齐。
+
+### TASK-010
+
+- `task_id`: `TASK-010`
+- `session_id`: `SES-20260314-06`
+- `title`: 落地 ask runtime trace 的 JSONL 持久化骨架
+- `category`: `Observability`
+- `priority`: `P1`
+- `status`: `completed`
+- `scope`: `medium`
+- `goal`: 在 `TASK-009` 已有内存态 `trace_hook` 的前提下，把 ask graph 的 runtime trace 落到本地 JSONL，形成最小可查询的 tracing 骨架。
+- `out_of_scope`:
+  - 不实现 audit_log
+  - 不实现 ingest / digest graph 的 tracing
+  - 不接入 LangSmith 或外部观测平台
+- `acceptance_criteria`:
+  - ask graph 每次执行都会写出包含 `thread_id`、`run_id`、`node_name`、`event_type`、时间戳的 trace 记录
+  - trace 写入失败不会阻断 ask 主链路
+  - 至少有一个最小测试或命令级验证证明 trace 文件已生成
+  - 不改变现有 `AskWorkflowResult` 返回 contract
+- `depends_on`:
+  - `TASK-009`
+- `related_files`:
+  - `backend/app/config.py`
+  - `backend/app/graphs/ask_graph.py`
+  - `backend/app/observability/runtime_trace.py`
+  - `backend/tests/test_ask_workflow.py`
+- `derived_tasks`:
+  - `TASK-011`
+  - `small: 在插件调试面板中暴露最近一次 ask 的 run_id / thread_id，便于人工排查 trace`
+  - `small: 为 ask runtime trace 增加文件轮转或断流健康检查，避免 JSONL 长期无限增长或静默失效`
+- `notes`: `TASK-009` 已经把 trace event 结构和 hook 入口放进 ask graph，但 trace 仍只存在于内存态 state 与 hook 回调里，不具备持久化、查询和回放价值。2026-03-14 已新增 `backend/app/observability/runtime_trace.py` 与 `backend/app/config.py` 中的 `KS_ASK_RUNTIME_TRACE_PATH` / 默认 `data/traces/ask_runtime.jsonl`，并让 `backend/app/graphs/ask_graph.py` 每次 ask 执行默认写出 JSONL trace、在单个 sink 写入失败时保持 ask 主链路不被阻断；`backend/tests/test_ask_workflow.py` 已覆盖文件生成、核心字段与写盘失败降级，因此任务转为 `completed`。当前仍未实现 SQLite `run_trace` 聚合表、多 graph tracing 与 trace 文件治理。
+
+### TASK-011
+
+- `task_id`: `TASK-011`
+- `session_id`: `SES-20260314-07`
+- `title`: 为 ask trace 增加 SQLite `run_trace` 聚合表与最小查询入口
+- `category`: `Observability`
+- `priority`: `P1`
+- `status`: `completed`
+- `scope`: `medium`
+- `goal`: 在 `TASK-010` 已落地 ask JSONL runtime trace 的前提下，补一个可本地查询的 SQLite `run_trace` 聚合骨架，避免 trace 长期停留在“可落盘但不好查”的状态。
+- `out_of_scope`:
+  - 不接入外部观测平台
+  - 不扩展到 ingest / digest graph 的 trace 聚合
+  - 不实现完整 dashboard 或告警系统
+- `acceptance_criteria`:
+  - 至少能把 ask trace 的关键字段聚合到 SQLite，可按 `run_id` 或 `thread_id` 查询
+  - 聚合失败不会阻断 ask 主链路
+  - 有最小测试或命令级验证证明查询链路可用
+  - 不改变现有 `AskWorkflowResult` 返回 contract
+- `depends_on`:
+  - `TASK-010`
+- `related_files`:
+  - `backend/app/indexing/store.py`
+  - `backend/app/graphs/ask_graph.py`
+  - `backend/app/observability/runtime_trace.py`
+  - `backend/tests/test_ask_workflow.py`
+  - `backend/tests/test_indexing_store.py`
+- `derived_tasks`:
+  - `small: 为 run_trace 增加按日期清理或压缩策略，避免本地 SQLite / JSONL 持续膨胀`
+- `notes`: 当前 ask trace 已不再只停留在 JSONL。2026-03-14 已在 `backend/app/indexing/store.py` 中把 schema 升到 `v3` 并新增 `run_trace` 表，在 `backend/app/observability/runtime_trace.py` 中落地 SQLite sink、`run_id / thread_id` 查询 helper 与最小 CLI 入口，并让 `backend/app/graphs/ask_graph.py` 默认执行 `JSONL + SQLite + 外部 hook` 三路 trace sink；`backend/tests/test_ask_workflow.py` 与 `backend/tests/test_indexing_store.py` 已覆盖写库、查询和 SQLite sink 失败降级，因此任务转为 `completed`。当前仍未实现多 graph trace 聚合、trace 断流发现、文件 / 数据库治理和更细粒度 latency / token 指标。
+
+### TASK-012
+
+- `task_id`: `TASK-012`
+- `session_id`: `SES-20260314-08`
+- `title`: 继续拆解主计划并登记下一批 medium 队列任务
+- `category`: `Docs`
+- `priority`: `P1`
+- `status`: `completed`
+- `scope`: `medium`
+- `goal`: 基于当前代码事实与 `docs/PROJECT_MASTER_PLAN.md`，把后续最优先的主线路径继续拆成可执行的 medium 任务，并登记进 `docs/TASK_QUEUE.md`，避免队列在 `TASK-011` 之后出现断档。
+- `out_of_scope`:
+  - 不实现任何业务功能
+  - 不修改整体架构路线
+  - 不重写与任务拆解无关的主文档章节
+- `acceptance_criteria`:
+  - 至少补齐一批可执行的后续 medium 任务
+  - 每个新任务都包含 `goal`、`out_of_scope`、`acceptance_criteria` 与 `depends_on`
+  - 新任务顺序与当前主计划阶段、代码现状一致
+  - 不把尚未明确边界的大任务直接塞进队列
+- `depends_on`:
+  - `TASK-011`
+- `related_files`:
+  - `docs/TASK_QUEUE.md`
+  - `docs/PROJECT_MASTER_PLAN.md`
+  - `docs/SESSION_LOG.md`
+- `derived_tasks`:
+  - `TASK-013`
+  - `TASK-014`
+  - `TASK-015`
+  - `TASK-016`
+  - `TASK-017`
+  - `TASK-018`
+  - `TASK-019`
+  - `TASK-020`
+  - `TASK-021`
+- `notes`: 本任务是一次“队列治理 + 路线拆解”会话，不应顺手推进新的功能实现。拆解原则是：优先把 Phase 3/4 的主闭环补齐，再把 citation 校验与最小 eval 这类 P1 能力放进队列；对仍然边界过大的内容，如完整多 graph tracing 平台化、复杂 UI 打磨和全面性能优化，本次不直接入队。
+
+### TASK-013
+
+- `task_id`: `TASK-013`
+- `session_id`: `SES-20260314-09`
+- `title`: 实现 `ingest_graph` 骨架与 `INGEST_STEWARD` workflow 入口
+- `category`: `Workflow`
+- `priority`: `P0`
+- `status`: `completed`
+- `scope`: `medium`
+- `goal`: 把当前 CLI 级别的 ingest 能力接入最小 `ingest_graph` 与 `/workflows/invoke` 入口，让 `INGEST_STEWARD` 不再停留在占位响应。
+- `out_of_scope`:
+  - 不生成 proposal
+  - 不实现写回或审批
+  - 不接入 checkpoint 恢复
+- `acceptance_criteria`:
+  - 新增 `backend/app/graphs/ingest_graph.py`
+  - `/workflows/invoke` 的 `INGEST_STEWARD` 能进入 graph 并返回最小 ingest 结果
+  - `thread_id` / `run_id` / trace 语义与 ask 路径保持一致
+  - 有最小测试覆盖 graph 入口与结果不回退
+- `depends_on`:
+  - `TASK-005`
+  - `TASK-009`
+  - `TASK-011`
+- `related_files`:
+  - `backend/app/graphs/ingest_graph.py`
+  - `backend/app/graphs/runtime.py`
+  - `backend/app/graphs/state.py`
+  - `backend/app/main.py`
+  - `backend/app/indexing/ingest.py`
+  - `backend/app/contracts/workflow.py`
+  - `backend/tests/test_ingest_workflow.py`
+  - `plugin/src/contracts.ts`
+- `derived_tasks`:
+  - `TASK-015`
+  - `TASK-016`
+  - `small: 收敛 runtime trace 配置命名或按 graph 分流 trace path，避免 \`KS_ASK_RUNTIME_TRACE_PATH\` 在 ingest 接入后语义失真`
+- `notes`: 本任务重点是 workflow 入口和状态流转，不是直接把 ingest graph 做成治理闭环。2026-03-14 已新增 `backend/app/graphs/ingest_graph.py`，把现有 `ingest_vault()` 作为最小业务节点接入 `prepare_ingest -> execute_ingest -> finalize_ingest` graph，并在 `backend/app/main.py` 中让 `/workflows/invoke` 的 `INGEST_STEWARD` 返回真实 `ingest_result`、统一 `thread_id` / `run_id`，同时复用 ask 路径已有的 JSONL + SQLite `run_trace` sink。为避免在同一会话内悄悄扩成 partial ingest，本次对 `note_path / note_paths` 请求显式返回 400；`backend/tests/test_ingest_workflow.py` 已覆盖 graph 入口、trace 写入和 scope 拒绝分支，因此任务转为 `completed`。
+
+### TASK-014
+
+- `task_id`: `TASK-014`
+- `session_id`: `SES-20260314-11`
+- `title`: 实现 `digest_graph` 骨架与最小 `DAILY_DIGEST` 返回
+- `category`: `Workflow`
+- `priority`: `P1`
+- `status`: `completed`
+- `scope`: `medium`
+- `goal`: 为 `DAILY_DIGEST` 场景补最小 `digest_graph` 与结构化返回骨架，让项目从“只有 ask”进一步走向“持续治理系统”的主叙事。
+- `out_of_scope`:
+  - 不做定时调度
+  - 不做写回草稿
+  - 不做插件端 digest UI
+- `acceptance_criteria`:
+  - 新增 `backend/app/graphs/digest_graph.py`
+  - `/workflows/invoke` 的 `DAILY_DIGEST` 不再返回纯占位响应
+  - 返回结果至少包含 digest 主体和来源 note 集合或等价结构化字段
+  - 有最小测试覆盖 digest graph 入口和基础 fallback
+- `depends_on`:
+  - `TASK-013`
+- `related_files`:
+  - `backend/app/graphs/digest_graph.py`
+  - `backend/app/services/digest.py`
+  - `backend/app/graphs/checkpoint.py`
+  - `backend/app/graphs/state.py`
+  - `backend/app/main.py`
+  - `backend/app/contracts/workflow.py`
+  - `backend/tests/test_digest_workflow.py`
+  - `plugin/src/contracts.ts`
+- `derived_tasks`:
+  - `TASK-016`
+  - `TASK-021`
+  - `small: 为 DAILY_DIGEST 增加显式时间窗口或 source note 过滤输入，避免大 Vault 下“最近笔记摘要”过粗`
+- `notes`: 首版应先把 digest 的 graph 边界和返回 contract 收敛清楚，不急着一次性把聚类、复习计划和写回草稿全部做完。2026-03-14 已新增 `backend/app/services/digest.py` 与 `backend/app/graphs/digest_graph.py`，基于 SQLite `note` 表落地 `prepare_digest -> build_digest -> finalize_digest` 三节点最小 graph，并在 `backend/app/main.py` 中让 `/workflows/invoke` 的 `DAILY_DIGEST` 返回真实 `digest_result`、`source_notes` 与 fallback message；同时复用 ask / ingest 已有的 JSONL + SQLite `run_trace` 与 SQLite `workflow_checkpoint` 语义，并在 `backend/tests/test_digest_workflow.py` 中覆盖 digest graph 入口、空索引 fallback、completed checkpoint 恢复命中和 scope 拒绝分支。首版仍显式拒绝 `note_path / note_paths` scoped digest，请求会返回 400；digest 主体当前是模板化摘要，不包含调度、写回草稿或 LLM 聚类，因此任务转为 `completed`。
+
+### TASK-015
+
+- `task_id`: `TASK-015`
+- `session_id`: `SES-20260314-10`
+- `title`: 为 ask / ingest 路径接入 SQLite checkpoint 与 `thread_id` 恢复协议
+- `category`: `Workflow`
+- `priority`: `P0`
+- `status`: `completed`
+- `scope`: `medium`
+- `goal`: 在 ask graph 已稳定、ingest graph 已接入的前提下，为至少 ask / ingest 两条路径补 SQLite checkpoint 与最小恢复协议，避免 graph 继续停留在“有 `thread_id` 但不可恢复”的状态。
+- `out_of_scope`:
+  - 不实现审批恢复
+  - 不覆盖所有 graph 的完整恢复
+  - 不引入外部状态平台
+- `acceptance_criteria`:
+  - 存在可复用的 SQLite checkpoint 适配层
+  - ask / ingest 至少有一条显式恢复路径能按 `thread_id` 复用状态
+  - 恢复失败不会破坏现有主链路
+  - 有最小测试验证 checkpoint 写入与恢复
+- `depends_on`:
+  - `TASK-013`
+- `related_files`:
+  - `backend/app/contracts/workflow.py`
+  - `backend/app/graphs/checkpoint.py`
+  - `backend/app/graphs/runtime.py`
+  - `backend/app/graphs/ask_graph.py`
+  - `backend/app/graphs/ingest_graph.py`
+  - `backend/app/indexing/store.py`
+  - `backend/app/main.py`
+  - `backend/tests/test_indexing_store.py`
+  - `backend/tests/test_ask_workflow.py`
+  - `backend/tests/test_ingest_workflow.py`
+  - `plugin/src/contracts.ts`
+- `derived_tasks`:
+  - `TASK-017`
+  - `small: 为 workflow_checkpoint 增加按状态 / 日期清理与最小查询入口，避免 thread 级快照长期堆积且排障困难`
+- `notes`: 本任务先解决“checkpoint 能不能用”和“恢复协议怎么长”两个问题，不在本轮把审批中断、写回幂等和 digest 全量恢复一起打包。2026-03-14 已新增 `backend/app/graphs/checkpoint.py`，在 `backend/app/indexing/store.py` 中把 schema 升到 `v4` 并新增 SQLite `workflow_checkpoint` 表，同时在 `backend/app/graphs/runtime.py` 中抽出共享 `invoke_checkpointed_linear_graph()` 线性 runner，让 ask / ingest 路径支持基于 `thread_id + graph_name` 的最小 checkpoint 持久化与恢复。`backend/app/contracts/workflow.py` 与 `plugin/src/contracts.ts` 已新增 `resume_from_checkpoint` 请求标志，`backend/app/main.py` 会拒绝缺少显式 `thread_id` 的恢复请求；`backend/tests/test_indexing_store.py`、`backend/tests/test_ask_workflow.py` 与 `backend/tests/test_ingest_workflow.py` 已覆盖 checkpoint roundtrip、ask / ingest completed checkpoint 恢复命中和 checkpoint 保存失败不阻断主链路。当前恢复能力仍停留在线性 graph 的 thread 级状态快照与 completed checkpoint 短路返回，尚未实现 digest / 审批恢复、细粒度节点中断续跑和 checkpoint 治理，因此任务转为 `completed`。
+
+### TASK-016
+
+- `task_id`: `TASK-016`
+- `session_id`: `SES-20260314-12`
+- `title`: 设计并落地 `proposal` / `patch_ops` / `audit_log` 的 SQLite schema
+- `category`: `Writeback`
+- `priority`: `P0`
+- `status`: `completed`
+- `scope`: `medium`
+- `goal`: 为后续 HITL 审批、写回执行和回放审计提供稳定的结构化存储骨架，避免 proposal 继续停留在文档设计层。
+- `out_of_scope`:
+  - 不实现插件审批 UI
+  - 不执行真实写回
+  - 不实现自动回滚
+- `acceptance_criteria`:
+  - 明确 `proposal` / `patch_ops` / `audit_log` 的核心表结构与索引
+  - 字段能覆盖 `proposal_id`、`thread_id`、`before_hash`、审批结果、patch op 与证据关联
+  - 有初始化或迁移入口
+  - 有最小测试验证 schema 与约束
+- `depends_on`:
+  - `TASK-013`
+- `related_files`:
+  - `backend/app/indexing/store.py`
+  - `backend/app/contracts/workflow.py`
+  - `backend/app/graphs/state.py`
+  - `backend/app/graphs/checkpoint.py`
+  - `backend/tests/test_indexing_store.py`
+- `derived_tasks`:
+  - `TASK-017`
+  - `TASK-019`
+- `notes`: 重点是把 schema、约束和持久化边界先钉住，而不是急着让 LLM 直接输出可执行 patch。2026-03-14 已在 `backend/app/indexing/store.py` 中把 schema 升到 `v5`，新增 `proposal`、`proposal_evidence`、`patch_op` 与 append-only `audit_log` 表，并为 `proposal_id`、`thread_id`、`run_id`、`before_hash`、`approval_status`、`writeback_applied`、`idempotency_key` 等后续恢复和审计要查的字段补齐约束与索引；同时新增 `save_proposal()`、`load_proposal()` 与 `append_audit_log_event()` 最小 helper，在 `backend/tests/test_indexing_store.py` 中覆盖表结构、proposal roundtrip、`idempotency_key` 冲突与 audit flattening。任务已满足“核心表结构 + 初始化入口 + 最小测试验证”的验收标准，因此转为 `completed`。当前仍未把 proposal / audit 真正接入 graph 运行链路，也未实现 `resume_workflow`、审批 UI 或真实写回执行器，后续主线继续进入 `TASK-017`。
+
+### TASK-017
+
+- `task_id`: `TASK-017`
+- `session_id`: `SES-20260314-13`
+- `title`: 实现 `resume_workflow` 协议与审批中断 contract
+- `category`: `Workflow`
+- `priority`: `P0`
+- `status`: `completed`
+- `scope`: `medium`
+- `goal`: 在 checkpoint 和 proposal schema 已有基础的前提下，补 `resume_workflow` 入口与审批决策 contract，让 HITL 主链路从“文档设想”走向可恢复的后端协议。
+- `out_of_scope`:
+  - 不做插件审批 UI
+  - 不执行真实写回
+  - 不支持部分应用 proposal
+- `acceptance_criteria`:
+  - 后端存在明确的恢复入口或等价 workflow resume 协议
+  - 审批决策 payload 与 `thread_id` / `proposal_id` 关联关系清晰
+  - 恢复路径能读到 checkpoint / proposal 持久化状态
+  - 有最小测试覆盖 approve / reject 基础分支
+- `depends_on`:
+  - `TASK-015`
+  - `TASK-016`
+- `related_files`:
+  - `backend/app/main.py`
+  - `backend/app/contracts/workflow.py`
+  - `backend/app/services/resume_workflow.py`
+  - `backend/app/graphs/checkpoint.py`
+  - `backend/app/indexing/store.py`
+  - `backend/tests/test_resume_workflow.py`
+  - `plugin/src/contracts.ts`
+  - `plugin/src/api/client.ts`
+- `derived_tasks`:
+  - `TASK-018`
+  - `TASK-019`
+  - `small: 为 /workflows/resume 增加请求指纹或 freshness 校验，降低 thread_id / proposal_id 误复用时的错误恢复风险`
+- `notes`: 本任务解决的是“审批协议”和“恢复控制面”，不是把写回执行器一起塞进来。2026-03-14 已在 `backend/app/contracts/workflow.py` 中新增 `WorkflowResumeRequest` / `WorkflowResumeResponse`，在 `backend/app/main.py` 中新增 `POST /workflows/resume`，并通过 `backend/app/services/resume_workflow.py` 把 `thread_id / proposal_id / approval_decision` 的恢复控制面接到 SQLite `workflow_checkpoint`、`proposal` 与 append-only `audit_log` 上；同时在 `backend/app/graphs/checkpoint.py` 中新增 `WAITING_FOR_APPROVAL` 状态与 thread 级查询 helper，在 `backend/app/indexing/store.py` 中把 schema 升到 `v6` 以兼容该状态，并在 `backend/tests/test_resume_workflow.py` 中覆盖 approve / reject / partial reject / 关联校验 / 幂等恢复。任务已满足“存在明确恢复入口、审批决策 payload 关联清晰、恢复能读持久化状态、approve/reject 有最小测试覆盖”的验收标准，因此转为 `completed`。当前 ask / ingest / digest graph 仍未真实产出 waiting checkpoint；插件审批面板骨架已在 `TASK-018` 完成，但真实 proposal 注入仍缺失，后续主线先进入 `TASK-022`，再推进 `TASK-019`。
+
+### TASK-018
+
+- `task_id`: `TASK-018`
+- `session_id`: `SES-20260314-14`
+- `title`: 实现插件审批面板与 diff 预览骨架
+- `category`: `Plugin`
+- `priority`: `P1`
+- `status`: `completed`
+- `scope`: `medium`
+- `goal`: 在后端已有 proposal / resume 协议后，为插件补一个能看懂风险、证据和 diff 的审批面板骨架，避免 HITL 只有后端协议没有用户交互。
+- `out_of_scope`:
+  - 不做视觉打磨
+  - 不做部分应用 proposal
+  - 不执行真实写回
+- `acceptance_criteria`:
+  - 插件可渲染 proposal 摘要、风险等级、证据来源和最小 diff
+  - 插件可发起 approve / reject 动作
+  - 面板错误态与后端异常有最小展示
+  - 有最小命令级或组件级验证
+- `depends_on`:
+  - `TASK-017`
+- `related_files`:
+  - `plugin/src/main.ts`
+  - `plugin/src/views/`
+  - `plugin/src/api/`
+  - `plugin/src/contracts.ts`
+  - `plugin/styles.css`
+- `derived_tasks`:
+  - `TASK-022`
+  - `TASK-019`
+  - `small: 在插件调试面板中显示最近一次 proposal_id / thread_id，便于恢复链路排障`
+- `notes`: 首版优先保证“用户能看懂改了什么、为什么改、风险多大”，不是做复杂交互或漂亮 UI。2026-03-14 已在 `plugin/src/views/KnowledgeStewardView.ts` 中把侧边栏扩为最小审批面板，可渲染 proposal 摘要、风险等级、安全检查、证据来源与 patch preview，并支持 reviewer/comment 输入和 approve / reject 提交；在 `plugin/src/api/client.ts` 中补齐后端 `detail` 错误解析与超时提示，在 `plugin/src/main.ts` 中增加 `Open approval demo` 命令以注入本地 demo proposal，在 `plugin/styles.css` 中补齐最小卡片 / callout / diff 样式，并通过 `cd plugin && npm run build` 完成构建验证。由于当前后端还没有待审批列表接口、业务 graph 也还不会真实产出 `waiting_for_approval` proposal，上述面板仍依赖本地 demo 上下文；这部分真实 proposal 注入与 waiting 产出已拆到 `TASK-022`，因此本任务按“审批面板骨架”标准转为 `completed`。
+
+### TASK-019
+
+- `task_id`: `TASK-019`
+- `session_id`: `SES-20260315-02`
+- `title`: 实现插件侧受限写回执行器与 `before_hash` 校验
+- `category`: `Writeback`
+- `priority`: `P0`
+- `status`: `completed`
+- `scope`: `medium`
+- `goal`: 在审批链路已贯通的前提下，落地首版受限写回执行器，至少支持 frontmatter merge 和指定 heading 下插入，并在执行前校验 `before_hash`。
+- `out_of_scope`:
+  - 不支持自由删除
+  - 不支持整篇重写
+  - 不实现自动回滚
+- `acceptance_criteria`:
+  - 插件能执行至少两类受限 patch op
+  - 写回前会校验 `before_hash` 并在不一致时拒绝执行
+  - 写回结果能回传最小成功 / 失败状态
+  - 有最小测试或命令级验证覆盖允许 / 拒绝分支
+- `depends_on`:
+  - `TASK-017`
+  - `TASK-018`
+  - `TASK-022`
+- `related_files`:
+  - `plugin/src/views/KnowledgeStewardView.ts`
+  - `plugin/src/writeback/`
+  - `plugin/src/contracts.ts`
+  - `plugin/package.json`
+  - `plugin/tsconfig.json`
+  - `backend/app/contracts/workflow.py`
+  - `backend/app/services/resume_workflow.py`
+  - `backend/tests/test_resume_workflow.py`
+- `derived_tasks`:
+  - `small: 写回成功后触发最小增量 ingest 入口，避免长期依赖全量重建索引`
+  - `small: 为“本地写回已成功但 /workflows/resume 失败”补跨会话恢复或待同步入口，避免当前只能依赖面板内存态重试`
+- `notes`: 这是首个真正带副作用的高风险闭环，必须把允许操作边界压得足够窄，宁可保守也不要追求“什么都能改”。2026-03-15 已在 `plugin/src/writeback/` 中落地首版受限写回执行器，支持 `merge_frontmatter`（兼容历史别名 `frontmatter_merge`）与 `insert_under_heading` 两类 patch op，并在执行前校验 `before_hash`；同时在 `plugin/src/views/KnowledgeStewardView.ts` 中改成“本地写回后再调用 /workflows/resume”，把真实 `writeback_result` 回传给 `backend/app/services/resume_workflow.py`，由后端统一写入 checkpoint 与 `audit_log`。`backend/tests/test_resume_workflow.py` 已覆盖成功写回、失败写回和非法 payload 拒绝分支，插件侧也新增 `plugin/src/writeback/writeback.test.ts` 并通过 `npm test`、`npx tsc --noEmit` 与 `npm run build` 验证，因此任务转为 `completed`。当前仍未在真实 Obsidian 宿主环境里做手工端到端验证，也尚未实现写回后增量 ingest、待审批列表和跨会话恢复入口。
+
+### TASK-020
+
+- `task_id`: `TASK-020`
+- `session_id`: `SES-20260315-03`
+- `title`: 为 generated answer 增加程序级 citation 对齐校验
+- `category`: `Retrieval`
+- `priority`: `P1`
+- `status`: `completed`
+- `scope`: `medium`
+- `goal`: 对当前 ask 路径的 `generated_answer` 增加程序级 citation 对齐校验，在模型输出引用缺失或编号漂移时自动降级，补齐当前问答可信度缺口。
+- `out_of_scope`:
+  - 不实现完整 groundedness 评分器
+  - 不接入 reranker
+  - 不改插件 ask UI
+- `acceptance_criteria`:
+  - 能检测引用缺失、越界编号或与候选不一致的 bad case
+  - 校验失败时会稳定退回 `retrieval_only` 或等价安全降级
+  - 不改变现有 ask 主体 contract
+  - 有最小测试覆盖成功 / 失败分支
+- `depends_on`:
+  - `TASK-011`
+- `related_files`:
+  - `backend/app/services/ask.py`
+  - `backend/app/contracts/workflow.py`
+  - `backend/tests/test_ask_workflow.py`
+- `derived_tasks`:
+  - `small: 在插件 ask 结果中渲染引用编号与原始 chunk 的对应关系，便于人工校对`
+- `notes`: 当前 generated answer 的编号级 citation 对齐校验已在 `backend/app/services/ask.py` 中落地：模型答案若缺少引用编号、引用越界或与当前候选集合编号不对齐，会稳定降级为 `retrieval_only`，并通过 `model_fallback_reason` 暴露失败原因；`backend/tests/test_ask_workflow.py` 已覆盖合法引用、缺引用、越界引用与 `/workflows/invoke` 层降级分支，因此任务转为 `completed`。本次没有扩展到语义级 groundedness 判分、插件 ask UI 或更复杂的 answer-citation consistency 评估，这些仍保持 out of scope。
+
+### TASK-021
+
+- `task_id`: `TASK-021`
+- `session_id`: `SES-20260315-04`
+- `title`: 构建最小 golden set 与 `eval/run_eval.py`
+- `category`: `Eval`
+- `priority`: `P1`
+- `status`: `completed`
+- `scope`: `medium`
+- `goal`: 基于现有 `sample_vault/` 构建最小 golden set 和离线评估执行器，让 ask / digest / proposal 相关能力从“可演示”走向“可回归”。
+- `out_of_scope`:
+  - 不做复杂可视化 dashboard
+  - 不接外部评测平台
+  - 不追求一次性覆盖所有场景
+- `acceptance_criteria`:
+  - `eval/golden/` 中至少有一批可运行的最小样本
+  - 新增 `eval/run_eval.py` 或等价执行入口
+  - 每次执行会产出带日期或版本标识的结果文件
+  - 至少覆盖 ask 与一个治理 / digest 场景
+- `depends_on`:
+  - `TASK-014`
+  - `TASK-019`
+- `related_files`:
+  - `eval/golden/`
+  - `eval/results/`
+  - `eval/run_eval.py`
+  - `backend/tests/test_eval_runner.py`
+  - `docs/PROJECT_MASTER_PLAN.md`
+- `derived_tasks`:
+  - `TASK-023`
+  - `small: 把最常见 bad case 固化为回归黑名单，避免同类退化重复出现`
+- `notes`: 首版没有强行追求 `eval/README.md` 里提到的 30 条样本，而是先落“真实 `sample_vault` 回归 + deterministic fixture bad case”混合策略的 8 条最小 golden case，优先保证执行稳定性和结果可落盘。2026-03-15 已新增 `eval/run_eval.py`，支持按 `case_id` 过滤执行、为 `sample_vault` / fixture 自动建索引、对 ask 场景 mock provider 返回，并把结果写入带时间戳的 `eval/results/*.json`；同时新增 `eval/golden/ask_cases.json`、`eval/golden/digest_cases.json` 与 `backend/tests/test_eval_runner.py`，覆盖 ask retrieval-only / retrieval fallback / generated answer / invalid citation / no_hits，以及 digest structured result / waiting proposal / empty-index fallback。`./.conda/knowledge-steward/bin/python eval/run_eval.py` 已验证全量 8 条 case 通过，`backend` 全量 48 个测试也已通过，因此任务转为 `completed`。
+
+### TASK-022
+
+- `task_id`: `TASK-022`
+- `session_id`: `SES-20260315-01`
+- `title`: 打通 workflow proposal 产出与插件审批面板真实上下文
+- `category`: `Workflow`
+- `priority`: `P0`
+- `status`: `completed`
+- `scope`: `medium`
+- `goal`: 让至少一条业务 workflow 能真实产出 `proposal + waiting_for_approval checkpoint`，并把 `thread_id / proposal_id / proposal` 上下文注入插件审批面板，去掉当前只能靠本地 demo 命令验证审批 UI 的断层。
+- `out_of_scope`:
+  - 不执行真实写回
+  - 不实现复杂待办列表或通知中心
+  - 不做部分 patch 应用
+- `acceptance_criteria`:
+  - 至少一条 workflow 能生成结构化 proposal 并持久化为 `waiting_for_approval` 状态
+  - 插件审批面板可消费真实 `thread_id / proposal_id / proposal` 上下文，而不是只依赖本地 demo 命令
+  - 无待审批 proposal 时有明确空态或降级提示
+  - 有最小测试或命令级验证覆盖 proposal 产出和面板注入链路
+- `depends_on`:
+  - `TASK-017`
+  - `TASK-018`
+- `related_files`:
+  - `backend/app/graphs/digest_graph.py`
+  - `backend/app/main.py`
+  - `backend/app/services/digest.py`
+  - `backend/app/indexing/store.py`
+  - `plugin/src/main.ts`
+  - `plugin/src/views/KnowledgeStewardView.ts`
+  - `backend/tests/test_digest_workflow.py`
+- `derived_tasks`:
+  - `TASK-019`
+  - `small: 收敛 proposal target_note_path 的绝对/相对路径语义，避免不同运行环境下路径别名影响审批与后续写回`
+  - `small: 统一 patch op 名称 \`merge_frontmatter\` / \`frontmatter_merge\`，避免写回执行器接入前协议分叉`
+- `notes`: `TASK-018` 证明了审批面板骨架可用，但也暴露出真实主线仍有断层：没有 workflow 真实产出 waiting proposal，插件只能通过本地 demo proposal 做 UI 验证。2026-03-15 已将 `DAILY_DIGEST` 选为首条真实 proposal 路径：`backend/app/services/digest.py` 新增结构化 proposal 构造，`backend/app/graphs/digest_graph.py` 在显式 `metadata.approval_mode=\"proposal\"` 时可把 digest 结果推进为 `proposal + waiting_for_approval checkpoint`，并在同一事务内原子落 proposal 与 checkpoint；`backend/app/main.py` 中的 `/workflows/invoke` 现可返回真实 `waiting_for_approval` + `proposal`，`plugin/src/main.ts` 新增 `Load daily digest approval` 命令把 `thread_id / proposal_id / proposal` 注入审批面板，`plugin/src/views/KnowledgeStewardView.ts` 也补了无 pending proposal 时的空态提示。`backend/tests/test_digest_workflow.py` 已覆盖 waiting proposal 产出、waiting checkpoint 持久化、无 proposal fallback 和 waiting thread 拒绝 `resume_from_checkpoint`，插件则通过 `npm run build` 完成构建验证。任务已满足验收标准，因此转为 `completed`；当前仍未实现待审批列表、approval 后真实写回副作用或多 workflow proposal 化，主线进入 `TASK-019`。
+
+### TASK-023
+
+- `task_id`: `TASK-023`
+- `session_id`: `SES-20260316-01`
+- `title`: 继续拆解 `TASK-021` 之后的下一批 medium 队列任务
+- `category`: `Docs`
+- `priority`: `P1`
+- `status`: `completed`
+- `scope`: `medium`
+- `goal`: 在 `TASK-021` 已补齐最小 eval 基线后，基于当前代码事实重新拆解并登记下一批 medium 任务，避免任务队列在 `TASK-021` 完成后断档。
+- `out_of_scope`:
+  - 不实现新的业务功能
+  - 不修改现有架构边界
+  - 不顺手推进待审批列表、增量 ingest、跨会话恢复或更大规模 eval
+- `acceptance_criteria`:
+  - 至少补齐一批新的可执行 medium 任务
+  - 每个新任务都包含 `goal`、`out_of_scope`、`acceptance_criteria` 与 `depends_on`
+  - 新任务顺序与当前主路线、代码现状和 `TASK-021` 之后的风险优先级一致
+  - 不把仍然边界过大的任务直接塞进队列
+- `depends_on`:
+  - `TASK-021`
+- `related_files`:
+  - `docs/TASK_QUEUE.md`
+  - `docs/PROJECT_MASTER_PLAN.md`
+  - `docs/SESSION_LOG.md`
+  - `eval/run_eval.py`
+  - `eval/golden/`
+- `derived_tasks`:
+  - `TASK-024`
+  - `TASK-025`
+  - `TASK-026`
+  - `TASK-027`
+  - `TASK-028`
+  - `small: 写回后最小增量 ingest 继续保留为派生 small，暂不打包成新的 medium`
+  - `small: 本地写回成功但 /workflows/resume 记账失败的跨会话恢复入口继续保留为派生 small，暂不打包成新的 medium`
+- `notes`: `TASK-021` 完成后，当前已登记的 medium 队列将全部清空；若不先补新任务，后续会话将无法按规则绑定任务开工。2026-03-16 已在重新核对 `eval/run_eval.py`、`backend/app/services/resume_workflow.py`、`backend/app/main.py`、`backend/app/indexing/ingest.py`、`plugin/src/main.ts`、`plugin/src/views/KnowledgeStewardView.ts` 与 `plugin/src/writeback/applyProposalWriteback.ts` 后，确认下一批主线缺口集中在五处：`writeback/resume` 离线回归、待审批 proposal 收件箱、`INGEST_STEWARD` scoped note ingest、`INGEST_STEWARD` 的首条真实治理 proposal，以及 ask 的语义级 groundedness 离线评估。与此同时，“写回后最小增量 ingest”和“本地写回成功但后端记账失败的跨会话恢复入口”虽然仍未完成，但当前实现规模和主计划定位都更接近派生 small，不在本次拆解中强行升格为新的 medium，因此任务转为 `completed`。
+
+### TASK-024
+
+- `task_id`: `TASK-024`
+- `session_id`: `SES-20260316-02`
+- `title`: 将 `resume_workflow` / `writeback_result` 纳入最小离线 eval
+- `category`: `Eval`
+- `priority`: `P0`
+- `status`: `completed`
+- `scope`: `medium`
+- `goal`: 在 ask / digest / proposal 已有最小 golden baseline 的前提下，把 approve / reject 与 writeback success / failure 的高风险链路补进离线回归，避免最危险副作用路径仍只靠 unittest 和人工演示验证。
+- `out_of_scope`:
+  - 不做真实 Obsidian 宿主端到端自动化
+  - 不引入 LLM-as-a-judge 或复杂 dashboard
+  - 不重构现有 `resume_workflow` / writeback 协议
+- `acceptance_criteria`:
+  - `eval/run_eval.py` 至少能覆盖 approve / reject / writeback success / writeback failure 中的一批代表 case
+  - 每次执行仍会产出带时间戳的 `eval/results/*.json`
+  - 新增 case 不依赖外部联网 provider 或真实 Obsidian 宿主
+  - 有最小测试验证新增 eval 场景可稳定执行
+- `depends_on`:
+  - `TASK-019`
+  - `TASK-021`
+- `related_files`:
+  - `eval/run_eval.py`
+  - `eval/golden/`
+  - `eval/golden/resume_cases.json`
+  - `backend/tests/test_eval_runner.py`
+  - `backend/tests/test_resume_workflow.py`
+  - `backend/app/services/resume_workflow.py`
+  - `backend/app/main.py`
+- `derived_tasks`:
+  - `small: 为 writeback / resume eval 结果增加失败类型聚合，便于后续观察最常见坏路径`
+- `notes`: 当前最小 golden set 已不再只覆盖 ask / digest / proposal。2026-03-16 已在 `eval/run_eval.py` 中新增 `resume` entrypoint、deterministic `resume_waiting_digest` fixture 与 `response + checkpoint + audit_log` 三层快照断言，并新增 `eval/golden/resume_cases.json` 覆盖 reject、successful writeback 和 failed writeback 三类代表 case；`backend/tests/test_eval_runner.py` 已验证新增 eval 场景可稳定执行，`./.conda/knowledge-steward/bin/python eval/run_eval.py --case-id ...` 也已生成带时间戳的结果文件，因此任务转为 `completed`。当前仍未覆盖真实 Obsidian 宿主端到端自动化、failure type 聚合和 richer eval 指标，这些继续保留在既有 `small` 派生项或后续任务中处理。
+
+### TASK-025
+
+- `task_id`: `TASK-025`
+- `session_id`: `SES-20260316-03`
+- `title`: 实现待审批 proposal 查询接口与插件审批收件箱
+- `category`: `Plugin`
+- `priority`: `P0`
+- `status`: `completed`
+- `scope`: `medium`
+- `goal`: 去掉当前插件只能“实时触发 `DAILY_DIGEST` proposal”或“打开本地 demo”才能进入审批面板的断层，为真实 waiting proposal 提供最小收件箱。
+- `out_of_scope`:
+  - 不做通知中心或后台轮询
+  - 不做多用户 / 多 reviewer 分配
+  - 不做复杂筛选、分页或历史归档
+- `acceptance_criteria`:
+  - 后端存在最小 pending proposal 查询入口，能返回 `thread_id`、`proposal_id`、`summary`、`target_note_path` 等必要字段
+  - 插件侧边栏可展示待审批列表，并能把至少一条真实 proposal 加载到现有审批面板
+  - 无 pending proposal、stale proposal 和接口错误时有明确提示
+  - 有最小测试、构建验证或命令级验证覆盖列表加载与空态
+- `depends_on`:
+  - `TASK-022`
+  - `TASK-019`
+- `related_files`:
+  - `backend/app/main.py`
+  - `backend/app/indexing/store.py`
+  - `backend/app/graphs/checkpoint.py`
+  - `backend/tests/test_indexing_store.py`
+  - `backend/tests/test_digest_workflow.py`
+  - `backend/tests/test_resume_workflow.py`
+  - `plugin/src/main.ts`
+  - `plugin/src/views/KnowledgeStewardView.ts`
+  - `plugin/src/api/client.ts`
+  - `plugin/src/contracts.ts`
+  - `plugin/styles.css`
+- `derived_tasks`:
+  - `small: 为 pending proposal 增加 freshness 提示或排序字段，降低陈旧 proposal 误操作风险`
+- `notes`: 当前插件已不再只依赖“现触发一条新的 `DAILY_DIGEST` proposal”或“手工打开 demo”进入审批面板。2026-03-16 已在 `backend/app/contracts/workflow.py`、`backend/app/indexing/store.py` 与 `backend/app/main.py` 中新增 pending approval contract、基于 `workflow_checkpoint.waiting_for_approval + proposal` 的最小查询 helper 和 `GET /workflows/pending-approvals`，并在 `plugin/src/views/KnowledgeStewardView.ts`、`plugin/src/api/client.ts`、`plugin/src/main.ts` 与 `plugin/styles.css` 中补齐插件侧边栏收件箱、刷新入口、空态/错误/陈旧 proposal 提示与真实 proposal 加载；`backend` 全量 52 个测试、`plugin` 构建与现有测试均已通过，因此任务转为 `completed`。当前仍未实现 freshness 排序、多 workflow inbox 聚合、后台轮询和跨会话待同步入口，这些继续保持在既有 `small` 派生项或后续任务中处理。
+
+### TASK-026
+
+- `task_id`: `TASK-026`
+- `session_id`: `SES-20260317-01`
+- `title`: 为 `INGEST_STEWARD` 打开 scoped note ingest 入口
+- `category`: `Workflow`
+- `priority`: `P0`
+- `status`: `completed`
+- `scope`: `medium`
+- `goal`: 让 `INGEST_STEWARD` 支持 `note_path / note_paths` 范围执行，结束当前 scoped ingest 请求被显式拒绝、只能整库同步的状态，为后续局部治理和写回后局部同步打底。
+- `out_of_scope`:
+  - 不做写回后自动触发
+  - 不做 embedding / 向量索引增量同步
+  - 不在本任务内生成 proposal 或审批节点
+- `acceptance_criteria`:
+  - `/workflows/invoke` 的 `INGEST_STEWARD` 能接受单 note 或 note 列表范围
+  - scoped ingest 只更新目标 note / chunk，不回退现有全量入口
+  - FTS 在 scoped ingest 后仍保持可查询一致性
+  - 有最小测试覆盖 scoped 命中与非法路径拒绝
+- `depends_on`:
+  - `TASK-013`
+- `related_files`:
+  - `backend/app/contracts/workflow.py`
+  - `backend/app/indexing/ingest.py`
+  - `backend/app/indexing/store.py`
+  - `backend/app/graphs/ingest_graph.py`
+  - `backend/app/graphs/runtime.py`
+  - `backend/app/main.py`
+  - `backend/tests/test_ingest_workflow.py`
+  - `backend/tests/test_indexing_ingest.py`
+- `derived_tasks`:
+  - `small: 评估 scoped ingest 的 FTS 重建代价，决定后续是否需要更细粒度同步策略`
+  - `small: 为 \`python -m app.indexing.ingest\` 增加 \`--note-path / --note-paths\` 参数，便于不经 API 复现 scoped ingest`
+- `notes`: 当前 `INGEST_STEWARD` 已不再拒绝 `note_path / note_paths`。2026-03-17 已在 `backend/app/indexing/ingest.py` 中落地 vault 内单 note / 多 note 路径校验、去重与稳定排序，并让 `backend/app/graphs/ingest_graph.py` 支持 scoped note ingest、在 trace 中记录 `ingest_scope` / `requested_note_paths`，同时通过 `backend/app/graphs/runtime.py` 的 `resume_match_fields=("note_paths",)` 避免同一 `thread_id` 在不同 ingest scope 间误命中旧 checkpoint；`backend/tests/test_indexing_ingest.py` 与 `backend/tests/test_ingest_workflow.py` 已覆盖 scoped 命中、vault 外路径拒绝、FTS 一致性与 scope mismatch resume miss，`backend` 全量 56 个测试通过，因此任务转为 `completed`。当前仍未实现 scoped ingest proposal 化、写回后自动触发与 FTS 增量优化，这些继续留给 `TASK-027` 或派生 `small`。
+
+### TASK-027
+
+- `task_id`: `TASK-027`
+- `session_id`: `SES-20260317-02`
+- `title`: 让 `INGEST_STEWARD` 在 scoped note 上产出首条治理 proposal
+- `category`: `Workflow`
+- `priority`: `P0`
+- `status`: `completed`
+- `scope`: `medium`
+- `goal`: 基于 scoped ingest 的 note 级上下文，让系统对“新笔记治理”产出首条非 digest 的真实 `proposal + waiting_for_approval checkpoint`，避免 proposal 能力长期只停在 `DAILY_DIGEST`。
+- `out_of_scope`:
+  - 不做 ask proposal 化
+  - 不做多 note 批量 proposal 合并
+  - 不执行自动写回或 partial patch approval
+- `acceptance_criteria`:
+  - 至少一条 scoped ingest 请求能生成结构化 proposal 并进入 `waiting_for_approval`
+  - proposal 的 evidence、patch_ops 与 `target_note_path` 能对齐 ingest note 上下文
+  - 现有插件审批面板无需依赖 demo 即可消费该 proposal
+  - 有最小测试覆盖 proposal 产出、waiting checkpoint 与 fallback / no-proposal 分支
+- `depends_on`:
+  - `TASK-017`
+  - `TASK-019`
+  - `TASK-026`
+- `related_files`:
+  - `backend/app/services/ingest_proposal.py`
+  - `backend/app/graphs/ingest_graph.py`
+  - `backend/app/contracts/workflow.py`
+  - `backend/app/indexing/store.py`
+  - `backend/app/indexing/parser.py`
+  - `backend/app/main.py`
+  - `backend/tests/test_ingest_workflow.py`
+  - `plugin/src/main.ts`
+- `derived_tasks`:
+  - `small: 收敛新笔记治理 proposal 的风险分级与 patch 模板，降低模板误判导致的过度 proposal`
+- `notes`: 当前 `INGEST_STEWARD` 已不再只停在 scoped sync。2026-03-17 已新增 `backend/app/services/ingest_proposal.py`，基于 parser 已有的单 note 结构化信号，为显式 `metadata.approval_mode="proposal"` 的 scoped ingest 生成首版规则驱动治理 proposal；`backend/app/graphs/ingest_graph.py` 已新增 ingest proposal / waiting 分支、skip fallback、waiting thread 拒绝 `resume_from_checkpoint` 与 proposal + checkpoint 原子落盘，`backend/app/main.py` 也会在命中 proposal 时返回 `waiting_for_approval`，现有 pending inbox / 审批面板无需依赖 demo 即可消费。`backend/tests/test_ingest_workflow.py` 已覆盖 proposal 产出、waiting checkpoint、pending inbox、no-proposal fallback 与 waiting thread resume 拒绝，后端全量 60 个测试通过，因此任务转为 `completed`。当前实现仍刻意限制在“单 note scoped ingest + 现有受限 patch op + 规则信号”边界内；多 note proposal 合并、跨 note duplicate/conflict 分析与写回后自动增量 ingest 继续保留在后续 `small` 或新任务中处理。
+
+### TASK-028
+
+- `task_id`: `TASK-028`
+- `session_id`: `SES-20260317-03`
+- `title`: 为 ask 增加语义级 groundedness 离线评估
+- `category`: `Eval`
+- `priority`: `P1`
+- `status`: `completed`
+- `scope`: `medium`
+- `goal`: 在编号级 citation alignment 已落地的基础上，用离线 eval 补最小 answer-citation semantic consistency 检查，避免 ask 可信度仍只停留在“引用编号合法”。
+- `out_of_scope`:
+  - 不接外部评测平台或在线 judge
+  - 不改 ask 主体 contract 或插件 ask UI
+  - 不引入 hybrid retrieval / rerank
+- `acceptance_criteria`:
+  - golden set 至少新增一批“编号合法但语义越界 / 过度概括”的 ask bad case
+  - `eval/run_eval.py` 能输出 groundedness / consistency 的最小结构化判定或分桶结果
+  - 新场景可在不依赖联网 provider 的前提下稳定执行
+  - 有最小测试覆盖 eval runner 的新增断言
+- `depends_on`:
+  - `TASK-020`
+  - `TASK-021`
+- `related_files`:
+  - `eval/run_eval.py`
+  - `eval/golden/ask_cases.json`
+  - `backend/tests/test_eval_runner.py`
+  - `backend/app/services/ask.py`
+- `derived_tasks`:
+  - `TASK-029`
+  - `small: 评估是否需要引入 LLM judge 作为人工抽样辅助，而不是直接进入主回归`
+  - `small: 为 groundedness rule-based term extractor 增加停用词 / allowlist，减少中文短窗匹配导致的语义误报`
+- `notes`: 当前 ask 已不再只停留在编号级 citation alignment。2026-03-17 已在 `eval/run_eval.py` 中新增 `ask_groundedness` 快照与最小 `grounded / unsupported_claim / citation_missing / citation_invalid / not_generated_answer` 分桶，基于 cited evidence 的 rule-based term extraction 在离线结果中显式暴露“编号合法但语义越界”的 bad case；同时更新 `ask_basic` fixture、`eval/golden/ask_cases.json` 与 `backend/tests/test_eval_runner.py`，新增 deterministic grounded case 和两条 semantic overclaim bad case，并通过 `./.conda/knowledge-steward/bin/python eval/run_eval.py` 验证全量 13 条 case 全部通过，因此任务转为 `completed`。当前实现仍刻意限制在“离线 eval 暴露风险”边界内，不改变 ask 主 contract，也不把启发式 groundedness 分桶直接接入线上回答拦截；是否继续引入 LLM judge、停用词/allowlist 收敛或线上 gate，留在后续派生 small 或新任务中处理。
+
+### TASK-029
+
+- `task_id`: `TASK-029`
+- `session_id`: `SES-20260317-04`
+- `title`: 继续拆解 `TASK-028` 之后的下一批 medium 队列任务
+- `category`: `Docs`
+- `priority`: `P1`
+- `status`: `completed`
+- `scope`: `medium`
+- `goal`: 在 `TASK-028` 已补齐 ask 语义级 groundedness 离线评估后，基于当前代码事实重新拆解并登记下一批 medium 任务，避免任务队列在 `TASK-028` 完成后断档。
+- `out_of_scope`:
+  - 不实现新的业务功能
+  - 不修改现有架构边界
+  - 不顺手推进线上 groundedness gate、freshness 治理或写回后增量 ingest
+- `acceptance_criteria`:
+  - 至少补齐一批新的可执行 medium 任务
+  - 每个新任务都包含 `goal`、`out_of_scope`、`acceptance_criteria` 与 `depends_on`
+  - 新任务顺序与当前主路线、代码现状和 `TASK-028` 之后暴露的风险优先级一致
+  - 不把仍然边界过大的任务直接塞进队列
+- `depends_on`:
+  - `TASK-028`
+- `related_files`:
+  - `docs/TASK_QUEUE.md`
+  - `docs/PROJECT_MASTER_PLAN.md`
+  - `docs/SESSION_LOG.md`
+  - `eval/run_eval.py`
+  - `eval/golden/ask_cases.json`
+  - `backend/tests/test_eval_runner.py`
+- `derived_tasks`:
+  - `TASK-030`
+  - `TASK-031`
+  - `TASK-032`
+  - `TASK-033`
+  - `small: pending inbox 已有 updated_at 排序与时间戳展示，继续只补 freshness 提示或生命周期治理，不单独升格为 medium`
+  - `small: 为 \`python -m app.indexing.ingest\` 增加 \`--note-path / --note-paths\`，补 scoped ingest 的 CLI parity`
+- `notes`: `TASK-029` 已在 2026-03-17 基于 `eval/run_eval.py`、`backend/app/services/resume_workflow.py`、`backend/app/indexing/ingest.py`、`plugin/src/views/KnowledgeStewardView.ts` 与 `plugin/src/writeback/applyProposalWriteback.ts` 的真实实现重新分级后续缺口：pending inbox 现在已经按 `workflow_checkpoint.updated_at DESC` 返回并展示 `checkpoint_updated_at`，因此 freshness 继续保留为 `small`；`python -m app.indexing.ingest` 当前只缺 scoped 参数暴露，也继续保留为 `small`。相对地，“写回成功后索引仍陈旧”“本地写回成功但后端 resume 失败只能靠面板内存态重试”“scoped ingest 仍整库重建 FTS”以及“ask groundedness 仍只停留在离线 eval、未进入 runtime gate”都已经形成可独立验收的新 `medium`，因此新增 `TASK-030` 到 `TASK-033`。同日后续在 `TASK-034` 中又根据《初步实现指南》的 interview-first MVP 重新对齐优先级：`TASK-030` 保留为当前 P0 主线，而 `TASK-031` 到 `TASK-033` 被后移到剩余 P0 和前三个 P1 之后执行。
+
+### TASK-030
+
+- `task_id`: `TASK-030`
+- `session_id`: `SES-20260317-06`
+- `title`: 写回成功后触发 scoped ingest 并刷新索引
+- `category`: `Workflow`
+- `priority`: `P0`
+- `status`: `completed`
+- `scope`: `medium`
+- `goal`: 在插件本地受限写回已可成功执行的前提下，让 approval 成功后的目标 note 自动进入 scoped ingest，避免 Vault 已改但 SQLite / FTS 索引仍长期陈旧。
+- `out_of_scope`:
+  - 不做向量索引或 embedding 增量同步
+  - 不做跨会话失败恢复入口
+  - 不做 scoped ingest 的性能优化或批量调度
+- `acceptance_criteria`:
+  - 至少一条 approval + successful writeback 路径会对 `target_note_path` 触发 scoped ingest 或等价的 note 级索引刷新
+  - 写回成功但后续 ingest 失败时，不会把本地写回事实伪装成“完全成功”，而是返回明确的降级状态或提示
+  - 写回后的 note / chunk / FTS 查询结果能反映最新内容
+  - 有最小测试覆盖成功刷新与 ingest 失败降级分支
+- `depends_on`:
+  - `TASK-019`
+  - `TASK-026`
+- `related_files`:
+  - `backend/app/contracts/workflow.py`
+  - `backend/app/graphs/state.py`
+  - `backend/app/graphs/checkpoint.py`
+  - `plugin/src/views/KnowledgeStewardView.ts`
+  - `plugin/src/contracts.ts`
+  - `plugin/src/writeback/applyProposalWriteback.ts`
+  - `backend/app/main.py`
+  - `backend/app/services/resume_workflow.py`
+  - `backend/app/indexing/ingest.py`
+  - `backend/app/graphs/ingest_graph.py`
+  - `backend/tests/test_resume_workflow.py`
+  - `backend/tests/test_ingest_workflow.py`
+- `derived_tasks`:
+  - `small: 为 post-writeback scoped ingest 增加最小去抖或批量合并，避免连续审批时重复刷新同一 note`
+- `notes`: 这个缺口在 `TASK-023` 时仍被压成 `small`，但当时 scoped ingest 还没打通、插件写回也还没接入真实 note 级同步。现在 `TASK-019` 与 `TASK-026` 都已完成，写回成功后“本地 Vault 已变更、索引仍陈旧”的一致性问题已经足够独立，不能继续当成零碎收尾项处理。2026-03-17 在 `TASK-034` 中进一步确认：这条任务直接对应《初步实现指南》中 workflow P0 的 `writeback -> reindex_incremental` 闭环，因此保留为当前第一优先的 P0 主线。2026-03-17 已在 `backend/app/services/resume_workflow.py` 中补上 approval + successful `writeback_result` 后的 best-effort scoped ingest，并通过 `PostWritebackSyncResult` 把刷新成功 / 失败结果回传到 `/workflows/resume` response 与 completed checkpoint；`backend/tests/test_resume_workflow.py` 已覆盖“写回成功后 DB/FTS 真刷新”和“刷新失败时显式降级但仍完成审计 / checkpoint”两条分支，`plugin/src/views/KnowledgeStewardView.ts` 也已能展示 `post_writeback_sync` 结果，因此任务转为 `completed`。当前仍未补跨会话恢复入口，也仍复用 `ingest_vault()` 的整库 FTS 重建策略；这两项分别留在 `TASK-031` 与 `TASK-032`。
+
+### TASK-031
+
+- `task_id`: `TASK-031`
+- `session_id`:
+- `title`: 为本地写回成功但 `/workflows/resume` 失败补跨会话恢复入口
+- `category`: `Plugin`
+- `priority`: `P2`
+- `status`: `planned`
+- `scope`: `medium`
+- `goal`: 在插件已经能保留 `pendingWritebackResult` 的前提下，把“本地写回已成功但后端审计 / checkpoint 记账失败”的恢复入口从面板内存态提升为跨会话可恢复控制面。
+- `out_of_scope`:
+  - 不做后台自动重试或常驻同步守护进程
+  - 不做自动回滚本地写回
+  - 不处理多设备或多 Vault 间的冲突合并
+- `acceptance_criteria`:
+  - 本地写回成功但 resume 失败后，插件能持久化一条可恢复的待同步记录
+  - 重启插件或重新打开面板后，用户仍可对这条记录执行“只同步后端审计 / checkpoint，不重复写回”
+  - 后端会对 stale / mismatched proposal 做安全拒绝，避免错误补记
+  - 有最小测试或构建验证覆盖持久化恢复与重复写回防护分支
+- `depends_on`:
+  - `TASK-019`
+  - `TASK-030`
+- `related_files`:
+  - `plugin/src/views/KnowledgeStewardView.ts`
+  - `plugin/src/main.ts`
+  - `plugin/src/contracts.ts`
+  - `plugin/src/writeback/applyProposalWriteback.ts`
+  - `backend/app/services/resume_workflow.py`
+  - `backend/app/main.py`
+  - `backend/tests/test_resume_workflow.py`
+- `derived_tasks`:
+  - `small: 为跨会话待同步记录增加过期清理或“已同步”自动收口，避免本地恢复列表长期堆积`
+- `notes`: 当前实现只在面板内存里保留 `pendingWritebackResult`；一旦插件重启或上下文丢失，用户就失去“只补后端记账、不重复执行 patch”的恢复入口。这个问题直接关系到审计可信度和副作用幂等，已经不适合继续放在 `small` 里。2026-03-17 在 `TASK-034` 中重新对齐《初步实现指南》后，本任务被明确后移：它不属于当前要先补齐的剩余 P0，也不属于当前只保留的前三个 P1，因此优先级降到 `P2`，待 guide-first MVP 首版收口后再推进。
+
+### TASK-032
+
+- `task_id`: `TASK-032`
+- `session_id`:
+- `title`: 为 scoped ingest 落地增量 FTS 同步策略
+- `category`: `Retrieval`
+- `priority`: `P2`
+- `status`: `planned`
+- `scope`: `medium`
+- `goal`: 让 scoped ingest 不再每次都整库重建 `chunk_fts`，把 note 级同步真正收敛为“局部写库 + 局部 FTS 刷新”的可持续路径。
+- `out_of_scope`:
+  - 不接入向量索引或 hybrid retrieval
+  - 不做完整性能 dashboard
+  - 不顺手实现写回后自动触发 scoped ingest
+- `acceptance_criteria`:
+  - scoped ingest 只重建或刷新受影响 note / chunk 的 FTS 文档，而不是整库重建
+  - 全量 ingest 入口仍保持可用，且不会因增量策略回退
+  - FTS 查询在新增、替换和删除 chunk 后仍保持一致
+  - 有最小测试覆盖 scoped ingest 下的 FTS 命中与旧文档清理
+- `depends_on`:
+  - `TASK-026`
+- `related_files`:
+  - `backend/app/indexing/store.py`
+  - `backend/app/indexing/ingest.py`
+  - `backend/app/retrieval/sqlite_fts.py`
+  - `backend/tests/test_indexing_ingest.py`
+  - `backend/tests/test_retrieval_fts.py`
+- `derived_tasks`:
+  - `small: 为 \`python -m app.indexing.ingest\` 增加 scoped 参数，便于脱离 API 复现增量 ingest`
+  - `small: 为 scoped ingest 记录最小 FTS 刷新耗时，便于后续判断是否还需更细粒度优化`
+- `notes`: `TASK-026` 虽然让 scoped ingest 真正可用了，但当前 `backend/app/indexing/ingest.py` 仍在任何 scoped note 更新后整库执行 `rebuild_chunk_fts_index(connection)`。在 scoped ingest 即将被写回链路复用的前提下，这已经不是单纯的“成本评估”问题，而是决定 scoped ingest 是否值得持续作为主路径使用的结构性问题。2026-03-17 在 `TASK-034` 中重新审视《初步实现指南》后，本任务被后移：当前 interview-first P0 先补向量检索、hybrid retrieval 和 eval baseline，更细的 FTS 增量同步留到之后处理。
+
+### TASK-033
+
+- `task_id`: `TASK-033`
+- `session_id`:
+- `title`: 在 ask 主链路接入保守 groundedness gate 与安全降级
+- `category`: `Retrieval`
+- `priority`: `P2`
+- `status`: `planned`
+- `scope`: `medium`
+- `goal`: 在 `TASK-028` 已有最小 groundedness 离线评估的基础上，把最保守的一层 answer-citation semantic consistency 检查接入 ask runtime，对明显 `unsupported_claim` 的 generated answer 做安全降级。
+- `out_of_scope`:
+  - 不引入 LLM judge 或外部评测平台
+  - 不改插件 ask UI
+  - 不接入 hybrid retrieval、rerank 或更复杂的 query planner
+- `acceptance_criteria`:
+  - 对 citation 编号合法但 evidence 不支持的 generated answer，ask runtime 会稳定降级为 `retrieval_only` 或等价安全结果
+  - 已验证的 grounded case 不会被大面积误伤
+  - 不改变现有 `AskWorkflowResult` 外层 contract
+  - 有最小测试与 eval case 覆盖成功 / 降级分支
+- `depends_on`:
+  - `TASK-028`
+- `related_files`:
+  - `backend/app/services/ask.py`
+  - `backend/tests/test_ask_workflow.py`
+  - `eval/run_eval.py`
+  - `eval/golden/ask_cases.json`
+  - `backend/tests/test_eval_runner.py`
+- `derived_tasks`:
+  - `small: 为 groundedness term extractor 增加停用词 / allowlist，减少中文短窗误报`
+  - `small: 评估是否需要把 LLM judge 只作为人工抽样辅助，而不是主链路依赖`
+- `notes`: `TASK-028` 已经证明当前 ask 还存在“引用编号合法，但答案语义越界”的 bad case。只要这个风险仍停留在离线结果文件里，ask 主链路的可信度边界就还是断裂的。下一步不需要一步到位做复杂 judge，而是先把最保守、最可回归的一层 gate 接进 runtime，并保持失败即降级的安全策略。2026-03-17 在 `TASK-034` 中对齐《初步实现指南》后，本任务被明确后移：它不在当前“剩余 P0 + 只做前三个 P1”的收口范围内，因此优先级降到 `P2`。
+
+### TASK-034
+
+- `task_id`: `TASK-034`
+- `session_id`: `SES-20260317-05`
+- `title`: 将后续任务优先级重新对齐到《初步实现指南》的 interview-first MVP
+- `category`: `Docs`
+- `priority`: `P0`
+- `status`: `completed`
+- `scope`: `medium`
+- `goal`: 在主文档已成为执行基准的前提下，补一个显式优先级校正任务：明确后续迭代仍需服从《初步实现指南》的 interview-first MVP 大方向，先补齐剩余 P0，再只推进前三个 P1，其他优化一律后移。
+- `out_of_scope`:
+  - 不实现任何业务功能
+  - 不推翻主文档已经确认的代码事实和架构边界
+  - 不借机把多个优化项重新包装成“都先做”的大任务
+- `acceptance_criteria`:
+  - `docs/TASK_QUEUE.md` 中已明确区分“剩余 P0”“当前只保留的前三个 P1”和后移优化项
+  - `docs/PROJECT_MASTER_PLAN.md` 的核心位置明确提醒后续会话：执行顺序仍需对齐《初步实现指南》的 interview-first MVP
+  - `README.md` 与 `docs/SESSION_LOG.md` 的 next action / 会话记录与新优先级一致
+  - 不把不在当前收口范围内的优化项继续伪装成第一批主线
+- `depends_on`:
+  - `TASK-029`
+- `related_files`:
+  - `docs/TASK_QUEUE.md`
+  - `docs/PROJECT_MASTER_PLAN.md`
+  - `docs/SESSION_LOG.md`
+  - `README.md`
+  - `Obsidian Knowledge Steward 项目初步实现指南.md`
+- `derived_tasks`:
+  - `TASK-030`
+  - `TASK-035`
+  - `TASK-036`
+  - `TASK-037`
+  - `TASK-038`
+  - `TASK-039`
+  - `TASK-040`
+  - `TASK-041`
+  - `TASK-042`
+  - `TASK-031`
+  - `TASK-032`
+  - `TASK-033`
+- `notes`: 本任务解决的是“优先级回正”，不是功能实现。2026-03-17 在复核《初步实现指南》的 MVP 表后，确认当前最适合面试的一版收口策略不是继续沿着 `TASK-031` 到 `TASK-033` 直接推进，而是先补齐剩余 P0：产品形态、受限写回安全链路和当前 ask / ingest / digest 的基础 tracing 已可视为 interview-first P0 下限达成，但后端服务、workflow、retrieval 与 eval 仍有关键缺口，因此保留 `TASK-030` 并新增 `TASK-035` 到 `TASK-039` 作为剩余 P0 主线；随后只保留三项 P1：分场景 benchmark、回滚/撤销与统一多入口 workflow，落到 `TASK-040` 到 `TASK-042`。`TASK-031` 到 `TASK-033` 不再作为 immediate next action，统一后移到本轮收口之后再推进。
+
+### TASK-035
+
+- `task_id`: `TASK-035`
+- `session_id`: `SES-20260317-07`
+- `title`: 为 `INGEST_STEWARD` 增加 retrieval-backed analyze_consistency 节点
+- `category`: `Workflow`
+- `priority`: `P0`
+- `status`: `completed`
+- `scope`: `medium`
+- `goal`: 在当前 scoped ingest proposal 已可运行的基础上，为 `INGEST_STEWARD` 补一条更接近《初步实现指南》的 `load_note -> related_retrieve -> analyze -> propose` 主线，让治理 proposal 不再只依赖 parser 的局部结构信号。
+- `out_of_scope`:
+  - 不做多 note proposal 合并
+  - 不做 GraphRAG 或跨 note 自动冲突合并
+  - 不引入自动写回
+- `acceptance_criteria`:
+  - scoped ingest 的单 note 治理链路会显式召回相关旧笔记或 chunk 作为 evidence
+  - `INGEST_STEWARD` 会输出最小结构化 analysis 结果，例如 duplicate/conflict/orphan_hint 或等价问题分类
+  - proposal 的 evidence 不再只来自当前 note 自身，也能对齐召回出的相关上下文
+  - 有最小测试覆盖 analysis 命中、无问题 fallback 与 evidence 对齐
+- `depends_on`:
+  - `TASK-027`
+  - `TASK-030`
+- `related_files`:
+  - `backend/app/main.py`
+  - `backend/app/graphs/ingest_graph.py`
+  - `backend/app/graphs/state.py`
+  - `backend/app/services/ingest_proposal.py`
+  - `backend/app/retrieval/sqlite_fts.py`
+  - `backend/app/contracts/workflow.py`
+  - `backend/tests/test_ingest_workflow.py`
+  - `plugin/src/contracts.ts`
+- `derived_tasks`:
+  - `small: 为 analysis 结果增加更细的风险分级和 reviewer-facing 解释字段`
+  - `small: 为 retrieval-backed analyze 增加 cold-index 提示或预热检查，避免 fresh DB scoped ingest 下 related evidence 缺失时被误解为功能失效`
+- `notes`: 这条任务直接对应《初步实现指南》中 workflow P0 的“analyze -> propose”缺口。当前首版 ingest proposal 虽然已能演示治理主线，但仍更像“结构信号驱动 patch 模板”，还不够像真正的知识治理分析。2026-03-17 已在 `backend/app/services/ingest_proposal.py` 中接入基于现有 SQLite FTS 的最小 related retrieve、`orphan_hint / duplicate_hint` 等 retrieval-backed analysis finding、目标 note 自身排除与 cross-note evidence 对齐，并通过 `IngestAnalysisResult` 把结构化 `analysis_result` 接入 `backend/app/contracts/workflow.py`、`backend/app/graphs/state.py`、`backend/app/graphs/ingest_graph.py`、`backend/app/main.py` 与 `plugin/src/contracts.ts`；`backend/tests/test_ingest_workflow.py` 已覆盖 retrieval-backed 命中、self-match 排除、无问题 fallback 与 trace 中的 `related_candidate_count`，后端全量 62 个测试与插件 `npm run build` 均通过，因此任务转为 `completed`。当前实现仍保持在“单 note scoped ingest + 现有 FTS 索引 + 保守规则分析”边界内，不包含向量检索、hybrid retrieval、多 note proposal 合并或审批面板对 `analysis_result` 的展示；同时 retrieval-backed 命中依赖索引里已存在相关旧笔记上下文，fresh DB 下若只有单 note scoped ingest，系统会安全 fallback，而不会硬造跨 note evidence。
+
+### TASK-036
+
+- `task_id`: `TASK-036`
+- `session_id`: `SES-20260318-01`
+- `title`: 为插件补后端自启 / 探活 / 降级启动控制
+- `category`: `Plugin`
+- `priority`: `P0`
+- `status`: `completed`
+- `scope`: `medium`
+- `goal`: 补齐《初步实现指南》里“本地 Python 后端，插件可自启/探活”的剩余缺口，让面试演示不再依赖手工分终端启动和口头解释。
+- `out_of_scope`:
+  - 不做多进程 supervisor 或系统级 service 安装
+  - 不做跨平台安装器
+  - 不改动后端核心业务逻辑
+- `acceptance_criteria`:
+  - 插件能明确检测 backend 是否可用，并给出启动中 / 已就绪 / 启动失败的状态
+  - 在用户提供可执行启动命令的前提下，插件可发起最小本地后端启动或等价的一键引导
+  - backend 不可用时，插件不会静默失败，而是给出明确降级提示
+  - 有最小构建验证或命令级验证覆盖探活与失败提示分支
+- `depends_on`:
+  - `TASK-003`
+- `related_files`:
+  - `plugin/src/main.ts`
+  - `plugin/src/backend/runtime.ts`
+  - `plugin/src/api/client.ts`
+  - `plugin/src/views/KnowledgeStewardView.ts`
+  - `plugin/src/settings.ts`
+  - `plugin/src/backend/runtime.test.ts`
+  - `plugin/styles.css`
+  - `README.md`
+- `derived_tasks`:
+  - `small: 为 backend runtime 增加显式 Stop / Restart 控制与 stale PID 提示，降低宿主重启或重复启动后的歧义`
+- `notes`: 这条任务对应《初步实现指南》的后端服务 P0。2026-03-18 已在 `plugin/src/backend/runtime.ts` 中落地插件侧 backend runtime 控制器：基于 `/health` 的 readiness probe 区分 `checking / starting / ready / unavailable / failed`，记录 `tracked_pid`、最近错误、退出码与最近输出，并在用户提供 `backendStartCommand` / `backendStartWorkingDirectory` 的前提下支持最小本地启动、auto-start 与失败降级提示；`plugin/src/main.ts` 已新增 `Start backend` 命令，`plugin/src/views/KnowledgeStewardView.ts` 已新增 Backend Runtime 区块与状态展示，`plugin/src/settings.ts` 已补齐启动命令、工作目录、超时、轮询与 auto-start 设置，`plugin/src/backend/runtime.test.ts`、`npm test` 与 `npm run build` 已覆盖未配置命令降级、启动后 ready 和进程提前退出失败分支，因此任务转为 `completed`。当前实现仍刻意限制在“用户提供命令 + 插件内最小启动 / 探活 / 降级控制”边界内，不包含 Stop/Restart、本地 supervisor、跨平台安装器或真实 Obsidian 宿主手工回归。
+
+### TASK-037
+
+- `task_id`: `TASK-037`
+- `session_id`: `SES-20260318-02`
+- `title`: 为 chunk 索引补最小向量写入与向量检索入口
+- `category`: `Retrieval`
+- `priority`: `P0`
+- `status`: `completed`
+- `scope`: `medium`
+- `goal`: 在现有 SQLite FTS5 基线之上，为 chunk 补最小 embedding 写入与向量检索入口，补齐《初步实现指南》里 retrieval P0 的向量侧缺口。
+- `out_of_scope`:
+  - 不做 hybrid 融合
+  - 不做 reranker
+  - 不做 GraphRAG
+- `acceptance_criteria`:
+  - ingest 之后至少能为 chunk 写入一份可查询的向量表示或等价 embedding 记录
+  - 存在最小向量检索入口，可返回 top-k candidate
+  - embedding provider / model 不可用时有明确 fallback 或禁用语义
+  - 有最小测试覆盖写入、查询和 provider 不可用降级
+- `depends_on`:
+  - `TASK-005`
+  - `TASK-006`
+- `related_files`:
+  - `backend/app/indexing/store.py`
+  - `backend/app/indexing/ingest.py`
+  - `backend/app/retrieval/embeddings.py`
+  - `backend/app/retrieval/sqlite_vector.py`
+  - `backend/app/contracts/workflow.py`
+  - `backend/app/graphs/ingest_graph.py`
+  - `backend/app/services/resume_workflow.py`
+  - `backend/tests/test_indexing_store.py`
+  - `backend/tests/test_indexing_ingest.py`
+  - `backend/tests/test_retrieval_vector.py`
+- `derived_tasks`:
+  - `TASK-038`
+  - `small: 为 vector index 增加 coverage / ready 统计，避免 embedding 仅部分写入时把索引误判为已就绪`
+- `notes`: 这条任务直接对应《初步实现指南》的 retrieval P0。2026-03-18 已在 `backend/app/indexing/store.py` 中把 schema 升到 `v7` 并新增 `chunk_embedding` 持久化，在 `backend/app/retrieval/embeddings.py` 中补最小 embedding provider 路由，在 `backend/app/indexing/ingest.py` 中接入 note/chunk 主索引成功后的 best-effort embedding 写入，并在 `backend/app/retrieval/sqlite_vector.py` 中落地最小向量检索入口：可返回标准 `RetrievedChunkCandidate`，且在 provider 不可用或当前 provider/model 下索引未就绪时返回显式 `disabled_reason`，而不是伪装成普通 no-hit。`backend/tests/test_indexing_store.py`、`backend/tests/test_indexing_ingest.py` 与 `backend/tests/test_retrieval_vector.py` 已覆盖 schema、写入替换、查询与禁用降级；聚合 40 条后端测试与 `compileall` 均通过，因此任务转为 `completed`。当前实现仍刻意限制在“SQLite 持久化 embedding + Python 余弦 top-k”的最小边界内，不包含 hybrid、rerank、外部向量库、ANN 或 ask / governance 主链路接入，这些继续留给 `TASK-038` 及后续 small 派生项。
+
+### TASK-038
+
+- `task_id`: `TASK-038`
+- `session_id`: `SES-20260318-03`
+- `title`: 实现 hybrid retrieval 融合并接入 ask / governance 主链路
+- `category`: `Retrieval`
+- `priority`: `P0`
+- `status`: `completed`
+- `scope`: `medium`
+- `goal`: 把现有 FTS/metadata filter 和新引入的向量检索融合成最小 hybrid retrieval，为 ask 和治理分析提供更接近《初步实现指南》的检索底座。
+- `out_of_scope`:
+  - 不做 reranker
+  - 不做 GraphRAG
+  - 不做复杂 query planner
+- `acceptance_criteria`:
+  - ask 路径能在统一 candidate 输出中消费 hybrid retrieval 结果
+  - 至少一条治理链路也可复用 hybrid candidate 作为 analysis evidence
+  - 当向量检索不可用时，系统会稳定退回到现有 FTS 路径
+  - 有最小测试覆盖 hybrid 命中、fallback 与 candidate 结构稳定性
+- `depends_on`:
+  - `TASK-007`
+  - `TASK-037`
+- `related_files`:
+  - `backend/app/retrieval/hybrid.py`
+  - `backend/app/retrieval/sqlite_fts.py`
+  - `backend/app/retrieval/sqlite_vector.py`
+  - `backend/app/services/ask.py`
+  - `backend/app/services/ingest_proposal.py`
+  - `backend/app/contracts/workflow.py`
+  - `backend/tests/test_retrieval_hybrid.py`
+  - `backend/tests/test_ask_workflow.py`
+  - `backend/tests/test_ingest_workflow.py`
+- `derived_tasks`:
+  - `small: 为 hybrid retrieval 暴露融合权重与最小调试快照，便于后续面试演示和回归`
+- `notes`: 当前 metadata filter 与最小向量检索都已不再停留在分离入口。2026-03-18 已新增 `backend/app/retrieval/hybrid.py`，用 rank-based RRF 融合 `sqlite_fts` 与 `sqlite_vector`，并把 metadata filter fallback 收敛到统一 hybrid 入口；`backend/app/services/ask.py` 现已消费 hybrid candidate，`backend/app/services/ingest_proposal.py` 也已让 related retrieve 走同一条 hybrid 底座，同时通过 `backend/app/graphs/ingest_graph.py` 透传运行态 `settings / provider_preference`，避免治理链路绕过向量配置。`backend/tests/test_retrieval_hybrid.py`、`backend/tests/test_ask_workflow.py` 与 `backend/tests/test_ingest_workflow.py` 已覆盖 hybrid 命中、向量不可用时退回 FTS、ask 消费与治理 evidence 对齐，后端全量 72 个测试与 `compileall` 均通过，因此任务转为 `completed`。当前仍未实现 rerank、ANN / 外部向量库、向量 coverage 观测与 hybrid branch 调试快照；这些继续留在既有 `small` 派生项或后续任务中处理。
+
+### TASK-039
+
+- `task_id`: `TASK-039`
+- `session_id`: `SES-20260318-04`
+- `title`: 将离线 eval 升级到 interview-first P0 基线
+- `category`: `Eval`
+- `priority`: `P0`
+- `status`: `completed`
+- `scope`: `medium`
+- `goal`: 在当前最小回归样本的基础上，把 eval 升级到更接近《初步实现指南》P0 的初版水位：更大的 golden set、可脚本化回归，以及最小 faithfulness / relevancy / context 指标。
+- `out_of_scope`:
+  - 不做在线评测平台
+  - 不做复杂 dashboard
+  - 不做自动难例挖掘
+- `acceptance_criteria`:
+  - golden set 显著扩容，并覆盖 ask / governance / digest / resume-writeback 四类核心场景
+  - 回归脚本支持稳定批量执行，并落盘结构化结果
+  - 至少引入一组可解释的忠实度 / 相关性 / 上下文指标（可基于 Ragas 或等价实现）
+  - 有最小测试验证新增 eval 路径可稳定执行
+- `depends_on`:
+  - `TASK-024`
+  - `TASK-028`
+  - `TASK-038`
+- `related_files`:
+  - `eval/run_eval.py`
+  - `eval/golden/ask_cases.json`
+  - `eval/golden/digest_cases.json`
+  - `eval/golden/governance_cases.json`
+  - `eval/golden/resume_cases.json`
+  - `eval/results/`
+  - `backend/tests/test_eval_runner.py`
+  - `docs/PROJECT_MASTER_PLAN.md`
+- `derived_tasks`:
+  - `TASK-040`
+  - `small: 为 eval 结果增加版本标签或队列 task_id 维度，便于后续回看是哪轮实现引入回归`
+- `notes`: 这条任务对应《初步实现指南》的 eval P0。2026-03-18 已在 `eval/run_eval.py` 中把结果 schema 升到 `1.2`，新增 `quality_metrics` 与全局 `metric_overview`，并通过 deterministic fixture、prewarm ingest 与 embedding mock 把 hybrid retrieval 稳定纳入回归；同时扩展 `eval/golden/ask_cases.json`、`eval/golden/digest_cases.json`、新增 `eval/golden/governance_cases.json`，让 golden set 从 13 条扩到 18 条，覆盖 ask / governance / digest / resume-writeback 四类核心场景。`backend/tests/test_eval_runner.py` 已新增 hybrid / governance / metric aggregation 断言，`./.conda/knowledge-steward/bin/python eval/run_eval.py` 验证全量 18 条 case 全部通过，`backend` 全量 73 个测试也已通过，因此任务转为 `completed`。当前仍未接入 Ragas / 在线 judge、分场景 benchmark、宿主级 E2E 或 richer failure type 聚合；这些继续留给 `TASK-040` 或后续派生项处理。
+
+### TASK-040
+
+- `task_id`: `TASK-040`
+- `session_id`: `SES-20260318-05`
+- `title`: 建立治理 vs 问答的分场景 benchmark
+- `category`: `Eval`
+- `priority`: `P1`
+- `status`: `completed`
+- `scope`: `medium`
+- `goal`: 在 P0 级 eval baseline 已可运行的前提下，把结果正式切成治理链路和问答链路两套 benchmark，补齐当前最优先的 P1。
+- `out_of_scope`:
+  - 不做自动样本生成
+  - 不做复杂可视化 dashboard
+  - 不做线上 A/B
+- `acceptance_criteria`:
+  - eval case 至少按问答与治理两大类输出聚合结果
+  - 不同场景有可区分的核心指标和失败类型统计
+  - 新增 case/指标不会破坏现有脚本化回归
+  - 有最小测试或结果快照验证场景聚合逻辑
+- `depends_on`:
+  - `TASK-039`
+- `related_files`:
+  - `eval/run_eval.py`
+  - `eval/golden/`
+  - `backend/tests/test_eval_runner.py`
+- `derived_tasks`:
+  - `small: 为 benchmark 汇总增加 markdown 报告导出，便于面试前快速复盘`
+- `notes`: 这是当前只保留的前三个 P1 之一，也是最能提升“我怎么证明系统真的有效”回答质量的任务。2026-03-18 已在 `eval/run_eval.py` 中把结果 schema 升到 `1.3`，新增 `benchmark_overview`，将现有 case 显式收敛为 `question_answering` 与 `governance` 两套 benchmark，并在各自的 `scenario_overview` 下输出场景级 `core_metrics` 与最小 `failure_type_breakdown`；同时补齐 `proposal.present` 显式语义，避免治理 KPI 继续依赖隐式 `None` 约定。`backend/tests/test_eval_runner.py` 已新增 benchmark 分组、digest / governance / resume KPI 与 failure type 断言，`./.conda/knowledge-steward/bin/python eval/run_eval.py` 全量 18 条 case 与 `backend` 全量 73 个测试均通过，因此任务转为 `completed`。当前仍未补 markdown 报告导出、按 benchmark 的 CLI 过滤、真实 Obsidian 宿主 E2E 或更强 judge，这些继续留在既有 `small` 派生项或后续新任务中处理。
+
+### TASK-041
+
+- `task_id`: `TASK-041`
+- `session_id`: `SES-20260318-06`
+- `title`: 为受限 patch op 落地最小撤销 / 回滚能力
+- `category`: `Writeback`
+- `priority`: `P1`
+- `status`: `completed`
+- `scope`: `medium`
+- `goal`: 基于当前已支持的 `merge_frontmatter` / `insert_under_heading` 受限写回链路，为审批后的副作用补最小撤销 / 回滚能力，补齐当前只保留的前三个 P1 之一。
+- `out_of_scope`:
+  - 不做通用三方合并
+  - 不做任意自由文本 patch 的自动回滚
+  - 不做跨多文件事务回滚
+- `acceptance_criteria`:
+  - 至少对当前已支持的受限 patch op 存在可执行的最小撤销路径
+  - 回滚前会继续校验目标文件状态，避免在内容已漂移时误撤销
+  - 回滚结果会写入最小审计事实
+  - 有最小测试覆盖允许撤销与拒绝撤销分支
+- `depends_on`:
+  - `TASK-019`
+  - `TASK-030`
+- `related_files`:
+  - `plugin/src/writeback/`
+  - `plugin/src/views/KnowledgeStewardView.ts`
+  - `plugin/src/api/client.ts`
+  - `backend/app/contracts/workflow.py`
+  - `backend/app/main.py`
+  - `backend/app/services/rollback_workflow.py`
+  - `backend/app/indexing/store.py`
+  - `backend/app/graphs/state.py`
+  - `backend/app/graphs/checkpoint.py`
+  - `backend/tests/test_resume_workflow.py`
+- `derived_tasks`:
+  - `small: 为撤销动作增加 reviewer-facing diff 预览，降低二次误操作风险`
+  - `small: 为 rollback 成功后补 scoped ingest 刷新，避免索引继续停留在写回后的旧状态`
+- `notes`: 这是当前只保留的前三个 P1 之一。2026-03-18 已在 `plugin/src/writeback/applyProposalWriteback.ts` 中为真实本地写回补 `LocalRollbackContext` 快照与保守 rollback 执行器：仅当当前文件仍匹配精确 `after_hash` 时才允许整文恢复，避免覆盖用户后续修改；同时在 `backend/app/contracts/workflow.py`、`backend/app/main.py` 与新增 `backend/app/services/rollback_workflow.py` 中补 `WorkflowRollbackRequest/Response` 与 `POST /workflows/rollback`，把 rollback 成功/失败结果写入 append-only `audit_log`，并仅在成功 rollback 时回写 completed checkpoint。`plugin/src/views/KnowledgeStewardView.ts` 已新增最小 rollback 入口与“本地成功、后端同步失败可重试”的防重保护，`backend/tests/test_resume_workflow.py` 已覆盖允许撤销与拒绝撤销分支，因此任务转为 `completed`。当前边界仍刻意限制在“当前插件会话内已执行写回的本地快照 rollback”，历史/推断为已应用的 writeback 还没有可执行 rollback，且 rollback 成功后尚未自动刷新 scoped ingest。 
+
+### TASK-042
+
+- `task_id`: `TASK-042`
+- `session_id`: `SES-20260318-07`
+- `title`: 统一 ask / digest / ingest 的入口路由与共享 workflow contract
+- `category`: `Workflow`
+- `priority`: `P1`
+- `status`: `completed`
+- `scope`: `medium`
+- `goal`: 在三条 graph 都已存在的前提下，进一步统一入口路由、共享 state 字段、trace/checkpoint 语义与公共 contract，补齐当前只保留的前三个 P1 之一。
+- `out_of_scope`:
+  - 不重写全部 graph 业务逻辑
+  - 不引入多 Agent supervisor
+  - 不扩到所有未来 workflow 的平台化框架
+- `acceptance_criteria`:
+  - ask / digest / ingest 至少共享一套更稳定的 runtime contract 或 state 协议
+  - 新增 workflow 不再需要在 API / trace / checkpoint 语义上各自复制一套样板
+  - 现有三条主链路行为不因统一 contract 而回退
+  - 有最小测试覆盖共享 contract 下的多入口调用
+- `depends_on`:
+  - `TASK-013`
+  - `TASK-014`
+  - `TASK-015`
+  - `TASK-035`
+- `related_files`:
+  - `backend/app/contracts/workflow.py`
+  - `backend/app/graphs/state.py`
+  - `backend/app/graphs/runtime.py`
+  - `backend/app/graphs/ask_graph.py`
+  - `backend/app/graphs/ingest_graph.py`
+  - `backend/app/graphs/digest_graph.py`
+  - `backend/app/main.py`
+  - `backend/tests/test_workflow_invoke_contract.py`
+  - `backend/tests/test_ask_workflow.py`
+  - `backend/tests/test_ingest_workflow.py`
+  - `backend/tests/test_digest_workflow.py`
+- `derived_tasks`:
+  - `small: 为统一 runtime contract 增加最小 schema 文档导出，便于后续新 workflow 接入时复用`
+- `notes`: 这是 interview-first 路线里最后一个保留 P1。2026-03-18 已在 `backend/app/graphs/runtime.py` 中补齐共享 `WorkflowGraphExecution`、基础 workflow state builder、runtime trace hook builder 与 execution builder，并让 `backend/app/graphs/ask_graph.py`、`backend/app/graphs/ingest_graph.py`、`backend/app/graphs/digest_graph.py` 统一继承共享 execution contract；同时 `backend/app/main.py` 的 `/workflows/invoke` 已从三个 action 分支收敛为 handler registry + 统一 invoker / outcome / response builder，`backend/tests/test_workflow_invoke_contract.py` 也补了多入口共享 contract 断言。定向 37 条测试、backend 全量 77 条测试与 `python -m compileall app tests` 已通过，因此任务转为 `completed`。当前仍未顺手处理 `KS_ASK_RUNTIME_TRACE_PATH` 的历史命名债，也没有把 waiting / proposal / resume / rollback 全部扩成更大的通用平台；这些不影响本任务验收，继续保留为后续小项或后移任务。

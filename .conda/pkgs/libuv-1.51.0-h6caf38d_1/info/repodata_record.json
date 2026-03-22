@@ -1,0 +1,22 @@
+{
+  "arch": "arm64",
+  "build": "h6caf38d_1",
+  "build_number": 1,
+  "channel": "https://mirrors.tuna.tsinghua.edu.cn/anaconda/cloud/conda-forge/osx-arm64",
+  "constrains": [],
+  "depends": [
+    "__osx >=11.0"
+  ],
+  "fn": "libuv-1.51.0-h6caf38d_1.conda",
+  "license": "MIT",
+  "license_family": "MIT",
+  "md5": "c0d87c3c8e075daf1daf6c31b53e8083",
+  "name": "libuv",
+  "platform": "darwin",
+  "sha256": "042c7488ad97a5629ec0a991a8b2a3345599401ecc75ad6a5af73b60e6db9689",
+  "size": 421195,
+  "subdir": "osx-arm64",
+  "timestamp": 1753948426000,
+  "url": "https://mirrors.tuna.tsinghua.edu.cn/anaconda/cloud/conda-forge/osx-arm64/libuv-1.51.0-h6caf38d_1.conda",
+  "version": "1.51.0"
+}

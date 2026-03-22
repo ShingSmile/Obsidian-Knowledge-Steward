@@ -1,0 +1,10 @@
+{
+  "id": "knowledge-steward",
+  "name": "Knowledge Steward",
+  "version": "0.1.0",
+  "minAppVersion": "1.5.0",
+  "description": "Baseline plugin for Obsidian Knowledge Steward.",
+  "author": "qingfeng Qi",
+  "authorUrl": "https://github.com/",
+  "isDesktopOnly": true
+}

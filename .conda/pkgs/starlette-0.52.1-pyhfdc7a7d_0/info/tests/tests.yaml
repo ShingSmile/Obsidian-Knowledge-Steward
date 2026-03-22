@@ -1,0 +1,6 @@
+- python:
+    imports:
+    - starlette
+    python_version:
+    - 3.10.*
+    - 3.13.*

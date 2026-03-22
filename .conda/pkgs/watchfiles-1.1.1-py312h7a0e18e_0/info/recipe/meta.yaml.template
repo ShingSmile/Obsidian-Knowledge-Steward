@@ -1,0 +1,62 @@
+{% set name = "watchfiles" %}
+{% set version = "1.1.1" %}
+
+
+package:
+  name: {{ name|lower }}
+  version: {{ version }}
+
+source:
+  url: https://pypi.org/packages/source/{{ name[0] }}/{{ name }}/{{ name }}-{{ version }}.tar.gz
+  sha256: a173cb5c16c4f40ab19cecf48a534c409f7ea983ab8fed0741304a1c0a31b3f2
+
+build:
+  number: 0
+  script:
+    # PyPy has weird sysconfigdata name
+    - rm -f $PREFIX/lib/pypy$PY_VER/_sysconfigdata.py  # [build_platform != target_platform and target_platform == "linux-ppc64le"]
+    - {{ PYTHON }} -m pip install . -vv
+    - cargo-bundle-licenses --format yaml --output THIRDPARTY.yml
+  entry_points:
+    - watchfiles = watchfiles.cli:cli
+
+
+requirements:
+  build:
+    - python
+    - cross-python_{{ target_platform }}     # [build_platform != target_platform]
+    - {{ compiler('c') }}
+    - {{ stdlib("c") }}
+    - {{ compiler('rust') }}
+    - cargo-bundle-licenses
+    - maturin
+  host:
+    - maturin
+    - pip
+    - python
+  run:
+    - python
+    - anyio >=3.0.0
+
+test:
+  requires:
+    - pip
+  imports:
+    - watchfiles
+  commands:
+    - pip check
+    - watchfiles -h
+
+about:
+  home: https://watchfiles.helpmanual.io
+  summary: Simple, modern and high performance file watching and code reload in python.
+  dev_url: https://github.com/samuelcolvin/watchfiles
+  license: MIT
+  license_file:
+    - LICENSE
+    - THIRDPARTY.yml
+
+extra:
+  recipe-maintainers:
+    - davidbrochart
+    - samuelcolvin

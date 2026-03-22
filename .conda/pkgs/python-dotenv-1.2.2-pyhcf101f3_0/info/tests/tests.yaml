@@ -1,0 +1,11 @@
+- python:
+    imports:
+    - dotenv
+    python_version:
+    - 3.10.*
+    - 3.14.*
+- script:
+    content: pip check
+  requirements:
+    run:
+    - python 3.10.*

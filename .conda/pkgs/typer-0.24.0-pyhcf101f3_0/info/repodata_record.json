@@ -1,0 +1,26 @@
+{
+  "build": "pyhcf101f3_0",
+  "build_number": 0,
+  "channel": "https://mirrors.tuna.tsinghua.edu.cn/anaconda/cloud/conda-forge/noarch",
+  "constrains": [],
+  "depends": [
+    "annotated-doc >=0.0.2",
+    "click >=8.2.1",
+    "python >=3.10",
+    "rich >=12.3.0",
+    "shellingham >=1.3.0",
+    "python"
+  ],
+  "fn": "typer-0.24.0-pyhcf101f3_0.conda",
+  "license": "MIT",
+  "md5": "10870929f587540c5802cd9b071cba5c",
+  "name": "typer",
+  "noarch": "python",
+  "package_type": "noarch_python",
+  "sha256": "e1116d08e6a55b2b42a090130c268f75211ad8e6a8e7749e977924de3864d487",
+  "size": 117860,
+  "subdir": "noarch",
+  "timestamp": 1771292312000,
+  "url": "https://mirrors.tuna.tsinghua.edu.cn/anaconda/cloud/conda-forge/noarch/typer-0.24.0-pyhcf101f3_0.conda",
+  "version": "0.24.0"
+}

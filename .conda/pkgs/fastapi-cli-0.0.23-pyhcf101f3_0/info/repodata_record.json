@@ -1,0 +1,26 @@
+{
+  "build": "pyhcf101f3_0",
+  "build_number": 0,
+  "channel": "https://mirrors.tuna.tsinghua.edu.cn/anaconda/cloud/conda-forge/noarch",
+  "constrains": [],
+  "depends": [
+    "python >=3.10",
+    "rich-toolkit >=0.14.8",
+    "tomli >=2.0.0",
+    "typer >=0.15.1",
+    "uvicorn-standard >=0.15.0",
+    "python"
+  ],
+  "fn": "fastapi-cli-0.0.23-pyhcf101f3_0.conda",
+  "license": "MIT",
+  "md5": "442ec6511754418c87a84bc1dc0c5384",
+  "name": "fastapi-cli",
+  "noarch": "python",
+  "package_type": "noarch_python",
+  "sha256": "cb60fc8c96dcd2a6335914d4d6d7d5f5549c9e1ff4533be28ba699e648babf37",
+  "size": 18920,
+  "subdir": "noarch",
+  "timestamp": 1771293215000,
+  "url": "https://mirrors.tuna.tsinghua.edu.cn/anaconda/cloud/conda-forge/noarch/fastapi-cli-0.0.23-pyhcf101f3_0.conda",
+  "version": "0.0.23"
+}

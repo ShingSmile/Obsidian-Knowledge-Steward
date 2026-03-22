@@ -1,0 +1,17 @@
+- python:
+    imports:
+    - fastapi
+    - fastapi.dependencies
+    - fastapi.middleware
+    - fastapi.openapi
+    - fastapi.security
+    python_version:
+    - 3.10.*
+    - 3.14.*
+- script:
+    content: |-
+      fastapi --version
+      fastapi --help
+  requirements:
+    run:
+    - python 3.10.*

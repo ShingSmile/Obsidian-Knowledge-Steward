@@ -1,0 +1,978 @@
+{
+  "schema_version": "1.1",
+  "generated_at": "2026-03-17T07:38:46.251539+00:00",
+  "backend_version": "0.1.0",
+  "selected_case_ids": [
+    "ask_sample_retrieval_only_daily_notes",
+    "ask_sample_filter_fallback",
+    "ask_fixture_generated_answer_citation_valid",
+    "ask_fixture_invalid_citation_downgrades",
+    "ask_fixture_no_hits",
+    "ask_fixture_semantic_overclaim_writeback",
+    "ask_fixture_semantic_overclaim_governance",
+    "digest_sample_structured_result",
+    "digest_sample_waiting_proposal",
+    "digest_fixture_empty_index_fallback",
+    "resume_fixture_reject_waiting_proposal",
+    "resume_fixture_writeback_success",
+    "resume_fixture_writeback_failure"
+  ],
+  "summary": {
+    "selected_case_count": 13,
+    "passed_case_count": 13,
+    "failed_case_count": 0
+  },
+  "cases": [
+    {
+      "case_id": "ask_sample_retrieval_only_daily_notes",
+      "suite": "ask",
+      "suite_file": "eval/golden/ask_cases.json",
+      "scenario": "ask",
+      "fixture": "sample_vault",
+      "description": "基于真实 sample_vault 的最小问答回归，确认无 provider 时仍能返回 retrieval_only 证据结果。",
+      "started_at": "2026-03-17T07:38:45.280002+00:00",
+      "duration_ms": 195.28,
+      "outcome": "passed",
+      "expected": {
+        "http_status": 200,
+        "workflow_status": "completed",
+        "message_contains": "retrieval-only fallback",
+        "approval_required": false,
+        "ask_result": {
+          "mode": "retrieval_only",
+          "model_fallback_used": true,
+          "model_fallback_reason": "no_available_chat_provider",
+          "retrieval_fallback_used": false,
+          "min_citation_count": 1,
+          "min_retrieved_candidate_count": 1,
+          "answer_contains": "当前未使用模型生成答案"
+        }
+      },
+      "actual": {
+        "http_status": 200,
+        "workflow_status": "completed",
+        "message": "Ask workflow completed with retrieval-only fallback.",
+        "approval_required": false,
+        "run_id": "run_bed49098f11f439ab6761a563c13ed0b",
+        "thread_id": "thread_265beab4a4dc4981b5dcc29cc688644b",
+        "fixture_id": "sample_vault",
+        "fixture_db_path": "/var/folders/k1/fyz1kmds28dbvwxxbrrxt4rw0000gn/T/ks_eval_ask_sample_retrieval_only_daily_notes_wyvl_gic/knowledge_steward.sqlite3",
+        "trace_path_exists": true,
+        "ask_result": {
+          "mode": "retrieval_only",
+          "answer": "当前未使用模型生成答案，先返回与问题“总结”最相关的检索证据。\n[1] 2024-01-26_星期五.md / Summary (lines 21-43): ...想吐槽的，有什么问题但不一定能解决\n* 有什么idea\n* 讨论环节\n* action\n\n* [总结]\n\t* 业务\n\t\t* 坑\n\t* 技术\n\t* 模块化\n* session\n\t* 分享...\n[2] 2023-11-06_星期一.md / Summary (lines 21-34): # Summary\n\n* 要什么东西，提供什么功能\n* 这周四之前完成复盘、[总结]、和task\n* 正常的码单数据在下单收银之后会被直接删除，但是预订单的码单头部数据会保留\n* 类内部调用事务方法会导致事务失效\n\t* transactional基于aop，基于动态代理，调用内部类方法使用this对象不走动态代理...",
+          "citation_count": 2,
+          "retrieved_candidate_count": 2,
+          "retrieval_fallback_used": false,
+          "retrieval_fallback_reason": null,
+          "model_fallback_used": true,
+          "model_fallback_reason": "no_available_chat_provider",
+          "provider_name": null,
+          "model_name": null
+        },
+        "ask_groundedness": {
+          "bucket": "not_generated_answer",
+          "consistent": null,
+          "reason": "ask_result_not_generated_answer",
+          "citation_numbers": [],
+          "cited_candidate_count": 0,
+          "unsupported_terms": [],
+          "answer_text": "当前未使用模型生成答案，先返回与问题“总结”最相关的检索证据。\n 2024-01-26_星期五.md / Summary (lines 21-43): ...想吐槽的，有什么问题但不一定能解决\n* 有什么idea\n* 讨论环节\n* action\n\n* [总结]\n\t* 业务\n\t\t* 坑\n\t* 技术\n\t* 模块化\n* session\n\t* 分享...\n 2023-11-06_星期一.md / Summary (lines 21-34): # Summary\n\n* 要什么东西，提供什么功能\n* 这周四之前完成复盘、[总结]、和task\n* 正常的码单数据在下单收银之后会被直接删除，但是预订单的码单头部数据会保留\n* 类内部调用事务方法会导致事务失效\n\t* transactional基于aop，基于动态代理，调用内部类方法使用this对象不走动态代理..."
+        },
+        "digest_result": null,
+        "proposal": null
+      },
+      "error": null
+    },
+    {
+      "case_id": "ask_sample_filter_fallback",
+      "suite": "ask",
+      "suite_file": "eval/golden/ask_cases.json",
+      "scenario": "ask",
+      "fixture": "sample_vault",
+      "description": "真实 sample_vault 下的 metadata filter 过严时，应稳定退回纯 FTS 结果。",
+      "started_at": "2026-03-17T07:38:45.475361+00:00",
+      "duration_ms": 172.46,
+      "outcome": "passed",
+      "expected": {
+        "http_status": 200,
+        "workflow_status": "completed",
+        "message_contains": "retrieval-only fallback",
+        "approval_required": false,
+        "ask_result": {
+          "mode": "retrieval_only",
+          "model_fallback_used": true,
+          "model_fallback_reason": "no_available_chat_provider",
+          "retrieval_fallback_used": true,
+          "retrieval_fallback_reason": "metadata_filters_too_strict",
+          "min_citation_count": 1,
+          "min_retrieved_candidate_count": 1,
+          "answer_contains": [
+            "当前未使用模型生成答案",
+            "检索已退回纯 FTS 结果"
+          ]
+        }
+      },
+      "actual": {
+        "http_status": 200,
+        "workflow_status": "completed",
+        "message": "Ask workflow completed with retrieval-only fallback.",
+        "approval_required": false,
+        "run_id": "run_d1b343a728ad4b748d8349ec7deaf267",
+        "thread_id": "thread_50928f0a413447379fd19a54f5a67e7c",
+        "fixture_id": "sample_vault",
+        "fixture_db_path": "/var/folders/k1/fyz1kmds28dbvwxxbrrxt4rw0000gn/T/ks_eval_ask_sample_filter_fallback_vz38tdwf/knowledge_steward.sqlite3",
+        "trace_path_exists": true,
+        "ask_result": {
+          "mode": "retrieval_only",
+          "answer": "当前未使用模型生成答案，先返回与问题“总结”最相关的检索证据。\n注意：结构化过滤条件过严，检索已退回纯 FTS 结果。\n[1] v6.3.0迭代总结.md / 二、任务总结 > 5、总结 (lines 30-34): 二、任务总结 > 5、[总结]\n[2] v6.2.5迭代总结.md / 二、任务总结 > 5、总结 (lines 42-46): 二、任务总结 > 5、[总结]\n[3] 2024-01-26_星期五.md / Summary (lines 21-43): ...想吐槽的，有什么问题但不一定能解决\n* 有什么idea\n* 讨论环节\n* action\n\n* [总结]\n\t* 业务\n\t\t* 坑\n\t* 技术\n\t* 模块化\n* session\n\t* 分享...\n[4] 2023-11-06_星期一.md / Summary (lines 21-34): # Summary\n\n* 要什么东西，提供什么功能\n* 这周四之前完成复盘、[总结]、和task\n* 正常的码单数据在下单收银之后会被直接删除，但是预订单的码单头部数据会保留\n* 类内部调用事务方法会导致事务失效\n\t* transactional基于aop，基于动态代理，调用内部类方法使用this对象不走动态代理...",
+          "citation_count": 4,
+          "retrieved_candidate_count": 4,
+          "retrieval_fallback_used": true,
+          "retrieval_fallback_reason": "metadata_filters_too_strict",
+          "model_fallback_used": true,
+          "model_fallback_reason": "no_available_chat_provider",
+          "provider_name": null,
+          "model_name": null
+        },
+        "ask_groundedness": {
+          "bucket": "not_generated_answer",
+          "consistent": null,
+          "reason": "ask_result_not_generated_answer",
+          "citation_numbers": [],
+          "cited_candidate_count": 0,
+          "unsupported_terms": [],
+          "answer_text": "当前未使用模型生成答案，先返回与问题“总结”最相关的检索证据。\n注意：结构化过滤条件过严，检索已退回纯 FTS 结果。\n v6.3.0迭代总结.md / 二、任务总结 > 5、总结 (lines 30-34): 二、任务总结 > 5、[总结]\n v6.2.5迭代总结.md / 二、任务总结 > 5、总结 (lines 42-46): 二、任务总结 > 5、[总结]\n 2024-01-26_星期五.md / Summary (lines 21-43): ...想吐槽的，有什么问题但不一定能解决\n* 有什么idea\n* 讨论环节\n* action\n\n* [总结]\n\t* 业务\n\t\t* 坑\n\t* 技术\n\t* 模块化\n* session\n\t* 分享...\n 2023-11-06_星期一.md / Summary (lines 21-34): # Summary\n\n* 要什么东西，提供什么功能\n* 这周四之前完成复盘、[总结]、和task\n* 正常的码单数据在下单收银之后会被直接删除，但是预订单的码单头部数据会保留\n* 类内部调用事务方法会导致事务失效\n\t* transactional基于aop，基于动态代理，调用内部类方法使用this对象不走动态代理..."
+        },
+        "digest_result": null,
+        "proposal": null
+      },
+      "error": null
+    },
+    {
+      "case_id": "ask_fixture_generated_answer_citation_valid",
+      "suite": "ask",
+      "suite_file": "eval/golden/ask_cases.json",
+      "scenario": "ask",
+      "fixture": "ask_basic",
+      "description": "deterministic fixture 下 provider 返回合法且语义受证据支撑的 [1] 引用时，应保留 generated_answer。",
+      "started_at": "2026-03-17T07:38:45.647836+00:00",
+      "duration_ms": 29.07,
+      "outcome": "passed",
+      "expected": {
+        "http_status": 200,
+        "workflow_status": "completed",
+        "message_contains": "grounded answer",
+        "approval_required": false,
+        "ask_result": {
+          "mode": "generated_answer",
+          "model_fallback_used": false,
+          "provider_name": "openai-compatible",
+          "min_citation_count": 1,
+          "min_retrieved_candidate_count": 1,
+          "answer_contains": [
+            "携带引用",
+            "[2]"
+          ]
+        },
+        "ask_groundedness": {
+          "bucket": "grounded",
+          "consistent": true,
+          "reason": "all_answer_terms_supported_by_cited_evidence",
+          "cited_candidate_count": 1
+        }
+      },
+      "actual": {
+        "http_status": 200,
+        "workflow_status": "completed",
+        "message": "Ask workflow completed with a grounded answer.",
+        "approval_required": false,
+        "run_id": "run_b97270bc919345c09c434d2a87cb3a7a",
+        "thread_id": "thread_04ecc978789449a094be41edf269cc47",
+        "fixture_id": "ask_basic",
+        "fixture_db_path": "/var/folders/k1/fyz1kmds28dbvwxxbrrxt4rw0000gn/T/ks_eval_ask_fixture_generated_answer_citation_valid_ydgx3acu/knowledge_steward.sqlite3",
+        "trace_path_exists": true,
+        "ask_result": {
+          "mode": "generated_answer",
+          "answer": "问答结果需要携带引用。[2]",
+          "citation_count": 3,
+          "retrieved_candidate_count": 3,
+          "retrieval_fallback_used": false,
+          "retrieval_fallback_reason": null,
+          "model_fallback_used": false,
+          "model_fallback_reason": null,
+          "provider_name": "openai-compatible",
+          "model_name": "gpt-eval"
+        },
+        "ask_groundedness": {
+          "bucket": "grounded",
+          "consistent": true,
+          "reason": "all_answer_terms_supported_by_cited_evidence",
+          "citation_numbers": [
+            2
+          ],
+          "cited_candidate_count": 1,
+          "unsupported_terms": [],
+          "answer_text": "问答结果需要携带引用。"
+        },
+        "digest_result": null,
+        "proposal": null
+      },
+      "error": null
+    },
+    {
+      "case_id": "ask_fixture_invalid_citation_downgrades",
+      "suite": "ask",
+      "suite_file": "eval/golden/ask_cases.json",
+      "scenario": "ask",
+      "fixture": "ask_basic",
+      "description": "deterministic fixture 下 provider 返回越界编号时，应保守降级为 retrieval_only。",
+      "started_at": "2026-03-17T07:38:45.676925+00:00",
+      "duration_ms": 31.53,
+      "outcome": "passed",
+      "expected": {
+        "http_status": 200,
+        "workflow_status": "completed",
+        "message_contains": "retrieval-only fallback",
+        "approval_required": false,
+        "ask_result": {
+          "mode": "retrieval_only",
+          "model_fallback_used": true,
+          "model_fallback_reason": "citation_alignment_out_of_range",
+          "min_citation_count": 1,
+          "min_retrieved_candidate_count": 1,
+          "answer_contains": [
+            "当前未使用模型生成答案",
+            "[1]"
+          ]
+        }
+      },
+      "actual": {
+        "http_status": 200,
+        "workflow_status": "completed",
+        "message": "Ask workflow completed with retrieval-only fallback.",
+        "approval_required": false,
+        "run_id": "run_4b422643e09f4e67b8e8d512c3626678",
+        "thread_id": "thread_7b4a15d0f29e48689013f84a80cec6f9",
+        "fixture_id": "ask_basic",
+        "fixture_db_path": "/var/folders/k1/fyz1kmds28dbvwxxbrrxt4rw0000gn/T/ks_eval_ask_fixture_invalid_citation_downgrades_1flgycco/knowledge_steward.sqlite3",
+        "trace_path_exists": true,
+        "ask_result": {
+          "mode": "retrieval_only",
+          "answer": "当前未使用模型生成答案，先返回与问题“Roadmap”最相关的检索证据。\n[1] Roadmap.md / Roadmap (lines 1-2): [Roadmap]\n[2] Roadmap.md / Roadmap > Ask (lines 3-6): [Roadmap]\n[3] Roadmap.md / Roadmap > Scope (lines 7-9): [Roadmap]",
+          "citation_count": 3,
+          "retrieved_candidate_count": 3,
+          "retrieval_fallback_used": false,
+          "retrieval_fallback_reason": null,
+          "model_fallback_used": true,
+          "model_fallback_reason": "citation_alignment_out_of_range",
+          "provider_name": null,
+          "model_name": null
+        },
+        "ask_groundedness": {
+          "bucket": "not_generated_answer",
+          "consistent": null,
+          "reason": "ask_result_not_generated_answer",
+          "citation_numbers": [],
+          "cited_candidate_count": 0,
+          "unsupported_terms": [],
+          "answer_text": "当前未使用模型生成答案，先返回与问题“Roadmap”最相关的检索证据。\n Roadmap.md / Roadmap (lines 1-2): [Roadmap]\n Roadmap.md / Roadmap > Ask (lines 3-6): [Roadmap]\n Roadmap.md / Roadmap > Scope (lines 7-9): [Roadmap]"
+        },
+        "digest_result": null,
+        "proposal": null
+      },
+      "error": null
+    },
+    {
+      "case_id": "ask_fixture_no_hits",
+      "suite": "ask",
+      "suite_file": "eval/golden/ask_cases.json",
+      "scenario": "ask",
+      "fixture": "ask_basic",
+      "description": "无命中 query 应走 no_hits，而不是伪造 citation 或空 retrieval_only。",
+      "started_at": "2026-03-17T07:38:45.708466+00:00",
+      "duration_ms": 23.17,
+      "outcome": "passed",
+      "expected": {
+        "http_status": 200,
+        "workflow_status": "completed",
+        "message_contains": "without matching evidence",
+        "approval_required": false,
+        "ask_result": {
+          "mode": "no_hits",
+          "model_fallback_used": false,
+          "min_citation_count": 0,
+          "answer_contains": "未找到可支撑回答的笔记片段"
+        }
+      },
+      "actual": {
+        "http_status": 200,
+        "workflow_status": "completed",
+        "message": "Ask workflow completed without matching evidence.",
+        "approval_required": false,
+        "run_id": "run_e9d3f3ff475e4977b3734c3f2439e90d",
+        "thread_id": "thread_dec9fc15a7d3472195b8625bca199bac",
+        "fixture_id": "ask_basic",
+        "fixture_db_path": "/var/folders/k1/fyz1kmds28dbvwxxbrrxt4rw0000gn/T/ks_eval_ask_fixture_no_hits_zd3lo1u7/knowledge_steward.sqlite3",
+        "trace_path_exists": true,
+        "ask_result": {
+          "mode": "no_hits",
+          "answer": "未找到可支撑回答的笔记片段，当前无法返回带引用的答案。",
+          "citation_count": 0,
+          "retrieved_candidate_count": 0,
+          "retrieval_fallback_used": false,
+          "retrieval_fallback_reason": null,
+          "model_fallback_used": false,
+          "model_fallback_reason": null,
+          "provider_name": null,
+          "model_name": null
+        },
+        "ask_groundedness": {
+          "bucket": "not_generated_answer",
+          "consistent": null,
+          "reason": "ask_result_not_generated_answer",
+          "citation_numbers": [],
+          "cited_candidate_count": 0,
+          "unsupported_terms": [],
+          "answer_text": "未找到可支撑回答的笔记片段，当前无法返回带引用的答案。"
+        },
+        "digest_result": null,
+        "proposal": null
+      },
+      "error": null
+    },
+    {
+      "case_id": "ask_fixture_semantic_overclaim_writeback",
+      "suite": "ask",
+      "suite_file": "eval/golden/ask_cases.json",
+      "scenario": "ask",
+      "fixture": "ask_basic",
+      "description": "编号合法但答案声称会自动写回知识库时，离线 eval 应识别为 unsupported_claim。",
+      "started_at": "2026-03-17T07:38:45.731651+00:00",
+      "duration_ms": 19.52,
+      "outcome": "passed",
+      "expected": {
+        "http_status": 200,
+        "workflow_status": "completed",
+        "message_contains": "grounded answer",
+        "approval_required": false,
+        "ask_result": {
+          "mode": "generated_answer",
+          "model_fallback_used": false,
+          "provider_name": "openai-compatible",
+          "min_citation_count": 1,
+          "min_retrieved_candidate_count": 1,
+          "answer_contains": [
+            "自动写回知识库",
+            "[2]"
+          ]
+        },
+        "ask_groundedness": {
+          "bucket": "unsupported_claim",
+          "consistent": false,
+          "reason": "answer_contains_terms_not_found_in_cited_evidence",
+          "cited_candidate_count": 1,
+          "unsupported_term_min_count": 2,
+          "unsupported_term_contains": [
+            "自动",
+            "写回"
+          ]
+        }
+      },
+      "actual": {
+        "http_status": 200,
+        "workflow_status": "completed",
+        "message": "Ask workflow completed with a grounded answer.",
+        "approval_required": false,
+        "run_id": "run_67fbec992c4646c5a1de7713f67cb721",
+        "thread_id": "thread_20b5274c95244064a67c0db2ec9e6979",
+        "fixture_id": "ask_basic",
+        "fixture_db_path": "/var/folders/k1/fyz1kmds28dbvwxxbrrxt4rw0000gn/T/ks_eval_ask_fixture_semantic_overclaim_writeback_a8fdcybu/knowledge_steward.sqlite3",
+        "trace_path_exists": true,
+        "ask_result": {
+          "mode": "generated_answer",
+          "answer": "问答结果会自动写回知识库。[2]",
+          "citation_count": 3,
+          "retrieved_candidate_count": 3,
+          "retrieval_fallback_used": false,
+          "retrieval_fallback_reason": null,
+          "model_fallback_used": false,
+          "model_fallback_reason": null,
+          "provider_name": "openai-compatible",
+          "model_name": "gpt-eval"
+        },
+        "ask_groundedness": {
+          "bucket": "unsupported_claim",
+          "consistent": false,
+          "reason": "answer_contains_terms_not_found_in_cited_evidence",
+          "citation_numbers": [
+            2
+          ],
+          "cited_candidate_count": 1,
+          "unsupported_terms": [
+            "果会",
+            "会自",
+            "自动",
+            "动写",
+            "写回",
+            "回知",
+            "知识",
+            "识库"
+          ],
+          "answer_text": "问答结果会自动写回知识库。"
+        },
+        "digest_result": null,
+        "proposal": null
+      },
+      "error": null
+    },
+    {
+      "case_id": "ask_fixture_semantic_overclaim_governance",
+      "suite": "ask",
+      "suite_file": "eval/golden/ask_cases.json",
+      "scenario": "ask",
+      "fixture": "ask_basic",
+      "description": "编号合法但答案过度概括为已完成双链治理时，离线 eval 应识别为 unsupported_claim。",
+      "started_at": "2026-03-17T07:38:45.751181+00:00",
+      "duration_ms": 19.5,
+      "outcome": "passed",
+      "expected": {
+        "http_status": 200,
+        "workflow_status": "completed",
+        "message_contains": "grounded answer",
+        "approval_required": false,
+        "ask_result": {
+          "mode": "generated_answer",
+          "model_fallback_used": false,
+          "provider_name": "openai-compatible",
+          "min_citation_count": 1,
+          "min_retrieved_candidate_count": 1,
+          "answer_contains": [
+            "双链治理",
+            "[2]"
+          ]
+        },
+        "ask_groundedness": {
+          "bucket": "unsupported_claim",
+          "consistent": false,
+          "reason": "answer_contains_terms_not_found_in_cited_evidence",
+          "cited_candidate_count": 1,
+          "unsupported_term_min_count": 2,
+          "unsupported_term_contains": [
+            "双链",
+            "治理"
+          ]
+        }
+      },
+      "actual": {
+        "http_status": 200,
+        "workflow_status": "completed",
+        "message": "Ask workflow completed with a grounded answer.",
+        "approval_required": false,
+        "run_id": "run_c8ccb2f5e373487298cc8f6658dac682",
+        "thread_id": "thread_97b6c6ee29104a65b632835f2726c2ce",
+        "fixture_id": "ask_basic",
+        "fixture_db_path": "/var/folders/k1/fyz1kmds28dbvwxxbrrxt4rw0000gn/T/ks_eval_ask_fixture_semantic_overclaim_governance_p0dfd2hd/knowledge_steward.sqlite3",
+        "trace_path_exists": true,
+        "ask_result": {
+          "mode": "generated_answer",
+          "answer": "Roadmap 已完成双链治理。[2]",
+          "citation_count": 3,
+          "retrieved_candidate_count": 3,
+          "retrieval_fallback_used": false,
+          "retrieval_fallback_reason": null,
+          "model_fallback_used": false,
+          "model_fallback_reason": null,
+          "provider_name": "openai-compatible",
+          "model_name": "gpt-eval"
+        },
+        "ask_groundedness": {
+          "bucket": "unsupported_claim",
+          "consistent": false,
+          "reason": "answer_contains_terms_not_found_in_cited_evidence",
+          "citation_numbers": [
+            2
+          ],
+          "cited_candidate_count": 1,
+          "unsupported_terms": [
+            "roadmap",
+            "已完",
+            "完成",
+            "成双",
+            "双链",
+            "链治",
+            "治理",
+            "已完成"
+          ],
+          "answer_text": "Roadmap 已完成双链治理。"
+        },
+        "digest_result": null,
+        "proposal": null
+      },
+      "error": null
+    },
+    {
+      "case_id": "digest_sample_structured_result",
+      "suite": "digest",
+      "suite_file": "eval/golden/digest_cases.json",
+      "scenario": "digest",
+      "fixture": "sample_vault",
+      "description": "基于真实 sample_vault 的最小 DAILY_DIGEST 回归，确认当前至少能稳定产出结构化摘要。",
+      "started_at": "2026-03-17T07:38:45.770694+00:00",
+      "duration_ms": 203.06,
+      "outcome": "passed",
+      "expected": {
+        "http_status": 200,
+        "workflow_status": "completed",
+        "message_contains": "indexed note digest",
+        "approval_required": false,
+        "digest_result": {
+          "fallback_used": false,
+          "min_source_note_count": 1,
+          "markdown_contains": [
+            "本次 DAILY_DIGEST 基于最近",
+            "重点来源"
+          ]
+        }
+      },
+      "actual": {
+        "http_status": 200,
+        "workflow_status": "completed",
+        "message": "Digest workflow completed with indexed note digest.",
+        "approval_required": false,
+        "run_id": "run_c9609ac2aa5d4c979980b551c6e29118",
+        "thread_id": "thread_035a3697c2c64be799d7917288f831af",
+        "fixture_id": "sample_vault",
+        "fixture_db_path": "/var/folders/k1/fyz1kmds28dbvwxxbrrxt4rw0000gn/T/ks_eval_digest_sample_structured_result_6jszgmoq/knowledge_steward.sqlite3",
+        "trace_path_exists": true,
+        "ask_result": null,
+        "ask_groundedness": null,
+        "digest_result": {
+          "source_note_count": 6,
+          "fallback_used": false,
+          "fallback_reason": null,
+          "digest_markdown": "本次 DAILY_DIGEST 基于最近 6 篇已索引笔记生成。\n来源分布：daily_note 6 篇。\n覆盖日期：2024-03-23 至 2025-03-02。\n待跟进任务：当前来源笔记中未检测到任务项。\n\n## 重点来源\n- Task Planner（daily_note，2025-03-02，任务 0 项）\n- Task Planner（daily_note，2024-03-27，任务 0 项）\n- Task Planner（daily_note，2024-03-26，任务 0 项）\n- Task Planner（daily_note，2024-03-25，任务 0 项）\n\n其余 2 篇笔记已保留在 source_notes 中，可供后续扩展节点继续消费。"
+        },
+        "proposal": null
+      },
+      "error": null
+    },
+    {
+      "case_id": "digest_sample_waiting_proposal",
+      "suite": "digest",
+      "suite_file": "eval/golden/digest_cases.json",
+      "scenario": "digest",
+      "fixture": "sample_vault",
+      "description": "真实 sample_vault 下启用 proposal 模式时，应返回 waiting_for_approval 和结构化 proposal。",
+      "started_at": "2026-03-17T07:38:45.973773+00:00",
+      "duration_ms": 215.62,
+      "outcome": "passed",
+      "expected": {
+        "http_status": 202,
+        "workflow_status": "waiting_for_approval",
+        "message_contains": "waiting for approval",
+        "approval_required": true,
+        "digest_result": {
+          "fallback_used": false,
+          "min_source_note_count": 1,
+          "markdown_contains": "本次 DAILY_DIGEST 基于最近"
+        },
+        "proposal": {
+          "present": true,
+          "patch_ops": [
+            "merge_frontmatter",
+            "insert_under_heading"
+          ],
+          "target_note_path_suffix": ".md",
+          "summary_contains": "DAILY_DIGEST"
+        }
+      },
+      "actual": {
+        "http_status": 202,
+        "workflow_status": "waiting_for_approval",
+        "message": "Digest workflow generated a proposal and is waiting for approval.",
+        "approval_required": true,
+        "run_id": "run_0b6476dd9a264bb08ae5045b392c267f",
+        "thread_id": "thread_4e36c59cb47b4a7fb8f22960626577df",
+        "fixture_id": "sample_vault",
+        "fixture_db_path": "/var/folders/k1/fyz1kmds28dbvwxxbrrxt4rw0000gn/T/ks_eval_digest_sample_waiting_proposal_ggm2vc09/knowledge_steward.sqlite3",
+        "trace_path_exists": true,
+        "ask_result": null,
+        "ask_groundedness": null,
+        "digest_result": {
+          "source_note_count": 6,
+          "fallback_used": false,
+          "fallback_reason": null,
+          "digest_markdown": "本次 DAILY_DIGEST 基于最近 6 篇已索引笔记生成。\n来源分布：daily_note 6 篇。\n覆盖日期：2024-03-23 至 2025-03-02。\n待跟进任务：当前来源笔记中未检测到任务项。\n\n## 重点来源\n- Task Planner（daily_note，2025-03-02，任务 0 项）\n- Task Planner（daily_note，2024-03-27，任务 0 项）\n- Task Planner（daily_note，2024-03-26，任务 0 项）\n- Task Planner（daily_note，2024-03-25，任务 0 项）\n\n其余 2 篇笔记已保留在 source_notes 中，可供后续扩展节点继续消费。"
+        },
+        "proposal": {
+          "proposal_id": "prop_digest_e14cc75487dc63c3",
+          "target_note_path": "/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/sample_vault/日常/2025-03-02_星期日.md",
+          "summary": "将本次 DAILY_DIGEST 写入 Task Planner，并标记这次摘要需要人工审批。",
+          "risk_level": "medium",
+          "patch_ops": [
+            "merge_frontmatter",
+            "insert_under_heading"
+          ]
+        }
+      },
+      "error": null
+    },
+    {
+      "case_id": "digest_fixture_empty_index_fallback",
+      "suite": "digest",
+      "suite_file": "eval/golden/digest_cases.json",
+      "scenario": "digest",
+      "fixture": "empty_index",
+      "description": "空索引下 digest 应返回安全 fallback，而不是抛异常或空 proposal。",
+      "started_at": "2026-03-17T07:38:46.189399+00:00",
+      "duration_ms": 16.9,
+      "outcome": "passed",
+      "expected": {
+        "http_status": 200,
+        "workflow_status": "completed",
+        "message_contains": "safe fallback",
+        "approval_required": false,
+        "digest_result": {
+          "fallback_used": true,
+          "fallback_reason": "no_indexed_notes",
+          "source_note_count": 0,
+          "markdown_contains": "请先执行一次 INGEST_STEWARD"
+        }
+      },
+      "actual": {
+        "http_status": 200,
+        "workflow_status": "completed",
+        "message": "Digest workflow completed with safe fallback.",
+        "approval_required": false,
+        "run_id": "run_cb0f1b9f373a466cabd4e9e774e5460b",
+        "thread_id": "thread_093f46b46ab24d208abef8f6d891f8f6",
+        "fixture_id": "empty_index",
+        "fixture_db_path": "/var/folders/k1/fyz1kmds28dbvwxxbrrxt4rw0000gn/T/ks_eval_digest_fixture_empty_index_fallback_b7lf_zco/knowledge_steward.sqlite3",
+        "trace_path_exists": true,
+        "ask_result": null,
+        "ask_groundedness": null,
+        "digest_result": {
+          "source_note_count": 0,
+          "fallback_used": true,
+          "fallback_reason": "no_indexed_notes",
+          "digest_markdown": "当前索引中还没有可用于生成 DAILY_DIGEST 的笔记。\n请先执行一次 INGEST_STEWARD，再重新触发 digest。"
+        },
+        "proposal": null
+      },
+      "error": null
+    },
+    {
+      "case_id": "resume_fixture_reject_waiting_proposal",
+      "suite": "resume",
+      "suite_file": "eval/golden/resume_cases.json",
+      "scenario": "resume_workflow",
+      "fixture": "resume_waiting_digest",
+      "description": "对 waiting proposal 执行 reject，应完成 checkpoint 并写入 rejection audit，而不会生成 writeback_result。",
+      "started_at": "2026-03-17T07:38:46.206308+00:00",
+      "duration_ms": 14.81,
+      "outcome": "passed",
+      "expected": {
+        "http_status": 200,
+        "workflow_status": "completed",
+        "message_contains": "recorded rejection",
+        "approval_required": false,
+        "approval_decision": {
+          "approved": false,
+          "reviewer": "eval_reject_reviewer",
+          "approved_patch_op_count": 0
+        },
+        "writeback_result": {
+          "present": false
+        },
+        "checkpoint": {
+          "present": true,
+          "status": "completed",
+          "approval_required": false,
+          "patch_plan_count": 0,
+          "approval_decision_approved": false,
+          "writeback_result_present": false
+        },
+        "audit_log": {
+          "present": true,
+          "approval_status": "rejected",
+          "reviewer": "eval_reject_reviewer",
+          "writeback_applied": false,
+          "error": null
+        }
+      },
+      "actual": {
+        "http_status": 200,
+        "workflow_status": "completed",
+        "message": "Workflow resume recorded rejection. No writeback was executed.",
+        "approval_required": false,
+        "run_id": "run_52d84fb18ac84958b85af4875f90b7eb",
+        "thread_id": "thread_resume_digest",
+        "proposal_id": "prop_digest_resume",
+        "fixture_id": "resume_waiting_digest",
+        "fixture_db_path": "/var/folders/k1/fyz1kmds28dbvwxxbrrxt4rw0000gn/T/ks_eval_resume_fixture_reject_waiting_proposal_uti67gvn/knowledge_steward.sqlite3",
+        "trace_path_exists": false,
+        "proposal": {
+          "proposal_id": "prop_digest_resume",
+          "target_note_path": "/vault/Digest/2026-03-14.md",
+          "summary": "Insert the generated digest into the daily review note.",
+          "risk_level": "high",
+          "patch_ops": [
+            "frontmatter_merge",
+            "insert_under_heading"
+          ]
+        },
+        "approval_decision": {
+          "approved": false,
+          "reviewer": "eval_reject_reviewer",
+          "comment": "risk too high",
+          "approved_patch_op_count": 0
+        },
+        "audit_event_id": "audit_98e04f76e292412a9978541bfdc840df",
+        "writeback_result": null,
+        "checkpoint": {
+          "present": true,
+          "status": "completed",
+          "approval_required": false,
+          "patch_plan_count": 0,
+          "approval_decision_approved": false,
+          "writeback_result_present": false,
+          "writeback_applied": null,
+          "writeback_after_hash": null,
+          "writeback_error": null
+        },
+        "audit_log": {
+          "present": true,
+          "proposal_id": "prop_digest_resume",
+          "approval_status": "rejected",
+          "reviewer": "eval_reject_reviewer",
+          "approval_comment": "risk too high",
+          "before_hash": null,
+          "after_hash": null,
+          "writeback_applied": false,
+          "error": null
+        }
+      },
+      "error": null
+    },
+    {
+      "case_id": "resume_fixture_writeback_success",
+      "suite": "resume",
+      "suite_file": "eval/golden/resume_cases.json",
+      "scenario": "resume_workflow",
+      "fixture": "resume_waiting_digest",
+      "description": "approve 后附带成功 writeback_result，应写入 completed checkpoint 和成功审计记录。",
+      "started_at": "2026-03-17T07:38:46.221129+00:00",
+      "duration_ms": 15.31,
+      "outcome": "passed",
+      "expected": {
+        "http_status": 200,
+        "workflow_status": "completed",
+        "message_contains": "successful writeback result",
+        "approval_required": false,
+        "approval_decision": {
+          "approved": true,
+          "reviewer": "eval_success_reviewer",
+          "approved_patch_op_count": 2
+        },
+        "writeback_result": {
+          "present": true,
+          "applied": true,
+          "before_hash": "sha256:resume_before",
+          "after_hash": "sha256:after_success",
+          "applied_patch_op_count": 2,
+          "error": null
+        },
+        "checkpoint": {
+          "present": true,
+          "status": "completed",
+          "approval_required": false,
+          "patch_plan_count": 2,
+          "approval_decision_approved": true,
+          "writeback_result_present": true,
+          "writeback_applied": true,
+          "writeback_after_hash": "sha256:after_success"
+        },
+        "audit_log": {
+          "present": true,
+          "approval_status": "approved",
+          "reviewer": "eval_success_reviewer",
+          "writeback_applied": true,
+          "before_hash": "sha256:resume_before",
+          "after_hash": "sha256:after_success",
+          "error": null
+        }
+      },
+      "actual": {
+        "http_status": 200,
+        "workflow_status": "completed",
+        "message": "Workflow resume recorded approval and persisted a successful writeback result.",
+        "approval_required": false,
+        "run_id": "run_822538834e754e829a40e330393bc5b3",
+        "thread_id": "thread_resume_digest",
+        "proposal_id": "prop_digest_resume",
+        "fixture_id": "resume_waiting_digest",
+        "fixture_db_path": "/var/folders/k1/fyz1kmds28dbvwxxbrrxt4rw0000gn/T/ks_eval_resume_fixture_writeback_success__wh4hsmx/knowledge_steward.sqlite3",
+        "trace_path_exists": false,
+        "proposal": {
+          "proposal_id": "prop_digest_resume",
+          "target_note_path": "/vault/Digest/2026-03-14.md",
+          "summary": "Insert the generated digest into the daily review note.",
+          "risk_level": "high",
+          "patch_ops": [
+            "frontmatter_merge",
+            "insert_under_heading"
+          ]
+        },
+        "approval_decision": {
+          "approved": true,
+          "reviewer": "eval_success_reviewer",
+          "comment": "apply now",
+          "approved_patch_op_count": 2
+        },
+        "audit_event_id": "audit_77cbb407f1c642e9a1bd2236b3aee78b",
+        "writeback_result": {
+          "present": true,
+          "applied": true,
+          "target_note_path": "/vault/Digest/2026-03-14.md",
+          "before_hash": "sha256:resume_before",
+          "after_hash": "sha256:after_success",
+          "applied_patch_op_count": 2,
+          "error": null
+        },
+        "checkpoint": {
+          "present": true,
+          "status": "completed",
+          "approval_required": false,
+          "patch_plan_count": 2,
+          "approval_decision_approved": true,
+          "writeback_result_present": true,
+          "writeback_applied": true,
+          "writeback_after_hash": "sha256:after_success",
+          "writeback_error": null
+        },
+        "audit_log": {
+          "present": true,
+          "proposal_id": "prop_digest_resume",
+          "approval_status": "approved",
+          "reviewer": "eval_success_reviewer",
+          "approval_comment": "apply now",
+          "before_hash": "sha256:resume_before",
+          "after_hash": "sha256:after_success",
+          "writeback_applied": true,
+          "error": null
+        }
+      },
+      "error": null
+    },
+    {
+      "case_id": "resume_fixture_writeback_failure",
+      "suite": "resume",
+      "suite_file": "eval/golden/resume_cases.json",
+      "scenario": "resume_workflow",
+      "fixture": "resume_waiting_digest",
+      "description": "approve 后附带失败 writeback_result，应保留 completed checkpoint 和失败审计事实，不能伪装成成功写回。",
+      "started_at": "2026-03-17T07:38:46.236446+00:00",
+      "duration_ms": 15.08,
+      "outcome": "passed",
+      "expected": {
+        "http_status": 200,
+        "workflow_status": "completed",
+        "message_contains": "failed writeback result",
+        "approval_required": false,
+        "approval_decision": {
+          "approved": true,
+          "reviewer": "eval_failed_reviewer",
+          "approved_patch_op_count": 2
+        },
+        "writeback_result": {
+          "present": true,
+          "applied": false,
+          "before_hash": "sha256:current_hash",
+          "applied_patch_op_count": 0,
+          "error_contains": "before_hash mismatch"
+        },
+        "checkpoint": {
+          "present": true,
+          "status": "completed",
+          "approval_required": false,
+          "patch_plan_count": 2,
+          "approval_decision_approved": true,
+          "writeback_result_present": true,
+          "writeback_applied": false,
+          "writeback_error_contains": "before_hash mismatch"
+        },
+        "audit_log": {
+          "present": true,
+          "approval_status": "approved",
+          "reviewer": "eval_failed_reviewer",
+          "writeback_applied": false,
+          "before_hash": "sha256:current_hash",
+          "after_hash": null,
+          "error_contains": "before_hash mismatch"
+        }
+      },
+      "actual": {
+        "http_status": 200,
+        "workflow_status": "completed",
+        "message": "Workflow resume recorded approval, but the plugin reported a failed writeback result.",
+        "approval_required": false,
+        "run_id": "run_bae5a432e28f40a7b56b56771e911424",
+        "thread_id": "thread_resume_digest",
+        "proposal_id": "prop_digest_resume",
+        "fixture_id": "resume_waiting_digest",
+        "fixture_db_path": "/var/folders/k1/fyz1kmds28dbvwxxbrrxt4rw0000gn/T/ks_eval_resume_fixture_writeback_failure_uv0qdnyi/knowledge_steward.sqlite3",
+        "trace_path_exists": false,
+        "proposal": {
+          "proposal_id": "prop_digest_resume",
+          "target_note_path": "/vault/Digest/2026-03-14.md",
+          "summary": "Insert the generated digest into the daily review note.",
+          "risk_level": "high",
+          "patch_ops": [
+            "frontmatter_merge",
+            "insert_under_heading"
+          ]
+        },
+        "approval_decision": {
+          "approved": true,
+          "reviewer": "eval_failed_reviewer",
+          "comment": "record the failure",
+          "approved_patch_op_count": 2
+        },
+        "audit_event_id": "audit_ba2f6608014f4737955722525e578393",
+        "writeback_result": {
+          "present": true,
+          "applied": false,
+          "target_note_path": "/vault/Digest/2026-03-14.md",
+          "before_hash": "sha256:current_hash",
+          "after_hash": null,
+          "applied_patch_op_count": 0,
+          "error": "before_hash mismatch: current file changed"
+        },
+        "checkpoint": {
+          "present": true,
+          "status": "completed",
+          "approval_required": false,
+          "patch_plan_count": 2,
+          "approval_decision_approved": true,
+          "writeback_result_present": true,
+          "writeback_applied": false,
+          "writeback_after_hash": null,
+          "writeback_error": "before_hash mismatch: current file changed"
+        },
+        "audit_log": {
+          "present": true,
+          "proposal_id": "prop_digest_resume",
+          "approval_status": "approved",
+          "reviewer": "eval_failed_reviewer",
+          "approval_comment": "record the failure",
+          "before_hash": "sha256:current_hash",
+          "after_hash": null,
+          "writeback_applied": false,
+          "error": "before_hash mismatch: current file changed"
+        }
+      },
+      "error": null
+    }
+  ]
+}

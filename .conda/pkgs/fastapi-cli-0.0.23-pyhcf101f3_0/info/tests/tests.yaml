@@ -1,0 +1,9 @@
+- python:
+    imports:
+    - fastapi_cli
+- script:
+    content: fastapi --help
+  requirements:
+    run:
+    - fastapi
+    - python 3.10.*

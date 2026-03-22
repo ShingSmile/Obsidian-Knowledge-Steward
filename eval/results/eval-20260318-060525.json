@@ -1,0 +1,651 @@
+{
+  "schema_version": "1.2",
+  "generated_at": "2026-03-18T06:05:25.626331+00:00",
+  "backend_version": "0.1.0",
+  "selected_case_ids": [
+    "ask_fixture_hybrid_retrieval_only",
+    "digest_fixture_structured_result_metrics",
+    "digest_fixture_waiting_proposal_metrics",
+    "governance_fixture_waiting_proposal_hybrid",
+    "governance_fixture_no_proposal_fallback"
+  ],
+  "summary": {
+    "selected_case_count": 5,
+    "passed_case_count": 2,
+    "failed_case_count": 3,
+    "metric_overview": {
+      "faithfulness": {
+        "case_count": 5,
+        "average_score": 1.0,
+        "min_score": 1.0,
+        "max_score": 1.0
+      },
+      "relevancy": {
+        "case_count": 5,
+        "average_score": 0.95,
+        "min_score": 0.75,
+        "max_score": 1.0
+      },
+      "context_precision": {
+        "case_count": 5,
+        "average_score": 0.8333,
+        "min_score": 0.5,
+        "max_score": 1.0
+      },
+      "context_recall": {
+        "case_count": 5,
+        "average_score": 0.9,
+        "min_score": 0.5,
+        "max_score": 1.0
+      }
+    }
+  },
+  "cases": [
+    {
+      "case_id": "ask_fixture_hybrid_retrieval_only",
+      "suite": "ask",
+      "suite_file": "eval/golden/ask_cases.json",
+      "scenario": "ask",
+      "fixture": "ask_hybrid_basic",
+      "description": "在 deterministic hybrid fixture 下，ask 应显式消费 hybrid candidate，而不是只回归纯 FTS。",
+      "started_at": "2026-03-18T06:05:25.480273+00:00",
+      "duration_ms": 29.54,
+      "outcome": "failed",
+      "expected": {
+        "http_status": 200,
+        "workflow_status": "completed",
+        "message_contains": "retrieval-only fallback",
+        "approval_required": false,
+        "ask_result": {
+          "mode": "retrieval_only",
+          "model_fallback_used": true,
+          "model_fallback_reason": "no_available_chat_provider",
+          "min_citation_count": 2,
+          "min_retrieved_candidate_count": 2,
+          "answer_contains": [
+            "当前未使用模型生成答案",
+            "[1]",
+            "[2]"
+          ],
+          "citation_path_suffixes": [
+            "Roadmap.md",
+            "Strategy.md"
+          ],
+          "retrieved_candidate_sources_contains": [
+            "hybrid_rrf",
+            "sqlite_vector"
+          ]
+        },
+        "quality_metrics": {
+          "faithfulness": {
+            "min": 1.0
+          },
+          "relevancy": {
+            "min": 1.0
+          },
+          "context_precision": {
+            "min": 1.0
+          },
+          "context_recall": {
+            "min": 1.0
+          }
+        }
+      },
+      "actual": {
+        "http_status": 200,
+        "workflow_status": "completed",
+        "message": "Ask workflow completed with retrieval-only fallback.",
+        "approval_required": false,
+        "run_id": "run_5a931b7525f941089deb8f5d25d8bcf7",
+        "thread_id": "thread_cf3c038787d04746bd66141567d98360",
+        "fixture_id": "ask_hybrid_basic",
+        "fixture_db_path": "/var/folders/k1/fyz1kmds28dbvwxxbrrxt4rw0000gn/T/ks_eval_ask_fixture_hybrid_retrieval_only_z57a7x2f/knowledge_steward.sqlite3",
+        "trace_path_exists": true,
+        "ask_result": {
+          "mode": "retrieval_only",
+          "answer": "当前未使用模型生成答案，先返回与问题“Roadmap”最相关的检索证据。\n[1] Roadmap.md / Roadmap (lines 1-3): # [Roadmap]\n\n[Roadmap] delivery plan.",
+          "citation_count": 1,
+          "retrieved_candidate_count": 1,
+          "retrieval_fallback_used": false,
+          "retrieval_fallback_reason": null,
+          "model_fallback_used": true,
+          "model_fallback_reason": "no_available_chat_provider",
+          "provider_name": null,
+          "model_name": null,
+          "citation_paths": [
+            "/private/var/folders/k1/fyz1kmds28dbvwxxbrrxt4rw0000gn/T/ks_eval_ask_fixture_hybrid_retrieval_only_z57a7x2f/vault/Roadmap.md"
+          ],
+          "citation_retrieval_sources": [
+            "sqlite_fts"
+          ],
+          "retrieved_candidate_paths": [
+            "/private/var/folders/k1/fyz1kmds28dbvwxxbrrxt4rw0000gn/T/ks_eval_ask_fixture_hybrid_retrieval_only_z57a7x2f/vault/Roadmap.md"
+          ],
+          "retrieved_candidate_retrieval_sources": [
+            "sqlite_fts"
+          ]
+        },
+        "ask_groundedness": {
+          "bucket": "not_generated_answer",
+          "consistent": null,
+          "reason": "ask_result_not_generated_answer",
+          "citation_numbers": [],
+          "cited_candidate_count": 0,
+          "unsupported_terms": [],
+          "answer_text": "当前未使用模型生成答案，先返回与问题“Roadmap”最相关的检索证据。\n Roadmap.md / Roadmap (lines 1-3): # [Roadmap]\n\n[Roadmap] delivery plan."
+        },
+        "ingest_result": null,
+        "analysis_result": null,
+        "digest_result": null,
+        "proposal": null,
+        "quality_metrics": {
+          "faithfulness": {
+            "score": 1.0,
+            "reason": "ask_groundedness:not_generated_answer"
+          },
+          "relevancy": {
+            "score": 0.75,
+            "matched_output_hint_count": 3,
+            "expected_output_hint_count": 4
+          },
+          "context_precision": {
+            "score": 1.0,
+            "matched_context_count": 1,
+            "actual_context_count": 1
+          },
+          "context_recall": {
+            "score": 0.5,
+            "matched_context_count": 1,
+            "reference_context_count": 2
+          }
+        }
+      },
+      "error": "Traceback (most recent call last):\n  File \"/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/eval/run_eval.py\", line 461, in run_case\n    assert_case_matches(case_payload[\"expected\"], actual_snapshot)\n  File \"/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/eval/run_eval.py\", line 1147, in assert_case_matches\n    assert_ask_result_matches(ask_expected, ask_actual)\n  File \"/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/eval/run_eval.py\", line 1246, in assert_ask_result_matches\n    assert_minimum(\n  File \"/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/eval/run_eval.py\", line 1664, in assert_minimum\n    raise EvalAssertionError(f\"{label} mismatch: expected >= {minimum}, actual={actual}\")\nEvalAssertionError: ask_result.citation_count mismatch: expected >= 2, actual=1\n"
+    },
+    {
+      "case_id": "digest_fixture_structured_result_metrics",
+      "suite": "digest",
+      "suite_file": "eval/golden/digest_cases.json",
+      "scenario": "digest",
+      "fixture": "digest_basic",
+      "description": "deterministic digest fixture 应稳定产出结构化摘要，并给出可解释的上下文覆盖指标。",
+      "started_at": "2026-03-18T06:05:25.510256+00:00",
+      "duration_ms": 28.21,
+      "outcome": "passed",
+      "expected": {
+        "http_status": 200,
+        "workflow_status": "completed",
+        "message_contains": "indexed note digest",
+        "approval_required": false,
+        "digest_result": {
+          "fallback_used": false,
+          "source_note_count": 3,
+          "markdown_contains": [
+            "本次 DAILY_DIGEST 基于最近 3 篇已索引笔记生成。",
+            "重点来源"
+          ],
+          "source_note_path_suffixes": [
+            "2026-03-14.md",
+            "2026-03-13.md",
+            "迭代总结.md"
+          ]
+        },
+        "quality_metrics": {
+          "faithfulness": {
+            "min": 1.0
+          },
+          "relevancy": {
+            "min": 1.0
+          },
+          "context_precision": {
+            "min": 1.0
+          },
+          "context_recall": {
+            "min": 1.0
+          }
+        }
+      },
+      "actual": {
+        "http_status": 200,
+        "workflow_status": "completed",
+        "message": "Digest workflow completed with indexed note digest.",
+        "approval_required": false,
+        "run_id": "run_debb95889da84f189135e38118f78e19",
+        "thread_id": "thread_0d8112e436874e8a85b613d9efaa63e3",
+        "fixture_id": "digest_basic",
+        "fixture_db_path": "/var/folders/k1/fyz1kmds28dbvwxxbrrxt4rw0000gn/T/ks_eval_digest_fixture_structured_result_metrics_flns48vv/knowledge_steward.sqlite3",
+        "trace_path_exists": true,
+        "ask_result": null,
+        "ask_groundedness": null,
+        "ingest_result": null,
+        "analysis_result": null,
+        "digest_result": {
+          "source_note_count": 3,
+          "fallback_used": false,
+          "fallback_reason": null,
+          "digest_markdown": "本次 DAILY_DIGEST 基于最近 3 篇已索引笔记生成。\n来源分布：daily_note 2 篇，summary_note 1 篇。\n覆盖日期：2026-03-13 至 2026-03-14。\n待跟进任务：来源笔记中共检测到 2 项任务。\n\n## 重点来源\n- 一、工作任务（daily_note，2026-03-14，任务 1 项）\n- Task Planner（daily_note，2026-03-13，任务 1 项）\n- 迭代总结（summary_note，迭代总结.md，任务 0 项）",
+          "source_note_paths": [
+            "/private/var/folders/k1/fyz1kmds28dbvwxxbrrxt4rw0000gn/T/ks_eval_digest_fixture_structured_result_metrics_flns48vv/vault/2026-03-14.md",
+            "/private/var/folders/k1/fyz1kmds28dbvwxxbrrxt4rw0000gn/T/ks_eval_digest_fixture_structured_result_metrics_flns48vv/vault/2026-03-13.md",
+            "/private/var/folders/k1/fyz1kmds28dbvwxxbrrxt4rw0000gn/T/ks_eval_digest_fixture_structured_result_metrics_flns48vv/vault/迭代总结.md"
+          ],
+          "source_note_titles": [
+            "一、工作任务",
+            "Task Planner",
+            "迭代总结"
+          ]
+        },
+        "proposal": null,
+        "quality_metrics": {
+          "faithfulness": {
+            "score": 1.0,
+            "reason": "supporting_context_path_coverage"
+          },
+          "relevancy": {
+            "score": 1.0,
+            "matched_output_hint_count": 3,
+            "expected_output_hint_count": 3
+          },
+          "context_precision": {
+            "score": 1.0,
+            "matched_context_count": 3,
+            "actual_context_count": 3
+          },
+          "context_recall": {
+            "score": 1.0,
+            "matched_context_count": 3,
+            "reference_context_count": 3
+          }
+        }
+      },
+      "error": null
+    },
+    {
+      "case_id": "digest_fixture_waiting_proposal_metrics",
+      "suite": "digest",
+      "suite_file": "eval/golden/digest_cases.json",
+      "scenario": "digest",
+      "fixture": "digest_basic",
+      "description": "deterministic digest fixture 在 proposal 模式下应返回 waiting proposal，并把 source note 作为最小上下文证据。",
+      "started_at": "2026-03-18T06:05:25.538477+00:00",
+      "duration_ms": 19.8,
+      "outcome": "passed",
+      "expected": {
+        "http_status": 202,
+        "workflow_status": "waiting_for_approval",
+        "message_contains": "waiting for approval",
+        "approval_required": true,
+        "digest_result": {
+          "fallback_used": false,
+          "source_note_count": 3,
+          "markdown_contains": "本次 DAILY_DIGEST 基于最近 3 篇已索引笔记生成。",
+          "source_note_path_suffixes": [
+            "2026-03-14.md",
+            "2026-03-13.md",
+            "迭代总结.md"
+          ]
+        },
+        "proposal": {
+          "present": true,
+          "patch_ops": [
+            "merge_frontmatter",
+            "insert_under_heading"
+          ],
+          "target_note_path_suffix": "2026-03-14.md",
+          "summary_contains": "DAILY_DIGEST",
+          "min_evidence_count": 3,
+          "evidence_path_suffixes": [
+            "2026-03-14.md",
+            "2026-03-13.md",
+            "迭代总结.md"
+          ]
+        },
+        "quality_metrics": {
+          "faithfulness": {
+            "min": 1.0
+          },
+          "relevancy": {
+            "min": 1.0
+          },
+          "context_precision": {
+            "min": 1.0
+          },
+          "context_recall": {
+            "min": 1.0
+          }
+        }
+      },
+      "actual": {
+        "http_status": 202,
+        "workflow_status": "waiting_for_approval",
+        "message": "Digest workflow generated a proposal and is waiting for approval.",
+        "approval_required": true,
+        "run_id": "run_a3d9db50e4a441bebd2f347911cd953f",
+        "thread_id": "thread_eval_digest_waiting",
+        "fixture_id": "digest_basic",
+        "fixture_db_path": "/var/folders/k1/fyz1kmds28dbvwxxbrrxt4rw0000gn/T/ks_eval_digest_fixture_waiting_proposal_metrics_3l1asxgb/knowledge_steward.sqlite3",
+        "trace_path_exists": true,
+        "ask_result": null,
+        "ask_groundedness": null,
+        "ingest_result": null,
+        "analysis_result": null,
+        "digest_result": {
+          "source_note_count": 3,
+          "fallback_used": false,
+          "fallback_reason": null,
+          "digest_markdown": "本次 DAILY_DIGEST 基于最近 3 篇已索引笔记生成。\n来源分布：daily_note 2 篇，summary_note 1 篇。\n覆盖日期：2026-03-13 至 2026-03-14。\n待跟进任务：来源笔记中共检测到 2 项任务。\n\n## 重点来源\n- 一、工作任务（daily_note，2026-03-14，任务 1 项）\n- Task Planner（daily_note，2026-03-13，任务 1 项）\n- 迭代总结（summary_note，迭代总结.md，任务 0 项）",
+          "source_note_paths": [
+            "/private/var/folders/k1/fyz1kmds28dbvwxxbrrxt4rw0000gn/T/ks_eval_digest_fixture_waiting_proposal_metrics_3l1asxgb/vault/2026-03-14.md",
+            "/private/var/folders/k1/fyz1kmds28dbvwxxbrrxt4rw0000gn/T/ks_eval_digest_fixture_waiting_proposal_metrics_3l1asxgb/vault/2026-03-13.md",
+            "/private/var/folders/k1/fyz1kmds28dbvwxxbrrxt4rw0000gn/T/ks_eval_digest_fixture_waiting_proposal_metrics_3l1asxgb/vault/迭代总结.md"
+          ],
+          "source_note_titles": [
+            "一、工作任务",
+            "Task Planner",
+            "迭代总结"
+          ]
+        },
+        "proposal": {
+          "proposal_id": "prop_digest_e35379e4b92d8862",
+          "target_note_path": "/private/var/folders/k1/fyz1kmds28dbvwxxbrrxt4rw0000gn/T/ks_eval_digest_fixture_waiting_proposal_metrics_3l1asxgb/vault/2026-03-14.md",
+          "summary": "将本次 DAILY_DIGEST 写入 一、工作任务，并标记这次摘要需要人工审批。",
+          "risk_level": "medium",
+          "patch_ops": [
+            "merge_frontmatter",
+            "insert_under_heading"
+          ],
+          "evidence_count": 3,
+          "evidence_paths": [
+            "/private/var/folders/k1/fyz1kmds28dbvwxxbrrxt4rw0000gn/T/ks_eval_digest_fixture_waiting_proposal_metrics_3l1asxgb/vault/2026-03-14.md",
+            "/private/var/folders/k1/fyz1kmds28dbvwxxbrrxt4rw0000gn/T/ks_eval_digest_fixture_waiting_proposal_metrics_3l1asxgb/vault/2026-03-13.md",
+            "/private/var/folders/k1/fyz1kmds28dbvwxxbrrxt4rw0000gn/T/ks_eval_digest_fixture_waiting_proposal_metrics_3l1asxgb/vault/迭代总结.md"
+          ]
+        },
+        "quality_metrics": {
+          "faithfulness": {
+            "score": 1.0,
+            "reason": "supporting_context_path_coverage"
+          },
+          "relevancy": {
+            "score": 1.0,
+            "matched_output_hint_count": 3,
+            "expected_output_hint_count": 3
+          },
+          "context_precision": {
+            "score": 1.0,
+            "matched_context_count": 3,
+            "actual_context_count": 3
+          },
+          "context_recall": {
+            "score": 1.0,
+            "matched_context_count": 3,
+            "reference_context_count": 3
+          }
+        }
+      },
+      "error": null
+    },
+    {
+      "case_id": "governance_fixture_waiting_proposal_hybrid",
+      "suite": "governance",
+      "suite_file": "eval/golden/governance_cases.json",
+      "scenario": "governance",
+      "fixture": "governance_basic",
+      "description": "单 note scoped ingest 在 proposal 模式下应产出真实治理 proposal，并在 deterministic embedding mock 下显式消费 hybrid related candidate。",
+      "started_at": "2026-03-18T06:05:25.558286+00:00",
+      "duration_ms": 38.43,
+      "outcome": "failed",
+      "expected": {
+        "http_status": 202,
+        "workflow_status": "waiting_for_approval",
+        "message_contains": "waiting for approval",
+        "approval_required": true,
+        "ingest_result": {
+          "scanned_notes": 1
+        },
+        "analysis_result": {
+          "fallback_used": false,
+          "min_related_candidate_count": 1,
+          "finding_types_contains": [
+            "orphan_hint",
+            "missing_frontmatter"
+          ],
+          "related_candidate_path_suffixes": [
+            "Beta.md"
+          ],
+          "related_candidate_sources_contains": [
+            "hybrid_rrf"
+          ]
+        },
+        "proposal": {
+          "present": true,
+          "patch_ops": [
+            "merge_frontmatter",
+            "insert_under_heading"
+          ],
+          "target_note_path_suffix": "Alpha.md",
+          "summary_contains": "Alpha",
+          "min_evidence_count": 2,
+          "evidence_path_suffixes": [
+            "Alpha.md",
+            "Beta.md"
+          ]
+        },
+        "quality_metrics": {
+          "faithfulness": {
+            "min": 1.0
+          },
+          "relevancy": {
+            "min": 1.0
+          },
+          "context_precision": {
+            "min": 1.0
+          },
+          "context_recall": {
+            "min": 1.0
+          }
+        }
+      },
+      "actual": {
+        "http_status": 202,
+        "workflow_status": "waiting_for_approval",
+        "message": "Ingest workflow generated a proposal and is waiting for approval.",
+        "approval_required": true,
+        "run_id": "run_d1fcd2a1e6a54a5fac60bb0eeb1c3cda",
+        "thread_id": "thread_eval_governance_waiting",
+        "fixture_id": "governance_basic",
+        "fixture_db_path": "/var/folders/k1/fyz1kmds28dbvwxxbrrxt4rw0000gn/T/ks_eval_governance_fixture_waiting_proposal_hybrid_g4dxbh_g/knowledge_steward.sqlite3",
+        "trace_path_exists": true,
+        "ask_result": null,
+        "ask_groundedness": null,
+        "ingest_result": {
+          "vault_path": "/private/var/folders/k1/fyz1kmds28dbvwxxbrrxt4rw0000gn/T/ks_eval_governance_fixture_waiting_proposal_hybrid_g4dxbh_g/vault",
+          "db_path": "/private/var/folders/k1/fyz1kmds28dbvwxxbrrxt4rw0000gn/T/ks_eval_governance_fixture_waiting_proposal_hybrid_g4dxbh_g/knowledge_steward.sqlite3",
+          "scanned_notes": 1,
+          "created_notes": 0,
+          "updated_notes": 1,
+          "current_chunk_count": 1,
+          "replaced_chunk_count": 1
+        },
+        "analysis_result": {
+          "scope": "scoped_ingest_single_note",
+          "target_note_path": "/private/var/folders/k1/fyz1kmds28dbvwxxbrrxt4rw0000gn/T/ks_eval_governance_fixture_waiting_proposal_hybrid_g4dxbh_g/vault/Alpha.md",
+          "target_note_title": "Alpha",
+          "retrieval_queries": [
+            "Alpha"
+          ],
+          "related_candidate_count": 2,
+          "related_candidate_paths": [
+            "/private/var/folders/k1/fyz1kmds28dbvwxxbrrxt4rw0000gn/T/ks_eval_governance_fixture_waiting_proposal_hybrid_g4dxbh_g/vault/2026-03-18.md",
+            "/private/var/folders/k1/fyz1kmds28dbvwxxbrrxt4rw0000gn/T/ks_eval_governance_fixture_waiting_proposal_hybrid_g4dxbh_g/vault/Beta.md"
+          ],
+          "related_candidate_retrieval_sources": [
+            "sqlite_fts",
+            "sqlite_fts"
+          ],
+          "finding_count": 3,
+          "finding_types": [
+            "orphan_hint",
+            "missing_frontmatter",
+            "unclassified_note_type"
+          ],
+          "fallback_used": false,
+          "fallback_reason": null
+        },
+        "digest_result": null,
+        "proposal": {
+          "proposal_id": "prop_ingest_e54f2208bc62dfec",
+          "target_note_path": "/private/var/folders/k1/fyz1kmds28dbvwxxbrrxt4rw0000gn/T/ks_eval_governance_fixture_waiting_proposal_hybrid_g4dxbh_g/vault/Alpha.md",
+          "summary": "为 Alpha 补最小治理标记与审查小节，结合 2 条 related retrieve 上下文，聚焦 3 个治理信号（orphan_hint、missing_frontmatter、unclassified_note_type）。",
+          "risk_level": "medium",
+          "patch_ops": [
+            "merge_frontmatter",
+            "insert_under_heading"
+          ],
+          "evidence_count": 3,
+          "evidence_paths": [
+            "/private/var/folders/k1/fyz1kmds28dbvwxxbrrxt4rw0000gn/T/ks_eval_governance_fixture_waiting_proposal_hybrid_g4dxbh_g/vault/2026-03-18.md",
+            "/private/var/folders/k1/fyz1kmds28dbvwxxbrrxt4rw0000gn/T/ks_eval_governance_fixture_waiting_proposal_hybrid_g4dxbh_g/vault/Alpha.md",
+            "/private/var/folders/k1/fyz1kmds28dbvwxxbrrxt4rw0000gn/T/ks_eval_governance_fixture_waiting_proposal_hybrid_g4dxbh_g/vault/Alpha.md"
+          ]
+        },
+        "quality_metrics": {
+          "faithfulness": {
+            "score": 1.0,
+            "reason": "supporting_context_path_coverage"
+          },
+          "relevancy": {
+            "score": 1.0,
+            "matched_output_hint_count": 2,
+            "expected_output_hint_count": 2
+          },
+          "context_precision": {
+            "score": 0.6667,
+            "matched_context_count": 2,
+            "actual_context_count": 3
+          },
+          "context_recall": {
+            "score": 1.0,
+            "matched_context_count": 2,
+            "reference_context_count": 2
+          }
+        }
+      },
+      "error": "Traceback (most recent call last):\n  File \"/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/eval/run_eval.py\", line 461, in run_case\n    assert_case_matches(case_payload[\"expected\"], actual_snapshot)\n  File \"/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/eval/run_eval.py\", line 1173, in assert_case_matches\n    assert_analysis_result_matches(analysis_expected, analysis_actual)\n  File \"/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/eval/run_eval.py\", line 1327, in assert_analysis_result_matches\n    assert_contains_all(\n  File \"/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/eval/run_eval.py\", line 1670, in assert_contains_all\n    raise EvalAssertionError(\nEvalAssertionError: analysis_result.related_candidate_sources_contains mismatch: missing substrings=['hybrid_rrf'], actual='sqlite_fts\\nsqlite_fts'\n"
+    },
+    {
+      "case_id": "governance_fixture_no_proposal_fallback",
+      "suite": "governance",
+      "suite_file": "eval/golden/governance_cases.json",
+      "scenario": "governance",
+      "fixture": "governance_basic",
+      "description": "结构稳定的 daily note 在 proposal 模式下应安全退回 completed，而不是硬造治理 proposal。",
+      "started_at": "2026-03-18T06:05:25.596964+00:00",
+      "duration_ms": 29.19,
+      "outcome": "failed",
+      "expected": {
+        "http_status": 200,
+        "workflow_status": "completed",
+        "message_contains": "no approval proposal was generated",
+        "approval_required": false,
+        "proposal": {
+          "present": false
+        },
+        "ingest_result": {
+          "scanned_notes": 1
+        },
+        "analysis_result": {
+          "fallback_used": true,
+          "fallback_reason": "no_governance_issues_detected",
+          "finding_count": 0,
+          "min_related_candidate_count": 1,
+          "related_candidate_path_suffixes": [
+            "Alpha.md"
+          ]
+        },
+        "quality_metrics": {
+          "faithfulness": {
+            "min": 1.0
+          },
+          "relevancy": {
+            "min": 1.0
+          },
+          "context_precision": {
+            "min": 1.0
+          },
+          "context_recall": {
+            "min": 1.0
+          }
+        }
+      },
+      "actual": {
+        "http_status": 200,
+        "workflow_status": "completed",
+        "message": "Ingest workflow completed with scoped note sync; no approval proposal was generated.",
+        "approval_required": false,
+        "run_id": "run_6eb7fd6249224e96894d1c670a909065",
+        "thread_id": "thread_eval_governance_completed",
+        "fixture_id": "governance_basic",
+        "fixture_db_path": "/var/folders/k1/fyz1kmds28dbvwxxbrrxt4rw0000gn/T/ks_eval_governance_fixture_no_proposal_fallback_y4my971i/knowledge_steward.sqlite3",
+        "trace_path_exists": true,
+        "ask_result": null,
+        "ask_groundedness": null,
+        "ingest_result": {
+          "vault_path": "/private/var/folders/k1/fyz1kmds28dbvwxxbrrxt4rw0000gn/T/ks_eval_governance_fixture_no_proposal_fallback_y4my971i/vault",
+          "db_path": "/private/var/folders/k1/fyz1kmds28dbvwxxbrrxt4rw0000gn/T/ks_eval_governance_fixture_no_proposal_fallback_y4my971i/knowledge_steward.sqlite3",
+          "scanned_notes": 1,
+          "created_notes": 0,
+          "updated_notes": 1,
+          "current_chunk_count": 3,
+          "replaced_chunk_count": 3
+        },
+        "analysis_result": {
+          "scope": "scoped_ingest_single_note",
+          "target_note_path": "/private/var/folders/k1/fyz1kmds28dbvwxxbrrxt4rw0000gn/T/ks_eval_governance_fixture_no_proposal_fallback_y4my971i/vault/2026-03-18.md",
+          "target_note_title": "Task Planner",
+          "retrieval_queries": [
+            "Alpha",
+            "Summary"
+          ],
+          "related_candidate_count": 2,
+          "related_candidate_paths": [
+            "/private/var/folders/k1/fyz1kmds28dbvwxxbrrxt4rw0000gn/T/ks_eval_governance_fixture_no_proposal_fallback_y4my971i/vault/Alpha.md",
+            "/private/var/folders/k1/fyz1kmds28dbvwxxbrrxt4rw0000gn/T/ks_eval_governance_fixture_no_proposal_fallback_y4my971i/vault/Beta.md"
+          ],
+          "related_candidate_retrieval_sources": [
+            "sqlite_fts",
+            "sqlite_fts"
+          ],
+          "finding_count": 0,
+          "finding_types": [],
+          "fallback_used": true,
+          "fallback_reason": "no_governance_issues_detected"
+        },
+        "digest_result": null,
+        "proposal": null,
+        "quality_metrics": {
+          "faithfulness": {
+            "score": 1.0,
+            "reason": "supporting_context_path_coverage"
+          },
+          "relevancy": {
+            "score": 1.0,
+            "matched_output_hint_count": 1,
+            "expected_output_hint_count": 1
+          },
+          "context_precision": {
+            "score": 0.5,
+            "matched_context_count": 1,
+            "actual_context_count": 2
+          },
+          "context_recall": {
+            "score": 1.0,
+            "matched_context_count": 1,
+            "reference_context_count": 1
+          }
+        }
+      },
+      "error": "Traceback (most recent call last):\n  File \"/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/eval/run_eval.py\", line 461, in run_case\n    assert_case_matches(case_payload[\"expected\"], actual_snapshot)\n  File \"/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/eval/run_eval.py\", line 1210, in assert_case_matches\n    assert_quality_metrics_matches(\n  File \"/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/eval/run_eval.py\", line 1645, in assert_quality_metrics_matches\n    raise EvalAssertionError(\nEvalAssertionError: quality_metrics.context_precision.score mismatch: expected >= 1.0, actual=0.5\n"
+    }
+  ]
+}

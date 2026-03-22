@@ -1,0 +1,137 @@
+recipe:
+  schema_version: 1
+  context:
+    version: 0.135.1
+    python_check_max: '3.14'
+  package:
+    name: fastapi
+    version: 0.135.1
+  source:
+  - url: https://pypi.org/packages/source/f/fastapi/fastapi-0.135.1.tar.gz
+    sha256: d04115b508d936d254cea545b7312ecaa58a7b3a0f84952535b4c9afae7668cd
+    patches:
+    - 0000-no-broken-cli.patch
+  build:
+    number: 0
+    string: h51dde83_0
+    noarch: generic
+  requirements:
+    run:
+    - pin_subpackage:
+        name: fastapi-core
+        exact: true
+    - email_validator
+    - fastapi-cli
+    - httpx
+    - jinja2
+    - pydantic-settings
+    - pydantic-extra-types
+    - python-multipart
+    - uvicorn-standard
+  tests:
+  - python:
+      imports:
+      - fastapi
+      - fastapi.dependencies
+      - fastapi.middleware
+      - fastapi.openapi
+      - fastapi.security
+      python_version:
+      - 3.10.*
+      - 3.14.*
+  - script:
+    - fastapi --version
+    - fastapi --help
+    requirements:
+      run:
+      - python 3.10.*
+  about:
+    homepage: https://pypi.org/project/fastapi
+    repository: https://github.com/fastapi/fastapi
+    documentation: https://fastapi.tiangolo.com/
+    license: MIT
+    license_file:
+    - LICENSE
+    summary: FastAPI framework, high performance, easy to learn, fast to code, ready for production (with [standard])
+  extra:
+    feedstock-name: fastapi
+    recipe-maintainers:
+    - dhirschfeld
+    - tiangolo
+    - synapticarbors
+    - bollwyvl
+    - davidbrochart
+build_configuration:
+  target_platform: noarch
+  host_platform:
+    platform: linux-64
+    virtual_packages:
+    - __unix=0=0
+    - __linux=6.14.0=0
+    - __glibc=2.34=0
+    - __archspec=1=zen2
+  build_platform:
+    platform: linux-64
+    virtual_packages:
+    - __unix=0=0
+    - __linux=6.14.0=0
+    - __glibc=2.34=0
+    - __archspec=1=zen2
+  variant:
+    channel_sources: conda-forge
+    channel_targets: conda-forge main
+    fastapi_core: 0.135.1 pyhcf101f3_0
+    python_min: '3.10'
+    target_platform: noarch
+  hash:
+    hash: 51dde83
+  directories:
+    host_prefix: /home/conda/feedstock_root/build_artifacts/bld/rattler-build_fastapi_1772408030/host_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeh
+    build_prefix: /home/conda/feedstock_root/build_artifacts/bld/rattler-build_fastapi_1772408030/build_env
+    work_dir: /home/conda/feedstock_root/build_artifacts/bld/rattler-build_fastapi_1772408030/work
+    build_dir: /home/conda/feedstock_root/build_artifacts/bld/rattler-build_fastapi_1772408030
+  channels:
+  - https://conda.anaconda.org/conda-forge
+  channel_priority: strict
+  solve_strategy: highest
+  timestamp: 2026-03-01T23:33:50.870510252Z
+  subpackages:
+    fastapi:
+      name: fastapi
+      version: 0.135.1
+      build_string: h51dde83_0
+    fastapi-core:
+      name: fastapi-core
+      version: 0.135.1
+      build_string: pyhcf101f3_0
+  packaging_settings:
+    archive_type: conda
+    compression_level: 15
+finalized_dependencies:
+  build: null
+  host: null
+  run:
+    depends:
+    - pin_subpackage: fastapi-core
+      exact: true
+      spec: fastapi-core ==0.135.1 pyhcf101f3_0
+    - source: email_validator
+    - source: fastapi-cli
+    - source: httpx
+    - source: jinja2
+    - source: pydantic-settings
+    - source: pydantic-extra-types
+    - source: python-multipart
+    - source: uvicorn-standard
+    constraints: []
+finalized_sources:
+- url: https://pypi.org/packages/source/f/fastapi/fastapi-0.135.1.tar.gz
+  sha256: d04115b508d936d254cea545b7312ecaa58a7b3a0f84952535b4c9afae7668cd
+  patches:
+  - 0000-no-broken-cli.patch
+system_tools:
+  rattler-build: 0.58.2
+extra_meta:
+  flow_run_id: azure_20260301.4.1
+  remote_url: https://github.com/conda-forge/fastapi-feedstock
+  sha: 491f9aaf501b9453c8952e3863ae9e949f137ae2

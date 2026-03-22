@@ -1,0 +1,13 @@
+{
+  "python": "3.12.* *_cpython",
+  "build_platform": "osx-64",
+  "c_stdlib": "macosx_deployment_target",
+  "channel_targets": "conda-forge main",
+  "CONDA_BUILD_SYSROOT": "/opt/conda-sdks/MacOSX11.0.sdk",
+  "c_stdlib_version": "11.0",
+  "c_compiler": "clang",
+  "target_platform": "osx-arm64",
+  "c_compiler_version": "19",
+  "use_noarch": "false",
+  "__osx": "__osx >=11.0"
+}

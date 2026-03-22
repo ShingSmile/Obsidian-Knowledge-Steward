@@ -1,0 +1,16 @@
+{
+  "arch": null,
+  "build": "pyhd8ed1ab_1",
+  "build_number": 1,
+  "depends": [
+    "python >=3.10",
+    "typing_extensions >=4.12.0"
+  ],
+  "license": "MIT",
+  "name": "typing-inspection",
+  "noarch": "python",
+  "platform": null,
+  "subdir": "noarch",
+  "timestamp": 1764158430324,
+  "version": "0.4.2"
+}

@@ -1,0 +1,14 @@
+{
+  "channels": [
+    "https://conda.anaconda.org/conda-forge/"
+  ],
+  "dev_url": "https://github.com/pydantic/pydantic-core",
+  "extra": {
+    "flow_run_id": "azure_20251112.2.1",
+    "remote_url": "https://github.com/conda-forge/pydantic-core-feedstock",
+    "sha": "e00018aca77863b8c0c2655f581bd9d18b1aeb98"
+  },
+  "home": "https://github.com/pydantic/pydantic-core",
+  "license": "MIT",
+  "summary": "Core validation logic for pydantic written in rust"
+}

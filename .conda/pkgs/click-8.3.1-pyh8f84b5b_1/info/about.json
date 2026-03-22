@@ -1,0 +1,16 @@
+{
+  "channels": [
+    "https://conda.anaconda.org/conda-forge/"
+  ],
+  "description": "Click is a Python package for creating beautiful command line interfaces\nin a composable way with as little code as necessary. It's the \"Command\nLine Interface Creation Kit\". It's highly configurable but comes with\nsensible defaults out of the box.",
+  "dev_url": "https://github.com/pallets/click/",
+  "doc_url": "https://click.palletsprojects.com/",
+  "extra": {
+    "flow_run_id": "azure_20251130.2.1",
+    "remote_url": "https://github.com/conda-forge/click-feedstock",
+    "sha": "3fbd55a6d6620ded10ea69cd2608792829f5e52e"
+  },
+  "home": "https://palletsprojects.com/p/click/",
+  "license": "BSD-3-Clause",
+  "summary": "Composable command line interface creation kit"
+}

@@ -1,0 +1,12 @@
+- python:
+    imports:
+    - uvicorn
+    python_version:
+    - 3.10.*
+    - 3.14.*
+- script:
+    content: uvicorn --help
+  requirements:
+    run:
+    - pip
+    - python 3.10.*

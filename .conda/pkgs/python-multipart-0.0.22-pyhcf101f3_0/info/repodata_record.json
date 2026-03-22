@@ -1,0 +1,22 @@
+{
+  "build": "pyhcf101f3_0",
+  "build_number": 0,
+  "channel": "https://mirrors.tuna.tsinghua.edu.cn/anaconda/cloud/conda-forge/noarch",
+  "constrains": [],
+  "depends": [
+    "python >=3.10",
+    "python"
+  ],
+  "fn": "python-multipart-0.0.22-pyhcf101f3_0.conda",
+  "license": "Apache-2.0",
+  "md5": "5a2610edf297cbd1cbc0e2c17bc47efc",
+  "name": "python-multipart",
+  "noarch": "python",
+  "package_type": "noarch_python",
+  "sha256": "8275c88b0f138dbd602c53bae9a11789126c6a2c97f7e89f679d3e7ccbb121ba",
+  "size": 30342,
+  "subdir": "noarch",
+  "timestamp": 1769356329000,
+  "url": "https://mirrors.tuna.tsinghua.edu.cn/anaconda/cloud/conda-forge/noarch/python-multipart-0.0.22-pyhcf101f3_0.conda",
+  "version": "0.0.22"
+}

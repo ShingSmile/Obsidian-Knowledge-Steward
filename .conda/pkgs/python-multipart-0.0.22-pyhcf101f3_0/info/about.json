@@ -1,0 +1,16 @@
+{
+  "channels": [
+    "https://conda.anaconda.org/conda-forge/"
+  ],
+  "description": "python-multipart is an Apache2 licensed streaming multipart parser for Python.\nIt's still under some development, but test coverage is currently 100%.\nDocumentation is available [here](http://andrew-d.github.io/python-multipart/).",
+  "dev_url": "https://github.com/Kludex/python-multipart",
+  "doc_url": "https://multipart.fastapiexpert.com/",
+  "extra": {
+    "flow_run_id": "azure_20260125.2.1",
+    "remote_url": "https://github.com/conda-forge/python-multipart-feedstock",
+    "sha": "d5d958df99026df9f32cb0715626505500fa84bf"
+  },
+  "home": "https://github.com/Kludex/python-multipart",
+  "license": "Apache-2.0",
+  "summary": "A streaming multipart parser for Python."
+}

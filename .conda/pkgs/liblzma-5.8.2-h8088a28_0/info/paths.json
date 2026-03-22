@@ -1,0 +1,11 @@
+{
+  "paths": [
+    {
+      "_path": "lib/liblzma.5.dylib",
+      "path_type": "hardlink",
+      "sha256": "a674357c37afcd0d53b418b4fac0b8f33f61604d1765177cece0657e18c420a4",
+      "size_in_bytes": 201152
+    }
+  ],
+  "paths_version": 1
+}

@@ -1,0 +1,22 @@
+{
+  "build": "pyhcf101f3_0",
+  "build_number": 0,
+  "channel": "https://mirrors.tuna.tsinghua.edu.cn/anaconda/cloud/conda-forge/noarch",
+  "constrains": [],
+  "depends": [
+    "python >=3.10",
+    "python"
+  ],
+  "fn": "tomli-2.4.0-pyhcf101f3_0.conda",
+  "license": "MIT",
+  "md5": "72e780e9aa2d0a3295f59b1874e3768b",
+  "name": "tomli",
+  "noarch": "python",
+  "package_type": "noarch_python",
+  "sha256": "62940c563de45790ba0f076b9f2085a842a65662268b02dd136a8e9b1eaf47a8",
+  "size": 21453,
+  "subdir": "noarch",
+  "timestamp": 1768146676000,
+  "url": "https://mirrors.tuna.tsinghua.edu.cn/anaconda/cloud/conda-forge/noarch/tomli-2.4.0-pyhcf101f3_0.conda",
+  "version": "2.4.0"
+}

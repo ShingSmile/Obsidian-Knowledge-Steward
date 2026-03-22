@@ -1,0 +1,198 @@
+.knowledge-steward-view {
+  padding: 16px;
+}
+
+.knowledge-steward-meta {
+  color: var(--text-muted);
+  font-size: 0.9em;
+  margin-bottom: 12px;
+}
+
+.knowledge-steward-section {
+  margin-top: 20px;
+}
+
+.knowledge-steward-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.knowledge-steward-section-header h3 {
+  margin: 0;
+}
+
+.knowledge-steward-card {
+  margin-top: 12px;
+  padding: 12px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--background-primary) 92%, var(--background-secondary) 8%);
+}
+
+.knowledge-steward-runtime-card {
+  position: relative;
+  overflow: hidden;
+}
+
+.knowledge-steward-runtime-ready {
+  border-color: rgba(76, 175, 80, 0.28);
+}
+
+.knowledge-steward-runtime-starting,
+.knowledge-steward-runtime-checking {
+  border-color: rgba(2, 136, 209, 0.24);
+}
+
+.knowledge-steward-runtime-unavailable,
+.knowledge-steward-runtime-failed {
+  border-color: rgba(211, 47, 47, 0.24);
+}
+
+.knowledge-steward-runtime-pill {
+  display: inline-flex;
+  align-items: center;
+  margin-top: 8px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 0.8em;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.knowledge-steward-runtime-pill-ready {
+  background: rgba(76, 175, 80, 0.14);
+  color: #2f7d32;
+}
+
+.knowledge-steward-runtime-pill-starting,
+.knowledge-steward-runtime-pill-checking {
+  background: rgba(2, 136, 209, 0.12);
+  color: #0b69a3;
+}
+
+.knowledge-steward-runtime-pill-unavailable,
+.knowledge-steward-runtime-pill-failed {
+  background: rgba(211, 47, 47, 0.14);
+  color: #b3261e;
+}
+
+.knowledge-steward-inbox-item-selected {
+  border-color: color-mix(in srgb, var(--interactive-accent) 42%, var(--background-modifier-border) 58%);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--interactive-accent) 28%, transparent 72%);
+}
+
+.knowledge-steward-label {
+  color: var(--text-muted);
+  font-size: 0.85em;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.knowledge-steward-inline-meta {
+  color: var(--text-muted);
+  font-size: 0.9em;
+  margin-top: 4px;
+}
+
+.knowledge-steward-risk {
+  display: inline-flex;
+  align-items: center;
+  margin-top: 8px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 0.85em;
+  font-weight: 600;
+}
+
+.knowledge-steward-risk-low {
+  background: rgba(76, 175, 80, 0.12);
+  color: #2f7d32;
+}
+
+.knowledge-steward-risk-medium {
+  background: rgba(255, 152, 0, 0.14);
+  color: #a05a00;
+}
+
+.knowledge-steward-risk-high,
+.knowledge-steward-risk-critical {
+  background: rgba(211, 47, 47, 0.14);
+  color: #b3261e;
+}
+
+.knowledge-steward-list {
+  margin: 8px 0 0;
+  padding-left: 18px;
+}
+
+.knowledge-steward-list li + li {
+  margin-top: 10px;
+}
+
+.knowledge-steward-patch + .knowledge-steward-patch {
+  margin-top: 12px;
+}
+
+.knowledge-steward-patch-title {
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+
+.knowledge-steward-code {
+  margin: 0;
+  padding: 10px;
+  overflow-x: auto;
+  border-radius: 8px;
+  background: var(--background-secondary);
+  font-family: var(--font-monospace);
+  font-size: 0.85em;
+  line-height: 1.45;
+  white-space: pre-wrap;
+}
+
+.knowledge-steward-field {
+  margin-top: 12px;
+}
+
+.knowledge-steward-input,
+.knowledge-steward-textarea {
+  width: 100%;
+  margin-top: 6px;
+  padding: 8px 10px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 8px;
+  background: var(--background-primary);
+  color: var(--text-normal);
+  box-sizing: border-box;
+}
+
+.knowledge-steward-textarea {
+  resize: vertical;
+}
+
+.knowledge-steward-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.knowledge-steward-callout {
+  margin-top: 12px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--background-modifier-border);
+}
+
+.knowledge-steward-callout-success {
+  background: rgba(76, 175, 80, 0.08);
+  border-color: rgba(76, 175, 80, 0.24);
+}
+
+.knowledge-steward-callout-error {
+  background: rgba(211, 47, 47, 0.08);
+  border-color: rgba(211, 47, 47, 0.24);
+}

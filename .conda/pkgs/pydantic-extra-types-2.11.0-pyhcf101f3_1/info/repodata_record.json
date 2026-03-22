@@ -1,0 +1,31 @@
+{
+  "build": "pyhcf101f3_1",
+  "build_number": 1,
+  "channel": "https://mirrors.tuna.tsinghua.edu.cn/anaconda/cloud/conda-forge/noarch",
+  "constrains": [
+    "phonenumbers >=8,<9",
+    "pycountry >=23",
+    "semver >=3.0.2,<4",
+    "python-ulid >=1,<4",
+    "pendulum >=3.0.0,<4.0.0",
+    "pytz >=2024.1",
+    "tzdata >=2024a"
+  ],
+  "depends": [
+    "python >=3.10",
+    "pydantic >=2.5.2",
+    "python"
+  ],
+  "fn": "pydantic-extra-types-2.11.0-pyhcf101f3_1.conda",
+  "license": "MIT",
+  "md5": "83984e3edee8f7312c0aa860682ee145",
+  "name": "pydantic-extra-types",
+  "noarch": "python",
+  "package_type": "noarch_python",
+  "sha256": "6a25f3b7a92833534eb9d09e3b4ba00195fbf459ec608d15dc9e31f81b67e972",
+  "size": 68665,
+  "subdir": "noarch",
+  "timestamp": 1770023146000,
+  "url": "https://mirrors.tuna.tsinghua.edu.cn/anaconda/cloud/conda-forge/noarch/pydantic-extra-types-2.11.0-pyhcf101f3_1.conda",
+  "version": "2.11.0"
+}

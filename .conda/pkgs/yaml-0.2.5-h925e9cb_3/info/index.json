@@ -1,0 +1,14 @@
+{
+  "arch": "arm64",
+  "build": "h925e9cb_3",
+  "build_number": 3,
+  "depends": [
+    "__osx >=11.0"
+  ],
+  "license": "MIT",
+  "name": "yaml",
+  "platform": "osx",
+  "subdir": "osx-arm64",
+  "timestamp": 1753484079473,
+  "version": "0.2.5"
+}

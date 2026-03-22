@@ -1,0 +1,6 @@
+- python:
+    imports:
+    - pydantic_extra_types
+    python_version:
+    - 3.10.*
+    - 3.*

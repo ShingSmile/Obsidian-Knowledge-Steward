@@ -1,0 +1,27 @@
+{
+  "build": "pyhcf101f3_1",
+  "build_number": 1,
+  "channel": "https://mirrors.tuna.tsinghua.edu.cn/anaconda/cloud/conda-forge/noarch",
+  "constrains": [],
+  "depends": [
+    "typing-inspection >=0.4.2",
+    "typing_extensions >=4.14.1",
+    "python >=3.10",
+    "typing-extensions >=4.6.1",
+    "annotated-types >=0.6.0",
+    "pydantic-core 2.41.5",
+    "python"
+  ],
+  "fn": "pydantic-2.12.5-pyhcf101f3_1.conda",
+  "license": "MIT",
+  "md5": "c3946ed24acdb28db1b5d63321dbca7d",
+  "name": "pydantic",
+  "noarch": "python",
+  "package_type": "noarch_python",
+  "sha256": "868569d9505b7fe246c880c11e2c44924d7613a8cdcc1f6ef85d5375e892f13d",
+  "size": 340482,
+  "subdir": "noarch",
+  "timestamp": 1764434463000,
+  "url": "https://mirrors.tuna.tsinghua.edu.cn/anaconda/cloud/conda-forge/noarch/pydantic-2.12.5-pyhcf101f3_1.conda",
+  "version": "2.12.5"
+}

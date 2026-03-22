@@ -1,0 +1,14 @@
+{
+  "channels": [
+    "https://conda.anaconda.org/conda-forge/"
+  ],
+  "doc_url": "https://anyio.readthedocs.io/",
+  "extra": {
+    "flow_run_id": "azure_20260106.2.1",
+    "remote_url": "https://github.com/conda-forge/anyio-feedstock",
+    "sha": "f02b3f3b6fc5ab227ea7858a25e3660bd6a727bc"
+  },
+  "home": "https://github.com/agronholm/anyio",
+  "license": "MIT",
+  "summary": "High level compatibility layer for multiple asynchronous event loop implementations on Python"
+}

@@ -1,0 +1,6 @@
+- python:
+    imports:
+    - uvicorn.supervisors.watchfilesreload
+    python_version:
+    - 3.10.*
+    - 3.14.*

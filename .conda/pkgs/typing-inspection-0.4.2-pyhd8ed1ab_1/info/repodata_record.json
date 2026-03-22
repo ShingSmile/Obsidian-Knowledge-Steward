@@ -1,0 +1,22 @@
+{
+  "build": "pyhd8ed1ab_1",
+  "build_number": 1,
+  "channel": "https://mirrors.tuna.tsinghua.edu.cn/anaconda/cloud/conda-forge/noarch",
+  "constrains": [],
+  "depends": [
+    "python >=3.10",
+    "typing_extensions >=4.12.0"
+  ],
+  "fn": "typing-inspection-0.4.2-pyhd8ed1ab_1.conda",
+  "license": "MIT",
+  "md5": "a0a4a3035667fc34f29bfbd5c190baa6",
+  "name": "typing-inspection",
+  "noarch": "python",
+  "package_type": "noarch_python",
+  "sha256": "70db27de58a97aeb7ba7448366c9853f91b21137492e0b4430251a1870aa8ff4",
+  "size": 18923,
+  "subdir": "noarch",
+  "timestamp": 1764158430000,
+  "url": "https://mirrors.tuna.tsinghua.edu.cn/anaconda/cloud/conda-forge/noarch/typing-inspection-0.4.2-pyhd8ed1ab_1.conda",
+  "version": "0.4.2"
+}

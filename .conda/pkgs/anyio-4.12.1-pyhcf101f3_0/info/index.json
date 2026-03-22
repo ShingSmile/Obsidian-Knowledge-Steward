@@ -1,0 +1,21 @@
+{
+  "build": "pyhcf101f3_0",
+  "build_number": 0,
+  "constrains": [
+    "trio >=0.32.0",
+    "uvloop >=0.21"
+  ],
+  "depends": [
+    "exceptiongroup >=1.0.2",
+    "idna >=2.8",
+    "python >=3.10",
+    "typing_extensions >=4.5",
+    "python"
+  ],
+  "license": "MIT",
+  "name": "anyio",
+  "noarch": "python",
+  "subdir": "noarch",
+  "timestamp": 1767719033569,
+  "version": "4.12.1"
+}

@@ -1,0 +1,27 @@
+{
+  "arch": "arm64",
+  "build": "py312h6ef9ec0_1",
+  "build_number": 1,
+  "channel": "https://mirrors.tuna.tsinghua.edu.cn/anaconda/cloud/conda-forge/osx-arm64",
+  "constrains": [
+    "__osx >=11.0"
+  ],
+  "depends": [
+    "python",
+    "typing-extensions >=4.6.0,!=4.7.0",
+    "python 3.12.* *_cpython",
+    "__osx >=11.0",
+    "python_abi 3.12.* *_cp312"
+  ],
+  "fn": "pydantic-core-2.41.5-py312h6ef9ec0_1.conda",
+  "license": "MIT",
+  "md5": "88a76b4c912b6127d64298e3d8db980c",
+  "name": "pydantic-core",
+  "platform": "darwin",
+  "sha256": "048da0a49d644dba126905a1abcea0aee75efe88b5d621b9007b569dd753cfbc",
+  "size": 1769018,
+  "subdir": "osx-arm64",
+  "timestamp": 1762989029000,
+  "url": "https://mirrors.tuna.tsinghua.edu.cn/anaconda/cloud/conda-forge/osx-arm64/pydantic-core-2.41.5-py312h6ef9ec0_1.conda",
+  "version": "2.41.5"
+}

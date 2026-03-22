@@ -1,0 +1,113 @@
+{
+  "paths": [
+    {
+      "_path": "site-packages/fastapi_cli/__init__.py",
+      "path_type": "hardlink",
+      "sha256": "08ed1599e92367fafc2c16156945d33378b4f2b115c182a18dbf6ccb45fbbf3d",
+      "size_in_bytes": 23
+    },
+    {
+      "_path": "site-packages/fastapi_cli/__main__.py",
+      "path_type": "hardlink",
+      "sha256": "6d8b7d7846a845059d7a3107143f11131f63c5511d669b44085b15ec5e3d2279",
+      "size_in_bytes": 30
+    },
+    {
+      "_path": "site-packages/fastapi_cli/cli.py",
+      "path_type": "hardlink",
+      "sha256": "542420cc440d3b2d3197551f15321278e1018bddd462784729c46a1b036d57d9",
+      "size_in_bytes": 14760
+    },
+    {
+      "_path": "site-packages/fastapi_cli/config.py",
+      "path_type": "hardlink",
+      "sha256": "44cb2025071a36ebc6f46cd0f14ae9b4cddcc6eb2c2c521822d77d628dd5b68a",
+      "size_in_bytes": 1296
+    },
+    {
+      "_path": "site-packages/fastapi_cli/discover.py",
+      "path_type": "hardlink",
+      "sha256": "bddfc702a35a04f5a560cfeb78031d40519fb458bb4d9e16d32e948f95fb2ba5",
+      "size_in_bytes": 4526
+    },
+    {
+      "_path": "site-packages/fastapi_cli/exceptions.py",
+      "path_type": "hardlink",
+      "sha256": "007452a9de377dba8de48a57f85ab7f3d93d32810afeadbcc1514bee8a8f35c7",
+      "size_in_bytes": 47
+    },
+    {
+      "_path": "site-packages/fastapi_cli/logging.py",
+      "path_type": "hardlink",
+      "sha256": "fe0328a62512ba7021053ee7b9a7e254b79057e8449acc0f89f57f975eada47e",
+      "size_in_bytes": 653
+    },
+    {
+      "_path": "site-packages/fastapi_cli/py.typed",
+      "path_type": "hardlink",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "size_in_bytes": 0
+    },
+    {
+      "_path": "site-packages/fastapi_cli/utils/__init__.py",
+      "path_type": "hardlink",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "size_in_bytes": 0
+    },
+    {
+      "_path": "site-packages/fastapi_cli/utils/cli.py",
+      "path_type": "hardlink",
+      "sha256": "eebcb91f284d5167659aa1e8acc7b9c1a5fc061354f376cdd3bb02f5bf114650",
+      "size_in_bytes": 2465
+    },
+    {
+      "_path": "site-packages/fastapi_cli-0.0.23.dist-info/INSTALLER",
+      "path_type": "hardlink",
+      "sha256": "bc33022edcb7639ff53355b4e91dade50a0bbf0299efeb6171d1ec0ba5029cfc",
+      "size_in_bytes": 6
+    },
+    {
+      "_path": "site-packages/fastapi_cli-0.0.23.dist-info/METADATA",
+      "path_type": "hardlink",
+      "sha256": "ddc1757da992f12a733a529cab12db25f9f5cabbec753095ab111ce7b35ff35b",
+      "size_in_bytes": 6400
+    },
+    {
+      "_path": "site-packages/fastapi_cli-0.0.23.dist-info/RECORD",
+      "path_type": "hardlink",
+      "sha256": "31ef9a6443a186941e6a40fe24898023e00e76ba3a9f5770f696f9e67f680bf5",
+      "size_in_bytes": 1980
+    },
+    {
+      "_path": "site-packages/fastapi_cli-0.0.23.dist-info/REQUESTED",
+      "path_type": "hardlink",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "size_in_bytes": 0
+    },
+    {
+      "_path": "site-packages/fastapi_cli-0.0.23.dist-info/WHEEL",
+      "path_type": "hardlink",
+      "sha256": "59bd0049b563f09bd61e93a22293e2eee71f22025e0a2fff3f38afbe21004057",
+      "size_in_bytes": 90
+    },
+    {
+      "_path": "site-packages/fastapi_cli-0.0.23.dist-info/direct_url.json",
+      "path_type": "hardlink",
+      "sha256": "f27d885148ba519c9328431d719af5eea4c020feee037386a19c1309623a3de5",
+      "size_in_bytes": 122
+    },
+    {
+      "_path": "site-packages/fastapi_cli-0.0.23.dist-info/entry_points.txt",
+      "path_type": "hardlink",
+      "sha256": "e8e62005c2f21425207aa2e09ef332389c4f096ce0cbbb1ee2b2cf2ad3689ccb",
+      "size_in_bytes": 34
+    },
+    {
+      "_path": "site-packages/fastapi_cli-0.0.23.dist-info/licenses/LICENSE",
+      "path_type": "hardlink",
+      "sha256": "16a0f907855b5c99de7e9ad0b1e13453c9652fa171a230be8bc9ae672ed89925",
+      "size_in_bytes": 1086
+    }
+  ],
+  "paths_version": 1
+}

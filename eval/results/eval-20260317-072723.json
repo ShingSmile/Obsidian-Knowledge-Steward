@@ -1,0 +1,258 @@
+{
+  "schema_version": "1.1",
+  "generated_at": "2026-03-17T07:27:23.481147+00:00",
+  "backend_version": "0.1.0",
+  "selected_case_ids": [
+    "ask_fixture_generated_answer_citation_valid",
+    "ask_fixture_semantic_overclaim_writeback",
+    "ask_fixture_semantic_overclaim_governance"
+  ],
+  "summary": {
+    "selected_case_count": 3,
+    "passed_case_count": 3,
+    "failed_case_count": 0
+  },
+  "cases": [
+    {
+      "case_id": "ask_fixture_generated_answer_citation_valid",
+      "suite": "ask",
+      "suite_file": "eval/golden/ask_cases.json",
+      "scenario": "ask",
+      "fixture": "ask_basic",
+      "description": "deterministic fixture 下 provider 返回合法且语义受证据支撑的 [1] 引用时，应保留 generated_answer。",
+      "started_at": "2026-03-17T07:27:23.236067+00:00",
+      "duration_ms": 113.7,
+      "outcome": "passed",
+      "expected": {
+        "http_status": 200,
+        "workflow_status": "completed",
+        "message_contains": "grounded answer",
+        "approval_required": false,
+        "ask_result": {
+          "mode": "generated_answer",
+          "model_fallback_used": false,
+          "provider_name": "openai-compatible",
+          "min_citation_count": 1,
+          "min_retrieved_candidate_count": 1,
+          "answer_contains": [
+            "携带引用",
+            "[2]"
+          ]
+        },
+        "ask_groundedness": {
+          "bucket": "grounded",
+          "consistent": true,
+          "reason": "all_answer_terms_supported_by_cited_evidence",
+          "cited_candidate_count": 1
+        }
+      },
+      "actual": {
+        "http_status": 200,
+        "workflow_status": "completed",
+        "message": "Ask workflow completed with a grounded answer.",
+        "approval_required": false,
+        "run_id": "run_ce709f56bd534d9eb6dc1487606b6acb",
+        "thread_id": "thread_45faa56b50ca4948a15a08662dbed199",
+        "fixture_id": "ask_basic",
+        "fixture_db_path": "/var/folders/k1/fyz1kmds28dbvwxxbrrxt4rw0000gn/T/ks_eval_ask_fixture_generated_answer_citation_valid_z1gnt7lu/knowledge_steward.sqlite3",
+        "trace_path_exists": true,
+        "ask_result": {
+          "mode": "generated_answer",
+          "answer": "问答结果需要携带引用。[2]",
+          "citation_count": 3,
+          "retrieved_candidate_count": 3,
+          "retrieval_fallback_used": false,
+          "retrieval_fallback_reason": null,
+          "model_fallback_used": false,
+          "model_fallback_reason": null,
+          "provider_name": "openai-compatible",
+          "model_name": "gpt-eval"
+        },
+        "ask_groundedness": {
+          "bucket": "grounded",
+          "consistent": true,
+          "reason": "all_answer_terms_supported_by_cited_evidence",
+          "citation_numbers": [
+            2
+          ],
+          "cited_candidate_count": 1,
+          "unsupported_terms": [],
+          "answer_text": "问答结果需要携带引用。"
+        },
+        "digest_result": null,
+        "proposal": null
+      },
+      "error": null
+    },
+    {
+      "case_id": "ask_fixture_semantic_overclaim_writeback",
+      "suite": "ask",
+      "suite_file": "eval/golden/ask_cases.json",
+      "scenario": "ask",
+      "fixture": "ask_basic",
+      "description": "编号合法但答案声称会自动写回知识库时，离线 eval 应识别为 unsupported_claim。",
+      "started_at": "2026-03-17T07:27:23.350938+00:00",
+      "duration_ms": 65.74,
+      "outcome": "passed",
+      "expected": {
+        "http_status": 200,
+        "workflow_status": "completed",
+        "message_contains": "grounded answer",
+        "approval_required": false,
+        "ask_result": {
+          "mode": "generated_answer",
+          "model_fallback_used": false,
+          "provider_name": "openai-compatible",
+          "min_citation_count": 1,
+          "min_retrieved_candidate_count": 1,
+          "answer_contains": [
+            "自动写回知识库",
+            "[2]"
+          ]
+        },
+        "ask_groundedness": {
+          "bucket": "unsupported_claim",
+          "consistent": false,
+          "reason": "answer_contains_terms_not_found_in_cited_evidence",
+          "cited_candidate_count": 1,
+          "unsupported_term_min_count": 2,
+          "unsupported_term_contains": [
+            "自动",
+            "写回"
+          ]
+        }
+      },
+      "actual": {
+        "http_status": 200,
+        "workflow_status": "completed",
+        "message": "Ask workflow completed with a grounded answer.",
+        "approval_required": false,
+        "run_id": "run_a78606f61eac4a7da67b68350c50937e",
+        "thread_id": "thread_c3b6ee7c779d44ea816a574b43bc5ede",
+        "fixture_id": "ask_basic",
+        "fixture_db_path": "/var/folders/k1/fyz1kmds28dbvwxxbrrxt4rw0000gn/T/ks_eval_ask_fixture_semantic_overclaim_writeback_gy54wa3d/knowledge_steward.sqlite3",
+        "trace_path_exists": true,
+        "ask_result": {
+          "mode": "generated_answer",
+          "answer": "问答结果会自动写回知识库。[2]",
+          "citation_count": 3,
+          "retrieved_candidate_count": 3,
+          "retrieval_fallback_used": false,
+          "retrieval_fallback_reason": null,
+          "model_fallback_used": false,
+          "model_fallback_reason": null,
+          "provider_name": "openai-compatible",
+          "model_name": "gpt-eval"
+        },
+        "ask_groundedness": {
+          "bucket": "unsupported_claim",
+          "consistent": false,
+          "reason": "answer_contains_terms_not_found_in_cited_evidence",
+          "citation_numbers": [
+            2
+          ],
+          "cited_candidate_count": 1,
+          "unsupported_terms": [
+            "果会",
+            "会自",
+            "自动",
+            "动写",
+            "写回",
+            "回知",
+            "知识",
+            "识库"
+          ],
+          "answer_text": "问答结果会自动写回知识库。"
+        },
+        "digest_result": null,
+        "proposal": null
+      },
+      "error": null
+    },
+    {
+      "case_id": "ask_fixture_semantic_overclaim_governance",
+      "suite": "ask",
+      "suite_file": "eval/golden/ask_cases.json",
+      "scenario": "ask",
+      "fixture": "ask_basic",
+      "description": "编号合法但答案过度概括为已完成双链治理时，离线 eval 应识别为 unsupported_claim。",
+      "started_at": "2026-03-17T07:27:23.416688+00:00",
+      "duration_ms": 64.4,
+      "outcome": "passed",
+      "expected": {
+        "http_status": 200,
+        "workflow_status": "completed",
+        "message_contains": "grounded answer",
+        "approval_required": false,
+        "ask_result": {
+          "mode": "generated_answer",
+          "model_fallback_used": false,
+          "provider_name": "openai-compatible",
+          "min_citation_count": 1,
+          "min_retrieved_candidate_count": 1,
+          "answer_contains": [
+            "双链治理",
+            "[2]"
+          ]
+        },
+        "ask_groundedness": {
+          "bucket": "unsupported_claim",
+          "consistent": false,
+          "reason": "answer_contains_terms_not_found_in_cited_evidence",
+          "cited_candidate_count": 1,
+          "unsupported_term_min_count": 2,
+          "unsupported_term_contains": [
+            "双链",
+            "治理"
+          ]
+        }
+      },
+      "actual": {
+        "http_status": 200,
+        "workflow_status": "completed",
+        "message": "Ask workflow completed with a grounded answer.",
+        "approval_required": false,
+        "run_id": "run_964cf00a54ba44aeafbff02cc5e6b1cc",
+        "thread_id": "thread_0eff01efc27644d78e7488ea3f8536c1",
+        "fixture_id": "ask_basic",
+        "fixture_db_path": "/var/folders/k1/fyz1kmds28dbvwxxbrrxt4rw0000gn/T/ks_eval_ask_fixture_semantic_overclaim_governance_ldd748kj/knowledge_steward.sqlite3",
+        "trace_path_exists": true,
+        "ask_result": {
+          "mode": "generated_answer",
+          "answer": "Roadmap 已完成双链治理。[2]",
+          "citation_count": 3,
+          "retrieved_candidate_count": 3,
+          "retrieval_fallback_used": false,
+          "retrieval_fallback_reason": null,
+          "model_fallback_used": false,
+          "model_fallback_reason": null,
+          "provider_name": "openai-compatible",
+          "model_name": "gpt-eval"
+        },
+        "ask_groundedness": {
+          "bucket": "unsupported_claim",
+          "consistent": false,
+          "reason": "answer_contains_terms_not_found_in_cited_evidence",
+          "citation_numbers": [
+            2
+          ],
+          "cited_candidate_count": 1,
+          "unsupported_terms": [
+            "roadmap",
+            "已完",
+            "完成",
+            "成双",
+            "双链",
+            "链治",
+            "治理",
+            "已完成"
+          ],
+          "answer_text": "Roadmap 已完成双链治理。"
+        },
+        "digest_result": null,
+        "proposal": null
+      },
+      "error": null
+    }
+  ]
+}

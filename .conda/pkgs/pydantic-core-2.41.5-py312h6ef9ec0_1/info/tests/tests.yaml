@@ -1,0 +1,10 @@
+- python:
+    imports:
+    - pydantic_core
+- script:
+    content: |-
+      pip check
+      python -c "from pydantic_core import PydanticUndefinedType"
+  requirements:
+    run:
+    - pip

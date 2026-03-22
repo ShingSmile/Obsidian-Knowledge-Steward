@@ -1,0 +1,18 @@
+{
+  "arch": "arm64",
+  "build": "py312h4409184_1",
+  "build_number": 1,
+  "depends": [
+    "__osx >=11.0",
+    "libuv >=1.51.0,<2.0a0",
+    "python >=3.12,<3.13.0a0",
+    "python >=3.12,<3.13.0a0 *_cpython",
+    "python_abi 3.12.* *_cp312"
+  ],
+  "license": "MIT OR Apache-2.0",
+  "name": "uvloop",
+  "platform": "osx",
+  "subdir": "osx-arm64",
+  "timestamp": 1762473729988,
+  "version": "0.22.1"
+}

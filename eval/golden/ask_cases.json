@@ -1,0 +1,376 @@
+{
+  "suite": "ask",
+  "schema_version": 1,
+  "cases": [
+    {
+      "case_id": "ask_sample_retrieval_only_daily_notes",
+      "scenario": "ask",
+      "fixture": "sample_vault",
+      "description": "基于真实 sample_vault 的最小问答回归，确认无 provider 时仍能返回 retrieval_only 证据结果。",
+      "request": {
+        "action_type": "ask_qa",
+        "user_query": "总结",
+        "retrieval_filter": {
+          "note_types": [
+            "daily_note"
+          ]
+        }
+      },
+      "setup": {
+        "provider_mode": "none"
+      },
+      "expected": {
+        "http_status": 200,
+        "workflow_status": "completed",
+        "message_contains": "retrieval-only fallback",
+        "approval_required": false,
+        "ask_result": {
+          "mode": "retrieval_only",
+          "model_fallback_used": true,
+          "model_fallback_reason": "no_available_chat_provider",
+          "retrieval_fallback_used": false,
+          "min_citation_count": 1,
+          "min_retrieved_candidate_count": 1,
+          "answer_contains": "当前未使用模型生成答案"
+        }
+      }
+    },
+    {
+      "case_id": "ask_sample_filter_fallback",
+      "scenario": "ask",
+      "fixture": "sample_vault",
+      "description": "真实 sample_vault 下的 metadata filter 过严时，应稳定退回纯 FTS 结果。",
+      "request": {
+        "action_type": "ask_qa",
+        "user_query": "总结",
+        "retrieval_filter": {
+          "path_prefixes": [
+            "__missing_eval_prefix__"
+          ]
+        }
+      },
+      "setup": {
+        "provider_mode": "none"
+      },
+      "expected": {
+        "http_status": 200,
+        "workflow_status": "completed",
+        "message_contains": "retrieval-only fallback",
+        "approval_required": false,
+        "ask_result": {
+          "mode": "retrieval_only",
+          "model_fallback_used": true,
+          "model_fallback_reason": "no_available_chat_provider",
+          "retrieval_fallback_used": true,
+          "retrieval_fallback_reason": "metadata_filters_too_strict",
+          "min_citation_count": 1,
+          "min_retrieved_candidate_count": 1,
+          "answer_contains": [
+            "当前未使用模型生成答案",
+            "检索已退回纯 FTS 结果"
+          ]
+        }
+      }
+    },
+    {
+      "case_id": "ask_fixture_generated_answer_citation_valid",
+      "scenario": "ask",
+      "fixture": "ask_basic",
+      "description": "deterministic fixture 下 provider 返回合法且语义受证据支撑的 [1] 引用时，应保留 generated_answer。",
+      "quality_reference": {
+        "reference_context_path_suffixes": [
+          "Roadmap.md"
+        ]
+      },
+      "request": {
+        "action_type": "ask_qa",
+        "user_query": "Roadmap"
+      },
+      "setup": {
+        "provider_mode": "mocked_cloud",
+        "mock_provider_answer": "问答结果需要携带引用。[2]"
+      },
+      "expected": {
+        "http_status": 200,
+        "workflow_status": "completed",
+        "message_contains": "grounded answer",
+        "approval_required": false,
+        "ask_result": {
+          "mode": "generated_answer",
+          "model_fallback_used": false,
+          "provider_name": "openai-compatible",
+          "min_citation_count": 1,
+          "min_retrieved_candidate_count": 1,
+          "answer_contains": [
+            "携带引用",
+            "[2]"
+          ]
+        },
+        "ask_groundedness": {
+          "bucket": "grounded",
+          "consistent": true,
+          "reason": "all_answer_terms_supported_by_cited_evidence",
+          "cited_candidate_count": 1
+        },
+        "quality_metrics": {
+          "faithfulness": {
+            "min": 1.0
+          },
+          "relevancy": {
+            "min": 1.0
+          },
+          "context_precision": {
+            "min": 1.0
+          },
+          "context_recall": {
+            "min": 1.0
+          }
+        }
+      }
+    },
+    {
+      "case_id": "ask_fixture_invalid_citation_downgrades",
+      "scenario": "ask",
+      "fixture": "ask_basic",
+      "description": "deterministic fixture 下 provider 返回越界编号时，应保守降级为 retrieval_only。",
+      "request": {
+        "action_type": "ask_qa",
+        "user_query": "Roadmap"
+      },
+      "setup": {
+        "provider_mode": "mocked_cloud",
+        "mock_provider_answer": "Roadmap 已拆成检索与 ask 两段实现。[9]"
+      },
+      "expected": {
+        "http_status": 200,
+        "workflow_status": "completed",
+        "message_contains": "retrieval-only fallback",
+        "approval_required": false,
+        "ask_result": {
+          "mode": "retrieval_only",
+          "model_fallback_used": true,
+          "model_fallback_reason": "citation_alignment_out_of_range",
+          "min_citation_count": 1,
+          "min_retrieved_candidate_count": 1,
+          "answer_contains": [
+            "当前未使用模型生成答案",
+            "[1]"
+          ]
+        }
+      }
+    },
+    {
+      "case_id": "ask_fixture_no_hits",
+      "scenario": "ask",
+      "fixture": "ask_basic",
+      "description": "无命中 query 应走 no_hits，而不是伪造 citation 或空 retrieval_only。",
+      "request": {
+        "action_type": "ask_qa",
+        "user_query": "knowledge_steward_eval_missing_phrase"
+      },
+      "setup": {
+        "provider_mode": "none"
+      },
+      "expected": {
+        "http_status": 200,
+        "workflow_status": "completed",
+        "message_contains": "without matching evidence",
+        "approval_required": false,
+        "ask_result": {
+          "mode": "no_hits",
+          "model_fallback_used": false,
+          "min_citation_count": 0,
+          "answer_contains": "未找到可支撑回答的笔记片段"
+        }
+      }
+    },
+    {
+      "case_id": "ask_fixture_semantic_overclaim_writeback",
+      "scenario": "ask",
+      "fixture": "ask_basic",
+      "description": "编号合法但答案声称会自动写回知识库时，离线 eval 应识别为 unsupported_claim。",
+      "quality_reference": {
+        "reference_context_path_suffixes": [
+          "Roadmap.md"
+        ]
+      },
+      "request": {
+        "action_type": "ask_qa",
+        "user_query": "Roadmap"
+      },
+      "setup": {
+        "provider_mode": "mocked_cloud",
+        "mock_provider_answer": "问答结果会自动写回知识库。[2]"
+      },
+      "expected": {
+        "http_status": 200,
+        "workflow_status": "completed",
+        "message_contains": "grounded answer",
+        "approval_required": false,
+        "ask_result": {
+          "mode": "generated_answer",
+          "model_fallback_used": false,
+          "provider_name": "openai-compatible",
+          "min_citation_count": 1,
+          "min_retrieved_candidate_count": 1,
+          "answer_contains": [
+            "自动写回知识库",
+            "[2]"
+          ]
+        },
+        "ask_groundedness": {
+          "bucket": "unsupported_claim",
+          "consistent": false,
+          "reason": "answer_contains_terms_not_found_in_cited_evidence",
+          "cited_candidate_count": 1,
+          "unsupported_term_min_count": 2,
+          "unsupported_term_contains": [
+            "自动",
+            "写回"
+          ]
+        },
+        "quality_metrics": {
+          "faithfulness": {
+            "max": 0.0
+          },
+          "relevancy": {
+            "min": 1.0
+          },
+          "context_precision": {
+            "min": 1.0
+          },
+          "context_recall": {
+            "min": 1.0
+          }
+        }
+      }
+    },
+    {
+      "case_id": "ask_fixture_semantic_overclaim_governance",
+      "scenario": "ask",
+      "fixture": "ask_basic",
+      "description": "编号合法但答案过度概括为已完成双链治理时，离线 eval 应识别为 unsupported_claim。",
+      "quality_reference": {
+        "reference_context_path_suffixes": [
+          "Roadmap.md"
+        ]
+      },
+      "request": {
+        "action_type": "ask_qa",
+        "user_query": "Roadmap"
+      },
+      "setup": {
+        "provider_mode": "mocked_cloud",
+        "mock_provider_answer": "Roadmap 已完成双链治理。[2]"
+      },
+      "expected": {
+        "http_status": 200,
+        "workflow_status": "completed",
+        "message_contains": "grounded answer",
+        "approval_required": false,
+        "ask_result": {
+          "mode": "generated_answer",
+          "model_fallback_used": false,
+          "provider_name": "openai-compatible",
+          "min_citation_count": 1,
+          "min_retrieved_candidate_count": 1,
+          "answer_contains": [
+            "双链治理",
+            "[2]"
+          ]
+        },
+        "ask_groundedness": {
+          "bucket": "unsupported_claim",
+          "consistent": false,
+          "reason": "answer_contains_terms_not_found_in_cited_evidence",
+          "cited_candidate_count": 1,
+          "unsupported_term_min_count": 2,
+          "unsupported_term_contains": [
+            "双链",
+            "治理"
+          ]
+        },
+        "quality_metrics": {
+          "faithfulness": {
+            "max": 0.0
+          },
+          "relevancy": {
+            "min": 1.0
+          },
+          "context_precision": {
+            "min": 1.0
+          },
+          "context_recall": {
+            "min": 1.0
+          }
+        }
+      }
+    },
+    {
+      "case_id": "ask_fixture_hybrid_retrieval_only",
+      "scenario": "ask",
+      "fixture": "ask_hybrid_basic",
+      "description": "在 deterministic hybrid fixture 下，ask 应显式消费 hybrid candidate，而不是只回归纯 FTS。",
+      "quality_reference": {
+        "reference_context_path_suffixes": [
+          "Roadmap.md",
+          "Strategy.md"
+        ]
+      },
+      "request": {
+        "action_type": "ask_qa",
+        "user_query": "Roadmap"
+      },
+      "setup": {
+        "provider_mode": "none",
+        "mock_embedding_profile": "roadmap_strategy_hybrid",
+        "prewarm_requests": [
+          {
+            "thread_id": "thread_eval_ask_hybrid_prewarm",
+            "action_type": "ingest_steward"
+          }
+        ]
+      },
+      "expected": {
+        "http_status": 200,
+        "workflow_status": "completed",
+        "message_contains": "retrieval-only fallback",
+        "approval_required": false,
+        "ask_result": {
+          "mode": "retrieval_only",
+          "model_fallback_used": true,
+          "model_fallback_reason": "no_available_chat_provider",
+          "min_citation_count": 2,
+          "min_retrieved_candidate_count": 2,
+          "answer_contains": [
+            "当前未使用模型生成答案",
+            "[1]",
+            "[2]"
+          ],
+          "citation_path_suffixes": [
+            "Roadmap.md",
+            "Strategy.md"
+          ],
+          "retrieved_candidate_sources_contains": [
+            "hybrid_rrf",
+            "sqlite_vector"
+          ]
+        },
+        "quality_metrics": {
+          "faithfulness": {
+            "min": 1.0
+          },
+          "relevancy": {
+            "min": 1.0
+          },
+          "context_precision": {
+            "min": 1.0
+          },
+          "context_recall": {
+            "min": 1.0
+          }
+        }
+      }
+    }
+  ]
+}

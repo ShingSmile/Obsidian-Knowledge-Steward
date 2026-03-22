@@ -1,0 +1,17 @@
+{
+  "channels": [
+    "https://conda.anaconda.org/conda-forge/"
+  ],
+  "dev_url": "https://github.com/patrick91/rich-toolkit",
+  "extra": {
+    "flow_run_id": "azure_20260224.2.1",
+    "recipe-maintainers": [
+      "synapticarbors"
+    ],
+    "remote_url": "https://github.com/conda-forge/rich-toolkit-feedstock",
+    "sha": "858b22bd0f0cbe7bb29e7c84caec4d2469aa2cb7"
+  },
+  "home": "https://github.com/patrick91/rich-toolkit",
+  "license": "MIT",
+  "summary": "Rich toolkit for building command-line applications"
+}

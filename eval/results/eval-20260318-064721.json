@@ -1,0 +1,2447 @@
+{
+  "schema_version": "1.3",
+  "generated_at": "2026-03-18T06:47:21.218747+00:00",
+  "backend_version": "0.1.0",
+  "selected_case_ids": [
+    "ask_sample_retrieval_only_daily_notes",
+    "ask_sample_filter_fallback",
+    "ask_fixture_generated_answer_citation_valid",
+    "ask_fixture_invalid_citation_downgrades",
+    "ask_fixture_no_hits",
+    "ask_fixture_semantic_overclaim_writeback",
+    "ask_fixture_semantic_overclaim_governance",
+    "ask_fixture_hybrid_retrieval_only",
+    "digest_sample_structured_result",
+    "digest_fixture_structured_result_metrics",
+    "digest_sample_waiting_proposal",
+    "digest_fixture_waiting_proposal_metrics",
+    "digest_fixture_empty_index_fallback",
+    "governance_fixture_waiting_proposal_hybrid",
+    "governance_fixture_no_proposal_fallback",
+    "resume_fixture_reject_waiting_proposal",
+    "resume_fixture_writeback_success",
+    "resume_fixture_writeback_failure"
+  ],
+  "summary": {
+    "selected_case_count": 18,
+    "passed_case_count": 18,
+    "failed_case_count": 0,
+    "metric_overview": {
+      "faithfulness": {
+        "case_count": 12,
+        "average_score": 0.8333,
+        "min_score": 0.0,
+        "max_score": 1.0
+      },
+      "relevancy": {
+        "case_count": 18,
+        "average_score": 1.0,
+        "min_score": 1.0,
+        "max_score": 1.0
+      },
+      "context_precision": {
+        "case_count": 16,
+        "average_score": 0.4479,
+        "min_score": 0.0,
+        "max_score": 1.0
+      },
+      "context_recall": {
+        "case_count": 8,
+        "average_score": 1.0,
+        "min_score": 1.0,
+        "max_score": 1.0
+      }
+    },
+    "benchmark_overview": {
+      "question_answering": {
+        "display_name": "Question Answering",
+        "scenario_names": [
+          "ask"
+        ],
+        "selected_case_count": 8,
+        "passed_case_count": 8,
+        "failed_case_count": 0,
+        "metric_overview": {
+          "faithfulness": {
+            "case_count": 8,
+            "average_score": 0.75,
+            "min_score": 0.0,
+            "max_score": 1.0
+          },
+          "relevancy": {
+            "case_count": 8,
+            "average_score": 1.0,
+            "min_score": 1.0,
+            "max_score": 1.0
+          },
+          "context_precision": {
+            "case_count": 7,
+            "average_score": 0.5714,
+            "min_score": 0.0,
+            "max_score": 1.0
+          },
+          "context_recall": {
+            "case_count": 4,
+            "average_score": 1.0,
+            "min_score": 1.0,
+            "max_score": 1.0
+          }
+        },
+        "failure_type_breakdown": {
+          "model_fallback:no_available_chat_provider": 3,
+          "ask_groundedness:unsupported_claim": 2,
+          "ask:no_hits": 1,
+          "model_fallback:citation_alignment_out_of_range": 1,
+          "retrieval_fallback:metadata_filters_too_strict": 1
+        },
+        "scenario_overview": {
+          "ask": {
+            "display_name": "Ask QA",
+            "selected_case_count": 8,
+            "passed_case_count": 8,
+            "failed_case_count": 0,
+            "metric_overview": {
+              "faithfulness": {
+                "case_count": 8,
+                "average_score": 0.75,
+                "min_score": 0.0,
+                "max_score": 1.0
+              },
+              "relevancy": {
+                "case_count": 8,
+                "average_score": 1.0,
+                "min_score": 1.0,
+                "max_score": 1.0
+              },
+              "context_precision": {
+                "case_count": 7,
+                "average_score": 0.5714,
+                "min_score": 0.0,
+                "max_score": 1.0
+              },
+              "context_recall": {
+                "case_count": 4,
+                "average_score": 1.0,
+                "min_score": 1.0,
+                "max_score": 1.0
+              }
+            },
+            "failure_type_breakdown": {
+              "model_fallback:no_available_chat_provider": 3,
+              "ask_groundedness:unsupported_claim": 2,
+              "ask:no_hits": 1,
+              "model_fallback:citation_alignment_out_of_range": 1,
+              "retrieval_fallback:metadata_filters_too_strict": 1
+            },
+            "core_metrics": {
+              "generated_answer_rate": 0.375,
+              "retrieval_only_rate": 0.5,
+              "no_hits_rate": 0.125,
+              "unsupported_claim_rate": 0.25,
+              "ask_result_mode_breakdown": {
+                "retrieval_only": 4,
+                "generated_answer": 3,
+                "no_hits": 1
+              },
+              "groundedness_bucket_breakdown": {
+                "not_generated_answer": 5,
+                "unsupported_claim": 2,
+                "grounded": 1
+              }
+            }
+          }
+        }
+      },
+      "governance": {
+        "display_name": "Governance",
+        "scenario_names": [
+          "governance",
+          "digest",
+          "resume_workflow"
+        ],
+        "selected_case_count": 10,
+        "passed_case_count": 10,
+        "failed_case_count": 0,
+        "metric_overview": {
+          "faithfulness": {
+            "case_count": 4,
+            "average_score": 1.0,
+            "min_score": 1.0,
+            "max_score": 1.0
+          },
+          "relevancy": {
+            "case_count": 10,
+            "average_score": 1.0,
+            "min_score": 1.0,
+            "max_score": 1.0
+          },
+          "context_precision": {
+            "case_count": 9,
+            "average_score": 0.3519,
+            "min_score": 0.0,
+            "max_score": 1.0
+          },
+          "context_recall": {
+            "case_count": 4,
+            "average_score": 1.0,
+            "min_score": 1.0,
+            "max_score": 1.0
+          }
+        },
+        "failure_type_breakdown": {
+          "analysis_fallback:no_governance_issues_detected": 1,
+          "digest_fallback:no_indexed_notes": 1,
+          "writeback_failure:before_hash_mismatch": 1
+        },
+        "scenario_overview": {
+          "governance": {
+            "display_name": "Ingest Governance",
+            "selected_case_count": 2,
+            "passed_case_count": 2,
+            "failed_case_count": 0,
+            "metric_overview": {
+              "faithfulness": {
+                "case_count": 2,
+                "average_score": 1.0,
+                "min_score": 1.0,
+                "max_score": 1.0
+              },
+              "relevancy": {
+                "case_count": 2,
+                "average_score": 1.0,
+                "min_score": 1.0,
+                "max_score": 1.0
+              },
+              "context_precision": {
+                "case_count": 2,
+                "average_score": 0.5834,
+                "min_score": 0.5,
+                "max_score": 0.6667
+              },
+              "context_recall": {
+                "case_count": 2,
+                "average_score": 1.0,
+                "min_score": 1.0,
+                "max_score": 1.0
+              }
+            },
+            "failure_type_breakdown": {
+              "analysis_fallback:no_governance_issues_detected": 1
+            },
+            "core_metrics": {
+              "proposal_generation_rate": 0.5,
+              "waiting_for_approval_rate": 0.5,
+              "analysis_fallback_rate": 0.5,
+              "workflow_status_breakdown": {
+                "completed": 1,
+                "waiting_for_approval": 1
+              },
+              "finding_type_breakdown": {
+                "missing_frontmatter": 1,
+                "orphan_hint": 1,
+                "unclassified_note_type": 1
+              },
+              "analysis_fallback_reason_breakdown": {
+                "no_governance_issues_detected": 1
+              }
+            }
+          },
+          "digest": {
+            "display_name": "Daily Digest",
+            "selected_case_count": 5,
+            "passed_case_count": 5,
+            "failed_case_count": 0,
+            "metric_overview": {
+              "faithfulness": {
+                "case_count": 2,
+                "average_score": 1.0,
+                "min_score": 1.0,
+                "max_score": 1.0
+              },
+              "relevancy": {
+                "case_count": 5,
+                "average_score": 1.0,
+                "min_score": 1.0,
+                "max_score": 1.0
+              },
+              "context_precision": {
+                "case_count": 4,
+                "average_score": 0.5,
+                "min_score": 0.0,
+                "max_score": 1.0
+              },
+              "context_recall": {
+                "case_count": 2,
+                "average_score": 1.0,
+                "min_score": 1.0,
+                "max_score": 1.0
+              }
+            },
+            "failure_type_breakdown": {
+              "digest_fallback:no_indexed_notes": 1
+            },
+            "core_metrics": {
+              "proposal_generation_rate": 0.4,
+              "waiting_for_approval_rate": 0.4,
+              "digest_fallback_rate": 0.2,
+              "average_source_note_count": 3.6,
+              "workflow_status_breakdown": {
+                "completed": 3,
+                "waiting_for_approval": 2
+              }
+            }
+          },
+          "resume_workflow": {
+            "display_name": "Resume Workflow",
+            "selected_case_count": 3,
+            "passed_case_count": 3,
+            "failed_case_count": 0,
+            "metric_overview": {
+              "faithfulness": {
+                "case_count": 0,
+                "average_score": null,
+                "min_score": null,
+                "max_score": null
+              },
+              "relevancy": {
+                "case_count": 3,
+                "average_score": 1.0,
+                "min_score": 1.0,
+                "max_score": 1.0
+              },
+              "context_precision": {
+                "case_count": 3,
+                "average_score": 0.0,
+                "min_score": 0.0,
+                "max_score": 0.0
+              },
+              "context_recall": {
+                "case_count": 0,
+                "average_score": null,
+                "min_score": null,
+                "max_score": null
+              }
+            },
+            "failure_type_breakdown": {
+              "writeback_failure:before_hash_mismatch": 1
+            },
+            "core_metrics": {
+              "approval_rejection_rate": 0.3333,
+              "writeback_success_rate": 0.3333,
+              "writeback_failure_rate": 0.3333,
+              "approval_decision_breakdown": {
+                "approved": 2,
+                "rejected": 1
+              },
+              "writeback_outcome_breakdown": {
+                "applied": 1,
+                "failed": 1,
+                "not_present": 1
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "cases": [
+    {
+      "case_id": "ask_sample_retrieval_only_daily_notes",
+      "benchmark": "question_answering",
+      "suite": "ask",
+      "suite_file": "eval/golden/ask_cases.json",
+      "scenario": "ask",
+      "fixture": "sample_vault",
+      "description": "基于真实 sample_vault 的最小问答回归，确认无 provider 时仍能返回 retrieval_only 证据结果。",
+      "started_at": "2026-03-18T06:47:20.275859+00:00",
+      "duration_ms": 164.77,
+      "outcome": "passed",
+      "expected": {
+        "http_status": 200,
+        "workflow_status": "completed",
+        "message_contains": "retrieval-only fallback",
+        "approval_required": false,
+        "ask_result": {
+          "mode": "retrieval_only",
+          "model_fallback_used": true,
+          "model_fallback_reason": "no_available_chat_provider",
+          "retrieval_fallback_used": false,
+          "min_citation_count": 1,
+          "min_retrieved_candidate_count": 1,
+          "answer_contains": "当前未使用模型生成答案"
+        }
+      },
+      "actual": {
+        "http_status": 200,
+        "workflow_status": "completed",
+        "message": "Ask workflow completed with retrieval-only fallback.",
+        "approval_required": false,
+        "run_id": "run_6ff2b3e492374e85a6f825903daf7356",
+        "thread_id": "thread_281c2bbe73394e91904e702229b94388",
+        "fixture_id": "sample_vault",
+        "fixture_db_path": "/var/folders/k1/fyz1kmds28dbvwxxbrrxt4rw0000gn/T/ks_eval_ask_sample_retrieval_only_daily_notes_uobva30n/knowledge_steward.sqlite3",
+        "trace_path_exists": true,
+        "ask_result": {
+          "mode": "retrieval_only",
+          "answer": "当前未使用模型生成答案，先返回与问题“总结”最相关的检索证据。\n[1] 2024-01-26_星期五.md / Summary (lines 21-43): ...想吐槽的，有什么问题但不一定能解决\n* 有什么idea\n* 讨论环节\n* action\n\n* [总结]\n\t* 业务\n\t\t* 坑\n\t* 技术\n\t* 模块化\n* session\n\t* 分享...\n[2] 2023-11-06_星期一.md / Summary (lines 21-34): # Summary\n\n* 要什么东西，提供什么功能\n* 这周四之前完成复盘、[总结]、和task\n* 正常的码单数据在下单收银之后会被直接删除，但是预订单的码单头部数据会保留\n* 类内部调用事务方法会导致事务失效\n\t* transactional基于aop，基于动态代理，调用内部类方法使用this对象不走动态代理...",
+          "citation_count": 2,
+          "retrieved_candidate_count": 2,
+          "retrieval_fallback_used": false,
+          "retrieval_fallback_reason": null,
+          "model_fallback_used": true,
+          "model_fallback_reason": "no_available_chat_provider",
+          "provider_name": null,
+          "model_name": null,
+          "citation_paths": [
+            "/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/sample_vault/日常/2024-01-26_星期五.md",
+            "/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/sample_vault/日常/2023-11-06_星期一.md"
+          ],
+          "citation_retrieval_sources": [
+            "sqlite_fts",
+            "sqlite_fts"
+          ],
+          "retrieved_candidate_paths": [
+            "/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/sample_vault/日常/2024-01-26_星期五.md",
+            "/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/sample_vault/日常/2023-11-06_星期一.md"
+          ],
+          "retrieved_candidate_retrieval_sources": [
+            "sqlite_fts",
+            "sqlite_fts"
+          ]
+        },
+        "ask_groundedness": {
+          "bucket": "not_generated_answer",
+          "consistent": null,
+          "reason": "ask_result_not_generated_answer",
+          "citation_numbers": [],
+          "cited_candidate_count": 0,
+          "unsupported_terms": [],
+          "answer_text": "当前未使用模型生成答案，先返回与问题“总结”最相关的检索证据。\n 2024-01-26_星期五.md / Summary (lines 21-43): ...想吐槽的，有什么问题但不一定能解决\n* 有什么idea\n* 讨论环节\n* action\n\n* [总结]\n\t* 业务\n\t\t* 坑\n\t* 技术\n\t* 模块化\n* session\n\t* 分享...\n 2023-11-06_星期一.md / Summary (lines 21-34): # Summary\n\n* 要什么东西，提供什么功能\n* 这周四之前完成复盘、[总结]、和task\n* 正常的码单数据在下单收银之后会被直接删除，但是预订单的码单头部数据会保留\n* 类内部调用事务方法会导致事务失效\n\t* transactional基于aop，基于动态代理，调用内部类方法使用this对象不走动态代理..."
+        },
+        "ingest_result": null,
+        "analysis_result": null,
+        "digest_result": null,
+        "proposal": null,
+        "quality_metrics": {
+          "faithfulness": {
+            "score": 1.0,
+            "reason": "ask_groundedness:not_generated_answer"
+          },
+          "relevancy": {
+            "score": 1.0,
+            "matched_output_hint_count": 2,
+            "expected_output_hint_count": 2
+          },
+          "context_precision": {
+            "score": 0.0,
+            "matched_context_count": 0,
+            "actual_context_count": 2
+          },
+          "context_recall": {
+            "score": null,
+            "matched_context_count": 0,
+            "reference_context_count": 0
+          }
+        }
+      },
+      "error": null
+    },
+    {
+      "case_id": "ask_sample_filter_fallback",
+      "benchmark": "question_answering",
+      "suite": "ask",
+      "suite_file": "eval/golden/ask_cases.json",
+      "scenario": "ask",
+      "fixture": "sample_vault",
+      "description": "真实 sample_vault 下的 metadata filter 过严时，应稳定退回纯 FTS 结果。",
+      "started_at": "2026-03-18T06:47:20.440731+00:00",
+      "duration_ms": 160.25,
+      "outcome": "passed",
+      "expected": {
+        "http_status": 200,
+        "workflow_status": "completed",
+        "message_contains": "retrieval-only fallback",
+        "approval_required": false,
+        "ask_result": {
+          "mode": "retrieval_only",
+          "model_fallback_used": true,
+          "model_fallback_reason": "no_available_chat_provider",
+          "retrieval_fallback_used": true,
+          "retrieval_fallback_reason": "metadata_filters_too_strict",
+          "min_citation_count": 1,
+          "min_retrieved_candidate_count": 1,
+          "answer_contains": [
+            "当前未使用模型生成答案",
+            "检索已退回纯 FTS 结果"
+          ]
+        }
+      },
+      "actual": {
+        "http_status": 200,
+        "workflow_status": "completed",
+        "message": "Ask workflow completed with retrieval-only fallback.",
+        "approval_required": false,
+        "run_id": "run_2679bc23ddd041f097073c65daa64be5",
+        "thread_id": "thread_96d919314ead4805932d8c0815185a0d",
+        "fixture_id": "sample_vault",
+        "fixture_db_path": "/var/folders/k1/fyz1kmds28dbvwxxbrrxt4rw0000gn/T/ks_eval_ask_sample_filter_fallback_xu6v0_6m/knowledge_steward.sqlite3",
+        "trace_path_exists": true,
+        "ask_result": {
+          "mode": "retrieval_only",
+          "answer": "当前未使用模型生成答案，先返回与问题“总结”最相关的检索证据。\n注意：结构化过滤条件过严，检索已退回纯 FTS 结果。\n[1] v6.3.0迭代总结.md / 二、任务总结 > 5、总结 (lines 30-34): 二、任务总结 > 5、[总结]\n[2] v6.2.5迭代总结.md / 二、任务总结 > 5、总结 (lines 42-46): 二、任务总结 > 5、[总结]\n[3] 2024-01-26_星期五.md / Summary (lines 21-43): ...想吐槽的，有什么问题但不一定能解决\n* 有什么idea\n* 讨论环节\n* action\n\n* [总结]\n\t* 业务\n\t\t* 坑\n\t* 技术\n\t* 模块化\n* session\n\t* 分享...\n[4] 2023-11-06_星期一.md / Summary (lines 21-34): # Summary\n\n* 要什么东西，提供什么功能\n* 这周四之前完成复盘、[总结]、和task\n* 正常的码单数据在下单收银之后会被直接删除，但是预订单的码单头部数据会保留\n* 类内部调用事务方法会导致事务失效\n\t* transactional基于aop，基于动态代理，调用内部类方法使用this对象不走动态代理...",
+          "citation_count": 4,
+          "retrieved_candidate_count": 4,
+          "retrieval_fallback_used": true,
+          "retrieval_fallback_reason": "metadata_filters_too_strict",
+          "model_fallback_used": true,
+          "model_fallback_reason": "no_available_chat_provider",
+          "provider_name": null,
+          "model_name": null,
+          "citation_paths": [
+            "/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/sample_vault/日常/2023-07/v6.3.0迭代总结.md",
+            "/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/sample_vault/日常/2023-06/v6.2.5迭代总结.md",
+            "/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/sample_vault/日常/2024-01-26_星期五.md",
+            "/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/sample_vault/日常/2023-11-06_星期一.md"
+          ],
+          "citation_retrieval_sources": [
+            "sqlite_fts",
+            "sqlite_fts",
+            "sqlite_fts",
+            "sqlite_fts"
+          ],
+          "retrieved_candidate_paths": [
+            "/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/sample_vault/日常/2023-07/v6.3.0迭代总结.md",
+            "/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/sample_vault/日常/2023-06/v6.2.5迭代总结.md",
+            "/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/sample_vault/日常/2024-01-26_星期五.md",
+            "/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/sample_vault/日常/2023-11-06_星期一.md"
+          ],
+          "retrieved_candidate_retrieval_sources": [
+            "sqlite_fts",
+            "sqlite_fts",
+            "sqlite_fts",
+            "sqlite_fts"
+          ]
+        },
+        "ask_groundedness": {
+          "bucket": "not_generated_answer",
+          "consistent": null,
+          "reason": "ask_result_not_generated_answer",
+          "citation_numbers": [],
+          "cited_candidate_count": 0,
+          "unsupported_terms": [],
+          "answer_text": "当前未使用模型生成答案，先返回与问题“总结”最相关的检索证据。\n注意：结构化过滤条件过严，检索已退回纯 FTS 结果。\n v6.3.0迭代总结.md / 二、任务总结 > 5、总结 (lines 30-34): 二、任务总结 > 5、[总结]\n v6.2.5迭代总结.md / 二、任务总结 > 5、总结 (lines 42-46): 二、任务总结 > 5、[总结]\n 2024-01-26_星期五.md / Summary (lines 21-43): ...想吐槽的，有什么问题但不一定能解决\n* 有什么idea\n* 讨论环节\n* action\n\n* [总结]\n\t* 业务\n\t\t* 坑\n\t* 技术\n\t* 模块化\n* session\n\t* 分享...\n 2023-11-06_星期一.md / Summary (lines 21-34): # Summary\n\n* 要什么东西，提供什么功能\n* 这周四之前完成复盘、[总结]、和task\n* 正常的码单数据在下单收银之后会被直接删除，但是预订单的码单头部数据会保留\n* 类内部调用事务方法会导致事务失效\n\t* transactional基于aop，基于动态代理，调用内部类方法使用this对象不走动态代理..."
+        },
+        "ingest_result": null,
+        "analysis_result": null,
+        "digest_result": null,
+        "proposal": null,
+        "quality_metrics": {
+          "faithfulness": {
+            "score": 1.0,
+            "reason": "ask_groundedness:not_generated_answer"
+          },
+          "relevancy": {
+            "score": 1.0,
+            "matched_output_hint_count": 3,
+            "expected_output_hint_count": 3
+          },
+          "context_precision": {
+            "score": 0.0,
+            "matched_context_count": 0,
+            "actual_context_count": 4
+          },
+          "context_recall": {
+            "score": null,
+            "matched_context_count": 0,
+            "reference_context_count": 0
+          }
+        }
+      },
+      "error": null
+    },
+    {
+      "case_id": "ask_fixture_generated_answer_citation_valid",
+      "benchmark": "question_answering",
+      "suite": "ask",
+      "suite_file": "eval/golden/ask_cases.json",
+      "scenario": "ask",
+      "fixture": "ask_basic",
+      "description": "deterministic fixture 下 provider 返回合法且语义受证据支撑的 [1] 引用时，应保留 generated_answer。",
+      "started_at": "2026-03-18T06:47:20.601001+00:00",
+      "duration_ms": 20.34,
+      "outcome": "passed",
+      "expected": {
+        "http_status": 200,
+        "workflow_status": "completed",
+        "message_contains": "grounded answer",
+        "approval_required": false,
+        "ask_result": {
+          "mode": "generated_answer",
+          "model_fallback_used": false,
+          "provider_name": "openai-compatible",
+          "min_citation_count": 1,
+          "min_retrieved_candidate_count": 1,
+          "answer_contains": [
+            "携带引用",
+            "[2]"
+          ]
+        },
+        "ask_groundedness": {
+          "bucket": "grounded",
+          "consistent": true,
+          "reason": "all_answer_terms_supported_by_cited_evidence",
+          "cited_candidate_count": 1
+        },
+        "quality_metrics": {
+          "faithfulness": {
+            "min": 1.0
+          },
+          "relevancy": {
+            "min": 1.0
+          },
+          "context_precision": {
+            "min": 1.0
+          },
+          "context_recall": {
+            "min": 1.0
+          }
+        }
+      },
+      "actual": {
+        "http_status": 200,
+        "workflow_status": "completed",
+        "message": "Ask workflow completed with a grounded answer.",
+        "approval_required": false,
+        "run_id": "run_3735099c6bdd4311b05aa798a6b15856",
+        "thread_id": "thread_88b951f35639434c8736ac160b819c9e",
+        "fixture_id": "ask_basic",
+        "fixture_db_path": "/var/folders/k1/fyz1kmds28dbvwxxbrrxt4rw0000gn/T/ks_eval_ask_fixture_generated_answer_citation_valid_kdeas4yb/knowledge_steward.sqlite3",
+        "trace_path_exists": true,
+        "ask_result": {
+          "mode": "generated_answer",
+          "answer": "问答结果需要携带引用。[2]",
+          "citation_count": 3,
+          "retrieved_candidate_count": 3,
+          "retrieval_fallback_used": false,
+          "retrieval_fallback_reason": null,
+          "model_fallback_used": false,
+          "model_fallback_reason": null,
+          "provider_name": "openai-compatible",
+          "model_name": "gpt-eval",
+          "citation_paths": [
+            "/private/var/folders/k1/fyz1kmds28dbvwxxbrrxt4rw0000gn/T/ks_eval_ask_fixture_generated_answer_citation_valid_kdeas4yb/vault/Roadmap.md",
+            "/private/var/folders/k1/fyz1kmds28dbvwxxbrrxt4rw0000gn/T/ks_eval_ask_fixture_generated_answer_citation_valid_kdeas4yb/vault/Roadmap.md",
+            "/private/var/folders/k1/fyz1kmds28dbvwxxbrrxt4rw0000gn/T/ks_eval_ask_fixture_generated_answer_citation_valid_kdeas4yb/vault/Roadmap.md"
+          ],
+          "citation_retrieval_sources": [
+            "sqlite_fts",
+            "sqlite_fts",
+            "sqlite_fts"
+          ],
+          "retrieved_candidate_paths": [
+            "/private/var/folders/k1/fyz1kmds28dbvwxxbrrxt4rw0000gn/T/ks_eval_ask_fixture_generated_answer_citation_valid_kdeas4yb/vault/Roadmap.md",
+            "/private/var/folders/k1/fyz1kmds28dbvwxxbrrxt4rw0000gn/T/ks_eval_ask_fixture_generated_answer_citation_valid_kdeas4yb/vault/Roadmap.md",
+            "/private/var/folders/k1/fyz1kmds28dbvwxxbrrxt4rw0000gn/T/ks_eval_ask_fixture_generated_answer_citation_valid_kdeas4yb/vault/Roadmap.md"
+          ],
+          "retrieved_candidate_retrieval_sources": [
+            "sqlite_fts",
+            "sqlite_fts",
+            "sqlite_fts"
+          ]
+        },
+        "ask_groundedness": {
+          "bucket": "grounded",
+          "consistent": true,
+          "reason": "all_answer_terms_supported_by_cited_evidence",
+          "citation_numbers": [
+            2
+          ],
+          "cited_candidate_count": 1,
+          "unsupported_terms": [],
+          "answer_text": "问答结果需要携带引用。"
+        },
+        "ingest_result": null,
+        "analysis_result": null,
+        "digest_result": null,
+        "proposal": null,
+        "quality_metrics": {
+          "faithfulness": {
+            "score": 1.0,
+            "reason": "ask_groundedness:grounded"
+          },
+          "relevancy": {
+            "score": 1.0,
+            "matched_output_hint_count": 3,
+            "expected_output_hint_count": 3
+          },
+          "context_precision": {
+            "score": 1.0,
+            "matched_context_count": 1,
+            "actual_context_count": 1
+          },
+          "context_recall": {
+            "score": 1.0,
+            "matched_context_count": 1,
+            "reference_context_count": 1
+          }
+        }
+      },
+      "error": null
+    },
+    {
+      "case_id": "ask_fixture_invalid_citation_downgrades",
+      "benchmark": "question_answering",
+      "suite": "ask",
+      "suite_file": "eval/golden/ask_cases.json",
+      "scenario": "ask",
+      "fixture": "ask_basic",
+      "description": "deterministic fixture 下 provider 返回越界编号时，应保守降级为 retrieval_only。",
+      "started_at": "2026-03-18T06:47:20.621351+00:00",
+      "duration_ms": 19.44,
+      "outcome": "passed",
+      "expected": {
+        "http_status": 200,
+        "workflow_status": "completed",
+        "message_contains": "retrieval-only fallback",
+        "approval_required": false,
+        "ask_result": {
+          "mode": "retrieval_only",
+          "model_fallback_used": true,
+          "model_fallback_reason": "citation_alignment_out_of_range",
+          "min_citation_count": 1,
+          "min_retrieved_candidate_count": 1,
+          "answer_contains": [
+            "当前未使用模型生成答案",
+            "[1]"
+          ]
+        }
+      },
+      "actual": {
+        "http_status": 200,
+        "workflow_status": "completed",
+        "message": "Ask workflow completed with retrieval-only fallback.",
+        "approval_required": false,
+        "run_id": "run_ee44c2426076438fb5cf4db7883a67c6",
+        "thread_id": "thread_7038f3c0081e4d888897976696203ab5",
+        "fixture_id": "ask_basic",
+        "fixture_db_path": "/var/folders/k1/fyz1kmds28dbvwxxbrrxt4rw0000gn/T/ks_eval_ask_fixture_invalid_citation_downgrades_sclwhfaz/knowledge_steward.sqlite3",
+        "trace_path_exists": true,
+        "ask_result": {
+          "mode": "retrieval_only",
+          "answer": "当前未使用模型生成答案，先返回与问题“Roadmap”最相关的检索证据。\n[1] Roadmap.md / Roadmap (lines 1-2): [Roadmap]\n[2] Roadmap.md / Roadmap > Ask (lines 3-6): [Roadmap]\n[3] Roadmap.md / Roadmap > Scope (lines 7-9): [Roadmap]",
+          "citation_count": 3,
+          "retrieved_candidate_count": 3,
+          "retrieval_fallback_used": false,
+          "retrieval_fallback_reason": null,
+          "model_fallback_used": true,
+          "model_fallback_reason": "citation_alignment_out_of_range",
+          "provider_name": null,
+          "model_name": null,
+          "citation_paths": [
+            "/private/var/folders/k1/fyz1kmds28dbvwxxbrrxt4rw0000gn/T/ks_eval_ask_fixture_invalid_citation_downgrades_sclwhfaz/vault/Roadmap.md",
+            "/private/var/folders/k1/fyz1kmds28dbvwxxbrrxt4rw0000gn/T/ks_eval_ask_fixture_invalid_citation_downgrades_sclwhfaz/vault/Roadmap.md",
+            "/private/var/folders/k1/fyz1kmds28dbvwxxbrrxt4rw0000gn/T/ks_eval_ask_fixture_invalid_citation_downgrades_sclwhfaz/vault/Roadmap.md"
+          ],
+          "citation_retrieval_sources": [
+            "sqlite_fts",
+            "sqlite_fts",
+            "sqlite_fts"
+          ],
+          "retrieved_candidate_paths": [
+            "/private/var/folders/k1/fyz1kmds28dbvwxxbrrxt4rw0000gn/T/ks_eval_ask_fixture_invalid_citation_downgrades_sclwhfaz/vault/Roadmap.md",
+            "/private/var/folders/k1/fyz1kmds28dbvwxxbrrxt4rw0000gn/T/ks_eval_ask_fixture_invalid_citation_downgrades_sclwhfaz/vault/Roadmap.md",
+            "/private/var/folders/k1/fyz1kmds28dbvwxxbrrxt4rw0000gn/T/ks_eval_ask_fixture_invalid_citation_downgrades_sclwhfaz/vault/Roadmap.md"
+          ],
+          "retrieved_candidate_retrieval_sources": [
+            "sqlite_fts",
+            "sqlite_fts",
+            "sqlite_fts"
+          ]
+        },
+        "ask_groundedness": {
+          "bucket": "not_generated_answer",
+          "consistent": null,
+          "reason": "ask_result_not_generated_answer",
+          "citation_numbers": [],
+          "cited_candidate_count": 0,
+          "unsupported_terms": [],
+          "answer_text": "当前未使用模型生成答案，先返回与问题“Roadmap”最相关的检索证据。\n Roadmap.md / Roadmap (lines 1-2): [Roadmap]\n Roadmap.md / Roadmap > Ask (lines 3-6): [Roadmap]\n Roadmap.md / Roadmap > Scope (lines 7-9): [Roadmap]"
+        },
+        "ingest_result": null,
+        "analysis_result": null,
+        "digest_result": null,
+        "proposal": null,
+        "quality_metrics": {
+          "faithfulness": {
+            "score": 1.0,
+            "reason": "ask_groundedness:not_generated_answer"
+          },
+          "relevancy": {
+            "score": 1.0,
+            "matched_output_hint_count": 3,
+            "expected_output_hint_count": 3
+          },
+          "context_precision": {
+            "score": 0.0,
+            "matched_context_count": 0,
+            "actual_context_count": 1
+          },
+          "context_recall": {
+            "score": null,
+            "matched_context_count": 0,
+            "reference_context_count": 0
+          }
+        }
+      },
+      "error": null
+    },
+    {
+      "case_id": "ask_fixture_no_hits",
+      "benchmark": "question_answering",
+      "suite": "ask",
+      "suite_file": "eval/golden/ask_cases.json",
+      "scenario": "ask",
+      "fixture": "ask_basic",
+      "description": "无命中 query 应走 no_hits，而不是伪造 citation 或空 retrieval_only。",
+      "started_at": "2026-03-18T06:47:20.640807+00:00",
+      "duration_ms": 19.43,
+      "outcome": "passed",
+      "expected": {
+        "http_status": 200,
+        "workflow_status": "completed",
+        "message_contains": "without matching evidence",
+        "approval_required": false,
+        "ask_result": {
+          "mode": "no_hits",
+          "model_fallback_used": false,
+          "min_citation_count": 0,
+          "answer_contains": "未找到可支撑回答的笔记片段"
+        }
+      },
+      "actual": {
+        "http_status": 200,
+        "workflow_status": "completed",
+        "message": "Ask workflow completed without matching evidence.",
+        "approval_required": false,
+        "run_id": "run_d9d27ab12bf2483b8a2cbcf4f22e2124",
+        "thread_id": "thread_31288dbe890c48aba03019492d2f64b2",
+        "fixture_id": "ask_basic",
+        "fixture_db_path": "/var/folders/k1/fyz1kmds28dbvwxxbrrxt4rw0000gn/T/ks_eval_ask_fixture_no_hits_5ffu066h/knowledge_steward.sqlite3",
+        "trace_path_exists": true,
+        "ask_result": {
+          "mode": "no_hits",
+          "answer": "未找到可支撑回答的笔记片段，当前无法返回带引用的答案。",
+          "citation_count": 0,
+          "retrieved_candidate_count": 0,
+          "retrieval_fallback_used": false,
+          "retrieval_fallback_reason": null,
+          "model_fallback_used": false,
+          "model_fallback_reason": null,
+          "provider_name": null,
+          "model_name": null,
+          "citation_paths": [],
+          "citation_retrieval_sources": [],
+          "retrieved_candidate_paths": [],
+          "retrieved_candidate_retrieval_sources": []
+        },
+        "ask_groundedness": {
+          "bucket": "not_generated_answer",
+          "consistent": null,
+          "reason": "ask_result_not_generated_answer",
+          "citation_numbers": [],
+          "cited_candidate_count": 0,
+          "unsupported_terms": [],
+          "answer_text": "未找到可支撑回答的笔记片段，当前无法返回带引用的答案。"
+        },
+        "ingest_result": null,
+        "analysis_result": null,
+        "digest_result": null,
+        "proposal": null,
+        "quality_metrics": {
+          "faithfulness": {
+            "score": 1.0,
+            "reason": "ask_groundedness:not_generated_answer"
+          },
+          "relevancy": {
+            "score": 1.0,
+            "matched_output_hint_count": 2,
+            "expected_output_hint_count": 2
+          },
+          "context_precision": {
+            "score": null,
+            "matched_context_count": 0,
+            "actual_context_count": 0
+          },
+          "context_recall": {
+            "score": null,
+            "matched_context_count": 0,
+            "reference_context_count": 0
+          }
+        }
+      },
+      "error": null
+    },
+    {
+      "case_id": "ask_fixture_semantic_overclaim_writeback",
+      "benchmark": "question_answering",
+      "suite": "ask",
+      "suite_file": "eval/golden/ask_cases.json",
+      "scenario": "ask",
+      "fixture": "ask_basic",
+      "description": "编号合法但答案声称会自动写回知识库时，离线 eval 应识别为 unsupported_claim。",
+      "started_at": "2026-03-18T06:47:20.660245+00:00",
+      "duration_ms": 19.22,
+      "outcome": "passed",
+      "expected": {
+        "http_status": 200,
+        "workflow_status": "completed",
+        "message_contains": "grounded answer",
+        "approval_required": false,
+        "ask_result": {
+          "mode": "generated_answer",
+          "model_fallback_used": false,
+          "provider_name": "openai-compatible",
+          "min_citation_count": 1,
+          "min_retrieved_candidate_count": 1,
+          "answer_contains": [
+            "自动写回知识库",
+            "[2]"
+          ]
+        },
+        "ask_groundedness": {
+          "bucket": "unsupported_claim",
+          "consistent": false,
+          "reason": "answer_contains_terms_not_found_in_cited_evidence",
+          "cited_candidate_count": 1,
+          "unsupported_term_min_count": 2,
+          "unsupported_term_contains": [
+            "自动",
+            "写回"
+          ]
+        },
+        "quality_metrics": {
+          "faithfulness": {
+            "max": 0.0
+          },
+          "relevancy": {
+            "min": 1.0
+          },
+          "context_precision": {
+            "min": 1.0
+          },
+          "context_recall": {
+            "min": 1.0
+          }
+        }
+      },
+      "actual": {
+        "http_status": 200,
+        "workflow_status": "completed",
+        "message": "Ask workflow completed with a grounded answer.",
+        "approval_required": false,
+        "run_id": "run_5e1a39871ca9439b922ae8d87acb0c63",
+        "thread_id": "thread_16a406756ae1457cbcf9be0ceff909ee",
+        "fixture_id": "ask_basic",
+        "fixture_db_path": "/var/folders/k1/fyz1kmds28dbvwxxbrrxt4rw0000gn/T/ks_eval_ask_fixture_semantic_overclaim_writeback_mc1dprz1/knowledge_steward.sqlite3",
+        "trace_path_exists": true,
+        "ask_result": {
+          "mode": "generated_answer",
+          "answer": "问答结果会自动写回知识库。[2]",
+          "citation_count": 3,
+          "retrieved_candidate_count": 3,
+          "retrieval_fallback_used": false,
+          "retrieval_fallback_reason": null,
+          "model_fallback_used": false,
+          "model_fallback_reason": null,
+          "provider_name": "openai-compatible",
+          "model_name": "gpt-eval",
+          "citation_paths": [
+            "/private/var/folders/k1/fyz1kmds28dbvwxxbrrxt4rw0000gn/T/ks_eval_ask_fixture_semantic_overclaim_writeback_mc1dprz1/vault/Roadmap.md",
+            "/private/var/folders/k1/fyz1kmds28dbvwxxbrrxt4rw0000gn/T/ks_eval_ask_fixture_semantic_overclaim_writeback_mc1dprz1/vault/Roadmap.md",
+            "/private/var/folders/k1/fyz1kmds28dbvwxxbrrxt4rw0000gn/T/ks_eval_ask_fixture_semantic_overclaim_writeback_mc1dprz1/vault/Roadmap.md"
+          ],
+          "citation_retrieval_sources": [
+            "sqlite_fts",
+            "sqlite_fts",
+            "sqlite_fts"
+          ],
+          "retrieved_candidate_paths": [
+            "/private/var/folders/k1/fyz1kmds28dbvwxxbrrxt4rw0000gn/T/ks_eval_ask_fixture_semantic_overclaim_writeback_mc1dprz1/vault/Roadmap.md",
+            "/private/var/folders/k1/fyz1kmds28dbvwxxbrrxt4rw0000gn/T/ks_eval_ask_fixture_semantic_overclaim_writeback_mc1dprz1/vault/Roadmap.md",
+            "/private/var/folders/k1/fyz1kmds28dbvwxxbrrxt4rw0000gn/T/ks_eval_ask_fixture_semantic_overclaim_writeback_mc1dprz1/vault/Roadmap.md"
+          ],
+          "retrieved_candidate_retrieval_sources": [
+            "sqlite_fts",
+            "sqlite_fts",
+            "sqlite_fts"
+          ]
+        },
+        "ask_groundedness": {
+          "bucket": "unsupported_claim",
+          "consistent": false,
+          "reason": "answer_contains_terms_not_found_in_cited_evidence",
+          "citation_numbers": [
+            2
+          ],
+          "cited_candidate_count": 1,
+          "unsupported_terms": [
+            "果会",
+            "会自",
+            "自动",
+            "动写",
+            "写回",
+            "回知",
+            "知识",
+            "识库"
+          ],
+          "answer_text": "问答结果会自动写回知识库。"
+        },
+        "ingest_result": null,
+        "analysis_result": null,
+        "digest_result": null,
+        "proposal": null,
+        "quality_metrics": {
+          "faithfulness": {
+            "score": 0.0,
+            "reason": "ask_groundedness:unsupported_claim"
+          },
+          "relevancy": {
+            "score": 1.0,
+            "matched_output_hint_count": 3,
+            "expected_output_hint_count": 3
+          },
+          "context_precision": {
+            "score": 1.0,
+            "matched_context_count": 1,
+            "actual_context_count": 1
+          },
+          "context_recall": {
+            "score": 1.0,
+            "matched_context_count": 1,
+            "reference_context_count": 1
+          }
+        }
+      },
+      "error": null
+    },
+    {
+      "case_id": "ask_fixture_semantic_overclaim_governance",
+      "benchmark": "question_answering",
+      "suite": "ask",
+      "suite_file": "eval/golden/ask_cases.json",
+      "scenario": "ask",
+      "fixture": "ask_basic",
+      "description": "编号合法但答案过度概括为已完成双链治理时，离线 eval 应识别为 unsupported_claim。",
+      "started_at": "2026-03-18T06:47:20.679477+00:00",
+      "duration_ms": 20.52,
+      "outcome": "passed",
+      "expected": {
+        "http_status": 200,
+        "workflow_status": "completed",
+        "message_contains": "grounded answer",
+        "approval_required": false,
+        "ask_result": {
+          "mode": "generated_answer",
+          "model_fallback_used": false,
+          "provider_name": "openai-compatible",
+          "min_citation_count": 1,
+          "min_retrieved_candidate_count": 1,
+          "answer_contains": [
+            "双链治理",
+            "[2]"
+          ]
+        },
+        "ask_groundedness": {
+          "bucket": "unsupported_claim",
+          "consistent": false,
+          "reason": "answer_contains_terms_not_found_in_cited_evidence",
+          "cited_candidate_count": 1,
+          "unsupported_term_min_count": 2,
+          "unsupported_term_contains": [
+            "双链",
+            "治理"
+          ]
+        },
+        "quality_metrics": {
+          "faithfulness": {
+            "max": 0.0
+          },
+          "relevancy": {
+            "min": 1.0
+          },
+          "context_precision": {
+            "min": 1.0
+          },
+          "context_recall": {
+            "min": 1.0
+          }
+        }
+      },
+      "actual": {
+        "http_status": 200,
+        "workflow_status": "completed",
+        "message": "Ask workflow completed with a grounded answer.",
+        "approval_required": false,
+        "run_id": "run_8c30bf1c01194815b2178a8621c7857f",
+        "thread_id": "thread_7a7bcce9f5df4a13850f1c07061f2971",
+        "fixture_id": "ask_basic",
+        "fixture_db_path": "/var/folders/k1/fyz1kmds28dbvwxxbrrxt4rw0000gn/T/ks_eval_ask_fixture_semantic_overclaim_governance_isywavqi/knowledge_steward.sqlite3",
+        "trace_path_exists": true,
+        "ask_result": {
+          "mode": "generated_answer",
+          "answer": "Roadmap 已完成双链治理。[2]",
+          "citation_count": 3,
+          "retrieved_candidate_count": 3,
+          "retrieval_fallback_used": false,
+          "retrieval_fallback_reason": null,
+          "model_fallback_used": false,
+          "model_fallback_reason": null,
+          "provider_name": "openai-compatible",
+          "model_name": "gpt-eval",
+          "citation_paths": [
+            "/private/var/folders/k1/fyz1kmds28dbvwxxbrrxt4rw0000gn/T/ks_eval_ask_fixture_semantic_overclaim_governance_isywavqi/vault/Roadmap.md",
+            "/private/var/folders/k1/fyz1kmds28dbvwxxbrrxt4rw0000gn/T/ks_eval_ask_fixture_semantic_overclaim_governance_isywavqi/vault/Roadmap.md",
+            "/private/var/folders/k1/fyz1kmds28dbvwxxbrrxt4rw0000gn/T/ks_eval_ask_fixture_semantic_overclaim_governance_isywavqi/vault/Roadmap.md"
+          ],
+          "citation_retrieval_sources": [
+            "sqlite_fts",
+            "sqlite_fts",
+            "sqlite_fts"
+          ],
+          "retrieved_candidate_paths": [
+            "/private/var/folders/k1/fyz1kmds28dbvwxxbrrxt4rw0000gn/T/ks_eval_ask_fixture_semantic_overclaim_governance_isywavqi/vault/Roadmap.md",
+            "/private/var/folders/k1/fyz1kmds28dbvwxxbrrxt4rw0000gn/T/ks_eval_ask_fixture_semantic_overclaim_governance_isywavqi/vault/Roadmap.md",
+            "/private/var/folders/k1/fyz1kmds28dbvwxxbrrxt4rw0000gn/T/ks_eval_ask_fixture_semantic_overclaim_governance_isywavqi/vault/Roadmap.md"
+          ],
+          "retrieved_candidate_retrieval_sources": [
+            "sqlite_fts",
+            "sqlite_fts",
+            "sqlite_fts"
+          ]
+        },
+        "ask_groundedness": {
+          "bucket": "unsupported_claim",
+          "consistent": false,
+          "reason": "answer_contains_terms_not_found_in_cited_evidence",
+          "citation_numbers": [
+            2
+          ],
+          "cited_candidate_count": 1,
+          "unsupported_terms": [
+            "roadmap",
+            "已完",
+            "完成",
+            "成双",
+            "双链",
+            "链治",
+            "治理",
+            "已完成"
+          ],
+          "answer_text": "Roadmap 已完成双链治理。"
+        },
+        "ingest_result": null,
+        "analysis_result": null,
+        "digest_result": null,
+        "proposal": null,
+        "quality_metrics": {
+          "faithfulness": {
+            "score": 0.0,
+            "reason": "ask_groundedness:unsupported_claim"
+          },
+          "relevancy": {
+            "score": 1.0,
+            "matched_output_hint_count": 3,
+            "expected_output_hint_count": 3
+          },
+          "context_precision": {
+            "score": 1.0,
+            "matched_context_count": 1,
+            "actual_context_count": 1
+          },
+          "context_recall": {
+            "score": 1.0,
+            "matched_context_count": 1,
+            "reference_context_count": 1
+          }
+        }
+      },
+      "error": null
+    },
+    {
+      "case_id": "ask_fixture_hybrid_retrieval_only",
+      "benchmark": "question_answering",
+      "suite": "ask",
+      "suite_file": "eval/golden/ask_cases.json",
+      "scenario": "ask",
+      "fixture": "ask_hybrid_basic",
+      "description": "在 deterministic hybrid fixture 下，ask 应显式消费 hybrid candidate，而不是只回归纯 FTS。",
+      "started_at": "2026-03-18T06:47:20.700015+00:00",
+      "duration_ms": 26.36,
+      "outcome": "passed",
+      "expected": {
+        "http_status": 200,
+        "workflow_status": "completed",
+        "message_contains": "retrieval-only fallback",
+        "approval_required": false,
+        "ask_result": {
+          "mode": "retrieval_only",
+          "model_fallback_used": true,
+          "model_fallback_reason": "no_available_chat_provider",
+          "min_citation_count": 2,
+          "min_retrieved_candidate_count": 2,
+          "answer_contains": [
+            "当前未使用模型生成答案",
+            "[1]",
+            "[2]"
+          ],
+          "citation_path_suffixes": [
+            "Roadmap.md",
+            "Strategy.md"
+          ],
+          "retrieved_candidate_sources_contains": [
+            "hybrid_rrf",
+            "sqlite_vector"
+          ]
+        },
+        "quality_metrics": {
+          "faithfulness": {
+            "min": 1.0
+          },
+          "relevancy": {
+            "min": 1.0
+          },
+          "context_precision": {
+            "min": 1.0
+          },
+          "context_recall": {
+            "min": 1.0
+          }
+        }
+      },
+      "actual": {
+        "http_status": 200,
+        "workflow_status": "completed",
+        "message": "Ask workflow completed with retrieval-only fallback.",
+        "approval_required": false,
+        "run_id": "run_172cd23495844a08861cc3daa8e2faae",
+        "thread_id": "thread_005b678b00b849a3847ab776b80141e1",
+        "fixture_id": "ask_hybrid_basic",
+        "fixture_db_path": "/var/folders/k1/fyz1kmds28dbvwxxbrrxt4rw0000gn/T/ks_eval_ask_fixture_hybrid_retrieval_only_itm7qzqw/knowledge_steward.sqlite3",
+        "trace_path_exists": true,
+        "ask_result": {
+          "mode": "retrieval_only",
+          "answer": "当前未使用模型生成答案，先返回与问题“Roadmap”最相关的检索证据。\n[1] Roadmap.md / Roadmap (lines 1-3): # [Roadmap]\n\n[Roadmap] delivery plan.\n[2] Strategy.md / Strategy (lines 1-3): # Strategy Semantic strategy note.",
+          "citation_count": 2,
+          "retrieved_candidate_count": 2,
+          "retrieval_fallback_used": false,
+          "retrieval_fallback_reason": null,
+          "model_fallback_used": true,
+          "model_fallback_reason": "no_available_chat_provider",
+          "provider_name": null,
+          "model_name": null,
+          "citation_paths": [
+            "/private/var/folders/k1/fyz1kmds28dbvwxxbrrxt4rw0000gn/T/ks_eval_ask_fixture_hybrid_retrieval_only_itm7qzqw/vault/Roadmap.md",
+            "/private/var/folders/k1/fyz1kmds28dbvwxxbrrxt4rw0000gn/T/ks_eval_ask_fixture_hybrid_retrieval_only_itm7qzqw/vault/Strategy.md"
+          ],
+          "citation_retrieval_sources": [
+            "hybrid_rrf",
+            "sqlite_vector"
+          ],
+          "retrieved_candidate_paths": [
+            "/private/var/folders/k1/fyz1kmds28dbvwxxbrrxt4rw0000gn/T/ks_eval_ask_fixture_hybrid_retrieval_only_itm7qzqw/vault/Roadmap.md",
+            "/private/var/folders/k1/fyz1kmds28dbvwxxbrrxt4rw0000gn/T/ks_eval_ask_fixture_hybrid_retrieval_only_itm7qzqw/vault/Strategy.md"
+          ],
+          "retrieved_candidate_retrieval_sources": [
+            "hybrid_rrf",
+            "sqlite_vector"
+          ]
+        },
+        "ask_groundedness": {
+          "bucket": "not_generated_answer",
+          "consistent": null,
+          "reason": "ask_result_not_generated_answer",
+          "citation_numbers": [],
+          "cited_candidate_count": 0,
+          "unsupported_terms": [],
+          "answer_text": "当前未使用模型生成答案，先返回与问题“Roadmap”最相关的检索证据。\n Roadmap.md / Roadmap (lines 1-3): # [Roadmap]\n\n[Roadmap] delivery plan.\n Strategy.md / Strategy (lines 1-3): # Strategy Semantic strategy note."
+        },
+        "ingest_result": null,
+        "analysis_result": null,
+        "digest_result": null,
+        "proposal": null,
+        "quality_metrics": {
+          "faithfulness": {
+            "score": 1.0,
+            "reason": "ask_groundedness:not_generated_answer"
+          },
+          "relevancy": {
+            "score": 1.0,
+            "matched_output_hint_count": 4,
+            "expected_output_hint_count": 4
+          },
+          "context_precision": {
+            "score": 1.0,
+            "matched_context_count": 2,
+            "actual_context_count": 2
+          },
+          "context_recall": {
+            "score": 1.0,
+            "matched_context_count": 2,
+            "reference_context_count": 2
+          }
+        }
+      },
+      "error": null
+    },
+    {
+      "case_id": "digest_sample_structured_result",
+      "benchmark": "governance",
+      "suite": "digest",
+      "suite_file": "eval/golden/digest_cases.json",
+      "scenario": "digest",
+      "fixture": "sample_vault",
+      "description": "基于真实 sample_vault 的最小 DAILY_DIGEST 回归，确认当前至少能稳定产出结构化摘要。",
+      "started_at": "2026-03-18T06:47:20.726382+00:00",
+      "duration_ms": 159.71,
+      "outcome": "passed",
+      "expected": {
+        "http_status": 200,
+        "workflow_status": "completed",
+        "message_contains": "indexed note digest",
+        "approval_required": false,
+        "digest_result": {
+          "fallback_used": false,
+          "min_source_note_count": 1,
+          "markdown_contains": [
+            "本次 DAILY_DIGEST 基于最近",
+            "重点来源"
+          ]
+        }
+      },
+      "actual": {
+        "http_status": 200,
+        "workflow_status": "completed",
+        "message": "Digest workflow completed with indexed note digest.",
+        "approval_required": false,
+        "run_id": "run_19d476329bf847a7aea0d6179568ee95",
+        "thread_id": "thread_07facbfca6884ddb9af1cb0ddb2d104e",
+        "fixture_id": "sample_vault",
+        "fixture_db_path": "/var/folders/k1/fyz1kmds28dbvwxxbrrxt4rw0000gn/T/ks_eval_digest_sample_structured_result_1jzifst6/knowledge_steward.sqlite3",
+        "trace_path_exists": true,
+        "ask_result": null,
+        "ask_groundedness": null,
+        "ingest_result": null,
+        "analysis_result": null,
+        "digest_result": {
+          "source_note_count": 6,
+          "fallback_used": false,
+          "fallback_reason": null,
+          "digest_markdown": "本次 DAILY_DIGEST 基于最近 6 篇已索引笔记生成。\n来源分布：daily_note 6 篇。\n覆盖日期：2024-03-23 至 2025-03-02。\n待跟进任务：当前来源笔记中未检测到任务项。\n\n## 重点来源\n- Task Planner（daily_note，2025-03-02，任务 0 项）\n- Task Planner（daily_note，2024-03-27，任务 0 项）\n- Task Planner（daily_note，2024-03-26，任务 0 项）\n- Task Planner（daily_note，2024-03-25，任务 0 项）\n\n其余 2 篇笔记已保留在 source_notes 中，可供后续扩展节点继续消费。",
+          "source_note_paths": [
+            "/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/sample_vault/日常/2025-03-02_星期日.md",
+            "/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/sample_vault/日常/2024-03-27_星期三.md",
+            "/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/sample_vault/日常/2024-03-26_星期二.md",
+            "/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/sample_vault/日常/2024-03-25_星期一.md",
+            "/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/sample_vault/日常/2024-03-24_星期日.md",
+            "/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/sample_vault/日常/2024-03-23_星期六.md"
+          ],
+          "source_note_titles": [
+            "Task Planner",
+            "Task Planner",
+            "Task Planner",
+            "Task Planner",
+            "Task Planner",
+            "Task Planner"
+          ]
+        },
+        "proposal": null,
+        "quality_metrics": {
+          "faithfulness": {
+            "score": null,
+            "reason": "not_applicable"
+          },
+          "relevancy": {
+            "score": 1.0,
+            "matched_output_hint_count": 3,
+            "expected_output_hint_count": 3
+          },
+          "context_precision": {
+            "score": 0.0,
+            "matched_context_count": 0,
+            "actual_context_count": 6
+          },
+          "context_recall": {
+            "score": null,
+            "matched_context_count": 0,
+            "reference_context_count": 0
+          }
+        }
+      },
+      "error": null
+    },
+    {
+      "case_id": "digest_fixture_structured_result_metrics",
+      "benchmark": "governance",
+      "suite": "digest",
+      "suite_file": "eval/golden/digest_cases.json",
+      "scenario": "digest",
+      "fixture": "digest_basic",
+      "description": "deterministic digest fixture 应稳定产出结构化摘要，并给出可解释的上下文覆盖指标。",
+      "started_at": "2026-03-18T06:47:20.886109+00:00",
+      "duration_ms": 19.9,
+      "outcome": "passed",
+      "expected": {
+        "http_status": 200,
+        "workflow_status": "completed",
+        "message_contains": "indexed note digest",
+        "approval_required": false,
+        "digest_result": {
+          "fallback_used": false,
+          "source_note_count": 3,
+          "markdown_contains": [
+            "本次 DAILY_DIGEST 基于最近 3 篇已索引笔记生成。",
+            "重点来源"
+          ],
+          "source_note_path_suffixes": [
+            "2026-03-14.md",
+            "2026-03-13.md",
+            "迭代总结.md"
+          ]
+        },
+        "quality_metrics": {
+          "faithfulness": {
+            "min": 1.0
+          },
+          "relevancy": {
+            "min": 1.0
+          },
+          "context_precision": {
+            "min": 1.0
+          },
+          "context_recall": {
+            "min": 1.0
+          }
+        }
+      },
+      "actual": {
+        "http_status": 200,
+        "workflow_status": "completed",
+        "message": "Digest workflow completed with indexed note digest.",
+        "approval_required": false,
+        "run_id": "run_9751436aa8ce43d0a8befd6c6a207c79",
+        "thread_id": "thread_5511bebd76514da59ea6d5f5ca64ec39",
+        "fixture_id": "digest_basic",
+        "fixture_db_path": "/var/folders/k1/fyz1kmds28dbvwxxbrrxt4rw0000gn/T/ks_eval_digest_fixture_structured_result_metrics_mj1tz7h5/knowledge_steward.sqlite3",
+        "trace_path_exists": true,
+        "ask_result": null,
+        "ask_groundedness": null,
+        "ingest_result": null,
+        "analysis_result": null,
+        "digest_result": {
+          "source_note_count": 3,
+          "fallback_used": false,
+          "fallback_reason": null,
+          "digest_markdown": "本次 DAILY_DIGEST 基于最近 3 篇已索引笔记生成。\n来源分布：daily_note 2 篇，summary_note 1 篇。\n覆盖日期：2026-03-13 至 2026-03-14。\n待跟进任务：来源笔记中共检测到 2 项任务。\n\n## 重点来源\n- 一、工作任务（daily_note，2026-03-14，任务 1 项）\n- Task Planner（daily_note，2026-03-13，任务 1 项）\n- 迭代总结（summary_note，迭代总结.md，任务 0 项）",
+          "source_note_paths": [
+            "/private/var/folders/k1/fyz1kmds28dbvwxxbrrxt4rw0000gn/T/ks_eval_digest_fixture_structured_result_metrics_mj1tz7h5/vault/2026-03-14.md",
+            "/private/var/folders/k1/fyz1kmds28dbvwxxbrrxt4rw0000gn/T/ks_eval_digest_fixture_structured_result_metrics_mj1tz7h5/vault/2026-03-13.md",
+            "/private/var/folders/k1/fyz1kmds28dbvwxxbrrxt4rw0000gn/T/ks_eval_digest_fixture_structured_result_metrics_mj1tz7h5/vault/迭代总结.md"
+          ],
+          "source_note_titles": [
+            "一、工作任务",
+            "Task Planner",
+            "迭代总结"
+          ]
+        },
+        "proposal": null,
+        "quality_metrics": {
+          "faithfulness": {
+            "score": 1.0,
+            "reason": "supporting_context_path_coverage"
+          },
+          "relevancy": {
+            "score": 1.0,
+            "matched_output_hint_count": 3,
+            "expected_output_hint_count": 3
+          },
+          "context_precision": {
+            "score": 1.0,
+            "matched_context_count": 3,
+            "actual_context_count": 3
+          },
+          "context_recall": {
+            "score": 1.0,
+            "matched_context_count": 3,
+            "reference_context_count": 3
+          }
+        }
+      },
+      "error": null
+    },
+    {
+      "case_id": "digest_sample_waiting_proposal",
+      "benchmark": "governance",
+      "suite": "digest",
+      "suite_file": "eval/golden/digest_cases.json",
+      "scenario": "digest",
+      "fixture": "sample_vault",
+      "description": "真实 sample_vault 下启用 proposal 模式时，应返回 waiting_for_approval 和结构化 proposal。",
+      "started_at": "2026-03-18T06:47:20.906019+00:00",
+      "duration_ms": 166.64,
+      "outcome": "passed",
+      "expected": {
+        "http_status": 202,
+        "workflow_status": "waiting_for_approval",
+        "message_contains": "waiting for approval",
+        "approval_required": true,
+        "digest_result": {
+          "fallback_used": false,
+          "min_source_note_count": 1,
+          "markdown_contains": "本次 DAILY_DIGEST 基于最近"
+        },
+        "proposal": {
+          "present": true,
+          "patch_ops": [
+            "merge_frontmatter",
+            "insert_under_heading"
+          ],
+          "target_note_path_suffix": ".md",
+          "summary_contains": "DAILY_DIGEST"
+        }
+      },
+      "actual": {
+        "http_status": 202,
+        "workflow_status": "waiting_for_approval",
+        "message": "Digest workflow generated a proposal and is waiting for approval.",
+        "approval_required": true,
+        "run_id": "run_49156e63c1114280a8ba2d96f412fa6f",
+        "thread_id": "thread_c7e061fd10644016a4273f1cba21897c",
+        "fixture_id": "sample_vault",
+        "fixture_db_path": "/var/folders/k1/fyz1kmds28dbvwxxbrrxt4rw0000gn/T/ks_eval_digest_sample_waiting_proposal_ce4__eb6/knowledge_steward.sqlite3",
+        "trace_path_exists": true,
+        "ask_result": null,
+        "ask_groundedness": null,
+        "ingest_result": null,
+        "analysis_result": null,
+        "digest_result": {
+          "source_note_count": 6,
+          "fallback_used": false,
+          "fallback_reason": null,
+          "digest_markdown": "本次 DAILY_DIGEST 基于最近 6 篇已索引笔记生成。\n来源分布：daily_note 6 篇。\n覆盖日期：2024-03-23 至 2025-03-02。\n待跟进任务：当前来源笔记中未检测到任务项。\n\n## 重点来源\n- Task Planner（daily_note，2025-03-02，任务 0 项）\n- Task Planner（daily_note，2024-03-27，任务 0 项）\n- Task Planner（daily_note，2024-03-26，任务 0 项）\n- Task Planner（daily_note，2024-03-25，任务 0 项）\n\n其余 2 篇笔记已保留在 source_notes 中，可供后续扩展节点继续消费。",
+          "source_note_paths": [
+            "/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/sample_vault/日常/2025-03-02_星期日.md",
+            "/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/sample_vault/日常/2024-03-27_星期三.md",
+            "/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/sample_vault/日常/2024-03-26_星期二.md",
+            "/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/sample_vault/日常/2024-03-25_星期一.md",
+            "/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/sample_vault/日常/2024-03-24_星期日.md",
+            "/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/sample_vault/日常/2024-03-23_星期六.md"
+          ],
+          "source_note_titles": [
+            "Task Planner",
+            "Task Planner",
+            "Task Planner",
+            "Task Planner",
+            "Task Planner",
+            "Task Planner"
+          ]
+        },
+        "proposal": {
+          "present": true,
+          "proposal_id": "prop_digest_a299108233d5b34f",
+          "target_note_path": "/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/sample_vault/日常/2025-03-02_星期日.md",
+          "summary": "将本次 DAILY_DIGEST 写入 Task Planner，并标记这次摘要需要人工审批。",
+          "risk_level": "medium",
+          "patch_ops": [
+            "merge_frontmatter",
+            "insert_under_heading"
+          ],
+          "evidence_count": 3,
+          "evidence_paths": [
+            "/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/sample_vault/日常/2025-03-02_星期日.md",
+            "/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/sample_vault/日常/2024-03-27_星期三.md",
+            "/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/sample_vault/日常/2024-03-26_星期二.md"
+          ]
+        },
+        "quality_metrics": {
+          "faithfulness": {
+            "score": null,
+            "reason": "not_applicable"
+          },
+          "relevancy": {
+            "score": 1.0,
+            "matched_output_hint_count": 3,
+            "expected_output_hint_count": 3
+          },
+          "context_precision": {
+            "score": 0.0,
+            "matched_context_count": 0,
+            "actual_context_count": 6
+          },
+          "context_recall": {
+            "score": null,
+            "matched_context_count": 0,
+            "reference_context_count": 0
+          }
+        }
+      },
+      "error": null
+    },
+    {
+      "case_id": "digest_fixture_waiting_proposal_metrics",
+      "benchmark": "governance",
+      "suite": "digest",
+      "suite_file": "eval/golden/digest_cases.json",
+      "scenario": "digest",
+      "fixture": "digest_basic",
+      "description": "deterministic digest fixture 在 proposal 模式下应返回 waiting proposal，并把 source note 作为最小上下文证据。",
+      "started_at": "2026-03-18T06:47:21.072669+00:00",
+      "duration_ms": 20.53,
+      "outcome": "passed",
+      "expected": {
+        "http_status": 202,
+        "workflow_status": "waiting_for_approval",
+        "message_contains": "waiting for approval",
+        "approval_required": true,
+        "digest_result": {
+          "fallback_used": false,
+          "source_note_count": 3,
+          "markdown_contains": "本次 DAILY_DIGEST 基于最近 3 篇已索引笔记生成。",
+          "source_note_path_suffixes": [
+            "2026-03-14.md",
+            "2026-03-13.md",
+            "迭代总结.md"
+          ]
+        },
+        "proposal": {
+          "present": true,
+          "patch_ops": [
+            "merge_frontmatter",
+            "insert_under_heading"
+          ],
+          "target_note_path_suffix": "2026-03-14.md",
+          "summary_contains": "DAILY_DIGEST",
+          "min_evidence_count": 3,
+          "evidence_path_suffixes": [
+            "2026-03-14.md",
+            "2026-03-13.md",
+            "迭代总结.md"
+          ]
+        },
+        "quality_metrics": {
+          "faithfulness": {
+            "min": 1.0
+          },
+          "relevancy": {
+            "min": 1.0
+          },
+          "context_precision": {
+            "min": 1.0
+          },
+          "context_recall": {
+            "min": 1.0
+          }
+        }
+      },
+      "actual": {
+        "http_status": 202,
+        "workflow_status": "waiting_for_approval",
+        "message": "Digest workflow generated a proposal and is waiting for approval.",
+        "approval_required": true,
+        "run_id": "run_aab0065077ee4ccf8ece84da5c9eb2a5",
+        "thread_id": "thread_eval_digest_waiting",
+        "fixture_id": "digest_basic",
+        "fixture_db_path": "/var/folders/k1/fyz1kmds28dbvwxxbrrxt4rw0000gn/T/ks_eval_digest_fixture_waiting_proposal_metrics_rad59z1e/knowledge_steward.sqlite3",
+        "trace_path_exists": true,
+        "ask_result": null,
+        "ask_groundedness": null,
+        "ingest_result": null,
+        "analysis_result": null,
+        "digest_result": {
+          "source_note_count": 3,
+          "fallback_used": false,
+          "fallback_reason": null,
+          "digest_markdown": "本次 DAILY_DIGEST 基于最近 3 篇已索引笔记生成。\n来源分布：daily_note 2 篇，summary_note 1 篇。\n覆盖日期：2026-03-13 至 2026-03-14。\n待跟进任务：来源笔记中共检测到 2 项任务。\n\n## 重点来源\n- 一、工作任务（daily_note，2026-03-14，任务 1 项）\n- Task Planner（daily_note，2026-03-13，任务 1 项）\n- 迭代总结（summary_note，迭代总结.md，任务 0 项）",
+          "source_note_paths": [
+            "/private/var/folders/k1/fyz1kmds28dbvwxxbrrxt4rw0000gn/T/ks_eval_digest_fixture_waiting_proposal_metrics_rad59z1e/vault/2026-03-14.md",
+            "/private/var/folders/k1/fyz1kmds28dbvwxxbrrxt4rw0000gn/T/ks_eval_digest_fixture_waiting_proposal_metrics_rad59z1e/vault/2026-03-13.md",
+            "/private/var/folders/k1/fyz1kmds28dbvwxxbrrxt4rw0000gn/T/ks_eval_digest_fixture_waiting_proposal_metrics_rad59z1e/vault/迭代总结.md"
+          ],
+          "source_note_titles": [
+            "一、工作任务",
+            "Task Planner",
+            "迭代总结"
+          ]
+        },
+        "proposal": {
+          "present": true,
+          "proposal_id": "prop_digest_8998825642aa8dae",
+          "target_note_path": "/private/var/folders/k1/fyz1kmds28dbvwxxbrrxt4rw0000gn/T/ks_eval_digest_fixture_waiting_proposal_metrics_rad59z1e/vault/2026-03-14.md",
+          "summary": "将本次 DAILY_DIGEST 写入 一、工作任务，并标记这次摘要需要人工审批。",
+          "risk_level": "medium",
+          "patch_ops": [
+            "merge_frontmatter",
+            "insert_under_heading"
+          ],
+          "evidence_count": 3,
+          "evidence_paths": [
+            "/private/var/folders/k1/fyz1kmds28dbvwxxbrrxt4rw0000gn/T/ks_eval_digest_fixture_waiting_proposal_metrics_rad59z1e/vault/2026-03-14.md",
+            "/private/var/folders/k1/fyz1kmds28dbvwxxbrrxt4rw0000gn/T/ks_eval_digest_fixture_waiting_proposal_metrics_rad59z1e/vault/2026-03-13.md",
+            "/private/var/folders/k1/fyz1kmds28dbvwxxbrrxt4rw0000gn/T/ks_eval_digest_fixture_waiting_proposal_metrics_rad59z1e/vault/迭代总结.md"
+          ]
+        },
+        "quality_metrics": {
+          "faithfulness": {
+            "score": 1.0,
+            "reason": "supporting_context_path_coverage"
+          },
+          "relevancy": {
+            "score": 1.0,
+            "matched_output_hint_count": 3,
+            "expected_output_hint_count": 3
+          },
+          "context_precision": {
+            "score": 1.0,
+            "matched_context_count": 3,
+            "actual_context_count": 3
+          },
+          "context_recall": {
+            "score": 1.0,
+            "matched_context_count": 3,
+            "reference_context_count": 3
+          }
+        }
+      },
+      "error": null
+    },
+    {
+      "case_id": "digest_fixture_empty_index_fallback",
+      "benchmark": "governance",
+      "suite": "digest",
+      "suite_file": "eval/golden/digest_cases.json",
+      "scenario": "digest",
+      "fixture": "empty_index",
+      "description": "空索引下 digest 应返回安全 fallback，而不是抛异常或空 proposal。",
+      "started_at": "2026-03-18T06:47:21.093210+00:00",
+      "duration_ms": 17.68,
+      "outcome": "passed",
+      "expected": {
+        "http_status": 200,
+        "workflow_status": "completed",
+        "message_contains": "safe fallback",
+        "approval_required": false,
+        "digest_result": {
+          "fallback_used": true,
+          "fallback_reason": "no_indexed_notes",
+          "source_note_count": 0,
+          "markdown_contains": "请先执行一次 INGEST_STEWARD"
+        }
+      },
+      "actual": {
+        "http_status": 200,
+        "workflow_status": "completed",
+        "message": "Digest workflow completed with safe fallback.",
+        "approval_required": false,
+        "run_id": "run_c6ec69eb53764d61a7e4503dfd3cb0ed",
+        "thread_id": "thread_7990fb23b47c416489d0b277ee45e4d3",
+        "fixture_id": "empty_index",
+        "fixture_db_path": "/var/folders/k1/fyz1kmds28dbvwxxbrrxt4rw0000gn/T/ks_eval_digest_fixture_empty_index_fallback_c8i0udz8/knowledge_steward.sqlite3",
+        "trace_path_exists": true,
+        "ask_result": null,
+        "ask_groundedness": null,
+        "ingest_result": null,
+        "analysis_result": null,
+        "digest_result": {
+          "source_note_count": 0,
+          "fallback_used": true,
+          "fallback_reason": "no_indexed_notes",
+          "digest_markdown": "当前索引中还没有可用于生成 DAILY_DIGEST 的笔记。\n请先执行一次 INGEST_STEWARD，再重新触发 digest。",
+          "source_note_paths": [],
+          "source_note_titles": []
+        },
+        "proposal": null,
+        "quality_metrics": {
+          "faithfulness": {
+            "score": null,
+            "reason": "not_applicable"
+          },
+          "relevancy": {
+            "score": 1.0,
+            "matched_output_hint_count": 2,
+            "expected_output_hint_count": 2
+          },
+          "context_precision": {
+            "score": null,
+            "matched_context_count": 0,
+            "actual_context_count": 0
+          },
+          "context_recall": {
+            "score": null,
+            "matched_context_count": 0,
+            "reference_context_count": 0
+          }
+        }
+      },
+      "error": null
+    },
+    {
+      "case_id": "governance_fixture_waiting_proposal_hybrid",
+      "benchmark": "governance",
+      "suite": "governance",
+      "suite_file": "eval/golden/governance_cases.json",
+      "scenario": "governance",
+      "fixture": "governance_basic",
+      "description": "单 note scoped ingest 在 proposal 模式下应产出真实治理 proposal，并在 deterministic embedding mock 下显式消费 hybrid related candidate。",
+      "started_at": "2026-03-18T06:47:21.110900+00:00",
+      "duration_ms": 28.32,
+      "outcome": "passed",
+      "expected": {
+        "http_status": 202,
+        "workflow_status": "waiting_for_approval",
+        "message_contains": "waiting for approval",
+        "approval_required": true,
+        "ingest_result": {
+          "scanned_notes": 1
+        },
+        "analysis_result": {
+          "fallback_used": false,
+          "min_related_candidate_count": 1,
+          "finding_types_contains": [
+            "orphan_hint",
+            "missing_frontmatter"
+          ],
+          "related_candidate_path_suffixes": [
+            "Beta.md"
+          ],
+          "related_candidate_sources_contains": [
+            "hybrid_rrf"
+          ]
+        },
+        "proposal": {
+          "present": true,
+          "patch_ops": [
+            "merge_frontmatter",
+            "insert_under_heading"
+          ],
+          "target_note_path_suffix": "Alpha.md",
+          "summary_contains": "Alpha",
+          "min_evidence_count": 2,
+          "evidence_path_suffixes": [
+            "Alpha.md",
+            "2026-03-18.md"
+          ]
+        },
+        "quality_metrics": {
+          "faithfulness": {
+            "min": 1.0
+          },
+          "relevancy": {
+            "min": 1.0
+          },
+          "context_precision": {
+            "min": 0.6
+          },
+          "context_recall": {
+            "min": 1.0
+          }
+        }
+      },
+      "actual": {
+        "http_status": 202,
+        "workflow_status": "waiting_for_approval",
+        "message": "Ingest workflow generated a proposal and is waiting for approval.",
+        "approval_required": true,
+        "run_id": "run_9ac246b76cf04fd2abd9ee2ca4f09f59",
+        "thread_id": "thread_eval_governance_waiting",
+        "fixture_id": "governance_basic",
+        "fixture_db_path": "/var/folders/k1/fyz1kmds28dbvwxxbrrxt4rw0000gn/T/ks_eval_governance_fixture_waiting_proposal_hybrid_ed7chuxb/knowledge_steward.sqlite3",
+        "trace_path_exists": true,
+        "ask_result": null,
+        "ask_groundedness": null,
+        "ingest_result": {
+          "vault_path": "/private/var/folders/k1/fyz1kmds28dbvwxxbrrxt4rw0000gn/T/ks_eval_governance_fixture_waiting_proposal_hybrid_ed7chuxb/vault",
+          "db_path": "/private/var/folders/k1/fyz1kmds28dbvwxxbrrxt4rw0000gn/T/ks_eval_governance_fixture_waiting_proposal_hybrid_ed7chuxb/knowledge_steward.sqlite3",
+          "scanned_notes": 1,
+          "created_notes": 0,
+          "updated_notes": 1,
+          "current_chunk_count": 1,
+          "replaced_chunk_count": 1
+        },
+        "analysis_result": {
+          "scope": "scoped_ingest_single_note",
+          "target_note_path": "/private/var/folders/k1/fyz1kmds28dbvwxxbrrxt4rw0000gn/T/ks_eval_governance_fixture_waiting_proposal_hybrid_ed7chuxb/vault/Alpha.md",
+          "target_note_title": "Alpha",
+          "retrieval_queries": [
+            "Alpha"
+          ],
+          "related_candidate_count": 3,
+          "related_candidate_paths": [
+            "/private/var/folders/k1/fyz1kmds28dbvwxxbrrxt4rw0000gn/T/ks_eval_governance_fixture_waiting_proposal_hybrid_ed7chuxb/vault/2026-03-18.md",
+            "/private/var/folders/k1/fyz1kmds28dbvwxxbrrxt4rw0000gn/T/ks_eval_governance_fixture_waiting_proposal_hybrid_ed7chuxb/vault/Beta.md",
+            "/private/var/folders/k1/fyz1kmds28dbvwxxbrrxt4rw0000gn/T/ks_eval_governance_fixture_waiting_proposal_hybrid_ed7chuxb/vault/2026-03-18.md"
+          ],
+          "related_candidate_retrieval_sources": [
+            "hybrid_rrf",
+            "hybrid_rrf",
+            "sqlite_vector"
+          ],
+          "finding_count": 3,
+          "finding_types": [
+            "orphan_hint",
+            "missing_frontmatter",
+            "unclassified_note_type"
+          ],
+          "fallback_used": false,
+          "fallback_reason": null
+        },
+        "digest_result": null,
+        "proposal": {
+          "present": true,
+          "proposal_id": "prop_ingest_2506c2cfde6a60f9",
+          "target_note_path": "/private/var/folders/k1/fyz1kmds28dbvwxxbrrxt4rw0000gn/T/ks_eval_governance_fixture_waiting_proposal_hybrid_ed7chuxb/vault/Alpha.md",
+          "summary": "为 Alpha 补最小治理标记与审查小节，结合 3 条 related retrieve 上下文，聚焦 3 个治理信号（orphan_hint、missing_frontmatter、unclassified_note_type）。",
+          "risk_level": "medium",
+          "patch_ops": [
+            "merge_frontmatter",
+            "insert_under_heading"
+          ],
+          "evidence_count": 3,
+          "evidence_paths": [
+            "/private/var/folders/k1/fyz1kmds28dbvwxxbrrxt4rw0000gn/T/ks_eval_governance_fixture_waiting_proposal_hybrid_ed7chuxb/vault/2026-03-18.md",
+            "/private/var/folders/k1/fyz1kmds28dbvwxxbrrxt4rw0000gn/T/ks_eval_governance_fixture_waiting_proposal_hybrid_ed7chuxb/vault/Alpha.md",
+            "/private/var/folders/k1/fyz1kmds28dbvwxxbrrxt4rw0000gn/T/ks_eval_governance_fixture_waiting_proposal_hybrid_ed7chuxb/vault/Alpha.md"
+          ]
+        },
+        "quality_metrics": {
+          "faithfulness": {
+            "score": 1.0,
+            "reason": "supporting_context_path_coverage"
+          },
+          "relevancy": {
+            "score": 1.0,
+            "matched_output_hint_count": 2,
+            "expected_output_hint_count": 2
+          },
+          "context_precision": {
+            "score": 0.6667,
+            "matched_context_count": 2,
+            "actual_context_count": 3
+          },
+          "context_recall": {
+            "score": 1.0,
+            "matched_context_count": 2,
+            "reference_context_count": 2
+          }
+        }
+      },
+      "error": null
+    },
+    {
+      "case_id": "governance_fixture_no_proposal_fallback",
+      "benchmark": "governance",
+      "suite": "governance",
+      "suite_file": "eval/golden/governance_cases.json",
+      "scenario": "governance",
+      "fixture": "governance_basic",
+      "description": "结构稳定的 daily note 在 proposal 模式下应安全退回 completed，而不是硬造治理 proposal。",
+      "started_at": "2026-03-18T06:47:21.139229+00:00",
+      "duration_ms": 27.52,
+      "outcome": "passed",
+      "expected": {
+        "http_status": 200,
+        "workflow_status": "completed",
+        "message_contains": "no approval proposal was generated",
+        "approval_required": false,
+        "proposal": {
+          "present": false
+        },
+        "ingest_result": {
+          "scanned_notes": 1
+        },
+        "analysis_result": {
+          "fallback_used": true,
+          "fallback_reason": "no_governance_issues_detected",
+          "finding_count": 0,
+          "min_related_candidate_count": 1,
+          "related_candidate_path_suffixes": [
+            "Alpha.md"
+          ]
+        },
+        "quality_metrics": {
+          "faithfulness": {
+            "min": 1.0
+          },
+          "relevancy": {
+            "min": 1.0
+          },
+          "context_precision": {
+            "min": 0.5
+          },
+          "context_recall": {
+            "min": 1.0
+          }
+        }
+      },
+      "actual": {
+        "http_status": 200,
+        "workflow_status": "completed",
+        "message": "Ingest workflow completed with scoped note sync; no approval proposal was generated.",
+        "approval_required": false,
+        "run_id": "run_4fd56f67dbfd4200af409647c503056a",
+        "thread_id": "thread_eval_governance_completed",
+        "fixture_id": "governance_basic",
+        "fixture_db_path": "/var/folders/k1/fyz1kmds28dbvwxxbrrxt4rw0000gn/T/ks_eval_governance_fixture_no_proposal_fallback_tfa77gtf/knowledge_steward.sqlite3",
+        "trace_path_exists": true,
+        "ask_result": null,
+        "ask_groundedness": null,
+        "ingest_result": {
+          "vault_path": "/private/var/folders/k1/fyz1kmds28dbvwxxbrrxt4rw0000gn/T/ks_eval_governance_fixture_no_proposal_fallback_tfa77gtf/vault",
+          "db_path": "/private/var/folders/k1/fyz1kmds28dbvwxxbrrxt4rw0000gn/T/ks_eval_governance_fixture_no_proposal_fallback_tfa77gtf/knowledge_steward.sqlite3",
+          "scanned_notes": 1,
+          "created_notes": 0,
+          "updated_notes": 1,
+          "current_chunk_count": 3,
+          "replaced_chunk_count": 3
+        },
+        "analysis_result": {
+          "scope": "scoped_ingest_single_note",
+          "target_note_path": "/private/var/folders/k1/fyz1kmds28dbvwxxbrrxt4rw0000gn/T/ks_eval_governance_fixture_no_proposal_fallback_tfa77gtf/vault/2026-03-18.md",
+          "target_note_title": "Task Planner",
+          "retrieval_queries": [
+            "Alpha",
+            "Summary"
+          ],
+          "related_candidate_count": 2,
+          "related_candidate_paths": [
+            "/private/var/folders/k1/fyz1kmds28dbvwxxbrrxt4rw0000gn/T/ks_eval_governance_fixture_no_proposal_fallback_tfa77gtf/vault/Alpha.md",
+            "/private/var/folders/k1/fyz1kmds28dbvwxxbrrxt4rw0000gn/T/ks_eval_governance_fixture_no_proposal_fallback_tfa77gtf/vault/Beta.md"
+          ],
+          "related_candidate_retrieval_sources": [
+            "sqlite_fts",
+            "sqlite_fts"
+          ],
+          "finding_count": 0,
+          "finding_types": [],
+          "fallback_used": true,
+          "fallback_reason": "no_governance_issues_detected"
+        },
+        "digest_result": null,
+        "proposal": null,
+        "quality_metrics": {
+          "faithfulness": {
+            "score": 1.0,
+            "reason": "supporting_context_path_coverage"
+          },
+          "relevancy": {
+            "score": 1.0,
+            "matched_output_hint_count": 1,
+            "expected_output_hint_count": 1
+          },
+          "context_precision": {
+            "score": 0.5,
+            "matched_context_count": 1,
+            "actual_context_count": 2
+          },
+          "context_recall": {
+            "score": 1.0,
+            "matched_context_count": 1,
+            "reference_context_count": 1
+          }
+        }
+      },
+      "error": null
+    },
+    {
+      "case_id": "resume_fixture_reject_waiting_proposal",
+      "benchmark": "governance",
+      "suite": "resume",
+      "suite_file": "eval/golden/resume_cases.json",
+      "scenario": "resume_workflow",
+      "fixture": "resume_waiting_digest",
+      "description": "对 waiting proposal 执行 reject，应完成 checkpoint 并写入 rejection audit，而不会生成 writeback_result。",
+      "started_at": "2026-03-18T06:47:21.166766+00:00",
+      "duration_ms": 17.39,
+      "outcome": "passed",
+      "expected": {
+        "http_status": 200,
+        "workflow_status": "completed",
+        "message_contains": "recorded rejection",
+        "approval_required": false,
+        "approval_decision": {
+          "approved": false,
+          "reviewer": "eval_reject_reviewer",
+          "approved_patch_op_count": 0
+        },
+        "writeback_result": {
+          "present": false
+        },
+        "checkpoint": {
+          "present": true,
+          "status": "completed",
+          "approval_required": false,
+          "patch_plan_count": 0,
+          "approval_decision_approved": false,
+          "writeback_result_present": false
+        },
+        "audit_log": {
+          "present": true,
+          "approval_status": "rejected",
+          "reviewer": "eval_reject_reviewer",
+          "writeback_applied": false,
+          "error": null
+        }
+      },
+      "actual": {
+        "http_status": 200,
+        "workflow_status": "completed",
+        "message": "Workflow resume recorded rejection. No writeback was executed.",
+        "approval_required": false,
+        "run_id": "run_ed499a61ce824560b5d48f0cbe2d821f",
+        "thread_id": "thread_resume_digest",
+        "proposal_id": "prop_digest_resume",
+        "fixture_id": "resume_waiting_digest",
+        "fixture_db_path": "/var/folders/k1/fyz1kmds28dbvwxxbrrxt4rw0000gn/T/ks_eval_resume_fixture_reject_waiting_proposal_uqpoelcz/knowledge_steward.sqlite3",
+        "trace_path_exists": false,
+        "proposal": {
+          "present": true,
+          "proposal_id": "prop_digest_resume",
+          "target_note_path": "/vault/Digest/2026-03-14.md",
+          "summary": "Insert the generated digest into the daily review note.",
+          "risk_level": "high",
+          "patch_ops": [
+            "frontmatter_merge",
+            "insert_under_heading"
+          ],
+          "evidence_count": 1,
+          "evidence_paths": [
+            "/vault/Daily/2026-03-14.md"
+          ]
+        },
+        "approval_decision": {
+          "approved": false,
+          "reviewer": "eval_reject_reviewer",
+          "comment": "risk too high",
+          "approved_patch_op_count": 0
+        },
+        "audit_event_id": "audit_0214dc580bd54ec485ede6e4d6156c11",
+        "writeback_result": null,
+        "checkpoint": {
+          "present": true,
+          "status": "completed",
+          "approval_required": false,
+          "patch_plan_count": 0,
+          "approval_decision_approved": false,
+          "writeback_result_present": false,
+          "writeback_applied": null,
+          "writeback_after_hash": null,
+          "writeback_error": null
+        },
+        "audit_log": {
+          "present": true,
+          "proposal_id": "prop_digest_resume",
+          "approval_status": "rejected",
+          "reviewer": "eval_reject_reviewer",
+          "approval_comment": "risk too high",
+          "before_hash": null,
+          "after_hash": null,
+          "writeback_applied": false,
+          "error": null
+        },
+        "quality_metrics": {
+          "faithfulness": {
+            "score": null,
+            "reason": "not_applicable"
+          },
+          "relevancy": {
+            "score": 1.0,
+            "matched_output_hint_count": 1,
+            "expected_output_hint_count": 1
+          },
+          "context_precision": {
+            "score": 0.0,
+            "matched_context_count": 0,
+            "actual_context_count": 1
+          },
+          "context_recall": {
+            "score": null,
+            "matched_context_count": 0,
+            "reference_context_count": 0
+          }
+        }
+      },
+      "error": null
+    },
+    {
+      "case_id": "resume_fixture_writeback_success",
+      "benchmark": "governance",
+      "suite": "resume",
+      "suite_file": "eval/golden/resume_cases.json",
+      "scenario": "resume_workflow",
+      "fixture": "resume_waiting_digest",
+      "description": "approve 后附带成功 writeback_result，应写入 completed checkpoint 和成功审计记录。",
+      "started_at": "2026-03-18T06:47:21.184169+00:00",
+      "duration_ms": 17.43,
+      "outcome": "passed",
+      "expected": {
+        "http_status": 200,
+        "workflow_status": "completed",
+        "message_contains": "successful writeback result",
+        "approval_required": false,
+        "approval_decision": {
+          "approved": true,
+          "reviewer": "eval_success_reviewer",
+          "approved_patch_op_count": 2
+        },
+        "writeback_result": {
+          "present": true,
+          "applied": true,
+          "before_hash": "sha256:resume_before",
+          "after_hash": "sha256:after_success",
+          "applied_patch_op_count": 2,
+          "error": null
+        },
+        "checkpoint": {
+          "present": true,
+          "status": "completed",
+          "approval_required": false,
+          "patch_plan_count": 2,
+          "approval_decision_approved": true,
+          "writeback_result_present": true,
+          "writeback_applied": true,
+          "writeback_after_hash": "sha256:after_success"
+        },
+        "audit_log": {
+          "present": true,
+          "approval_status": "approved",
+          "reviewer": "eval_success_reviewer",
+          "writeback_applied": true,
+          "before_hash": "sha256:resume_before",
+          "after_hash": "sha256:after_success",
+          "error": null
+        }
+      },
+      "actual": {
+        "http_status": 200,
+        "workflow_status": "completed",
+        "message": "Workflow resume recorded approval and persisted a successful writeback result, but scoped ingest refresh failed: Scoped ingest note paths must stay within the configured vault.",
+        "approval_required": false,
+        "run_id": "run_ad11a50af51a4ba8a2698dc02b0fd11e",
+        "thread_id": "thread_resume_digest",
+        "proposal_id": "prop_digest_resume",
+        "fixture_id": "resume_waiting_digest",
+        "fixture_db_path": "/var/folders/k1/fyz1kmds28dbvwxxbrrxt4rw0000gn/T/ks_eval_resume_fixture_writeback_success_admqpv8j/knowledge_steward.sqlite3",
+        "trace_path_exists": false,
+        "proposal": {
+          "present": true,
+          "proposal_id": "prop_digest_resume",
+          "target_note_path": "/vault/Digest/2026-03-14.md",
+          "summary": "Insert the generated digest into the daily review note.",
+          "risk_level": "high",
+          "patch_ops": [
+            "frontmatter_merge",
+            "insert_under_heading"
+          ],
+          "evidence_count": 1,
+          "evidence_paths": [
+            "/vault/Daily/2026-03-14.md"
+          ]
+        },
+        "approval_decision": {
+          "approved": true,
+          "reviewer": "eval_success_reviewer",
+          "comment": "apply now",
+          "approved_patch_op_count": 2
+        },
+        "audit_event_id": "audit_a5910b90246040dfb9249890d11b5cdb",
+        "writeback_result": {
+          "present": true,
+          "applied": true,
+          "target_note_path": "/vault/Digest/2026-03-14.md",
+          "before_hash": "sha256:resume_before",
+          "after_hash": "sha256:after_success",
+          "applied_patch_op_count": 2,
+          "error": null
+        },
+        "checkpoint": {
+          "present": true,
+          "status": "completed",
+          "approval_required": false,
+          "patch_plan_count": 2,
+          "approval_decision_approved": true,
+          "writeback_result_present": true,
+          "writeback_applied": true,
+          "writeback_after_hash": "sha256:after_success",
+          "writeback_error": null
+        },
+        "audit_log": {
+          "present": true,
+          "proposal_id": "prop_digest_resume",
+          "approval_status": "approved",
+          "reviewer": "eval_success_reviewer",
+          "approval_comment": "apply now",
+          "before_hash": "sha256:resume_before",
+          "after_hash": "sha256:after_success",
+          "writeback_applied": true,
+          "error": null
+        },
+        "quality_metrics": {
+          "faithfulness": {
+            "score": null,
+            "reason": "not_applicable"
+          },
+          "relevancy": {
+            "score": 1.0,
+            "matched_output_hint_count": 1,
+            "expected_output_hint_count": 1
+          },
+          "context_precision": {
+            "score": 0.0,
+            "matched_context_count": 0,
+            "actual_context_count": 1
+          },
+          "context_recall": {
+            "score": null,
+            "matched_context_count": 0,
+            "reference_context_count": 0
+          }
+        }
+      },
+      "error": null
+    },
+    {
+      "case_id": "resume_fixture_writeback_failure",
+      "benchmark": "governance",
+      "suite": "resume",
+      "suite_file": "eval/golden/resume_cases.json",
+      "scenario": "resume_workflow",
+      "fixture": "resume_waiting_digest",
+      "description": "approve 后附带失败 writeback_result，应保留 completed checkpoint 和失败审计事实，不能伪装成成功写回。",
+      "started_at": "2026-03-18T06:47:21.201608+00:00",
+      "duration_ms": 17.12,
+      "outcome": "passed",
+      "expected": {
+        "http_status": 200,
+        "workflow_status": "completed",
+        "message_contains": "failed writeback result",
+        "approval_required": false,
+        "approval_decision": {
+          "approved": true,
+          "reviewer": "eval_failed_reviewer",
+          "approved_patch_op_count": 2
+        },
+        "writeback_result": {
+          "present": true,
+          "applied": false,
+          "before_hash": "sha256:current_hash",
+          "applied_patch_op_count": 0,
+          "error_contains": "before_hash mismatch"
+        },
+        "checkpoint": {
+          "present": true,
+          "status": "completed",
+          "approval_required": false,
+          "patch_plan_count": 2,
+          "approval_decision_approved": true,
+          "writeback_result_present": true,
+          "writeback_applied": false,
+          "writeback_error_contains": "before_hash mismatch"
+        },
+        "audit_log": {
+          "present": true,
+          "approval_status": "approved",
+          "reviewer": "eval_failed_reviewer",
+          "writeback_applied": false,
+          "before_hash": "sha256:current_hash",
+          "after_hash": null,
+          "error_contains": "before_hash mismatch"
+        }
+      },
+      "actual": {
+        "http_status": 200,
+        "workflow_status": "completed",
+        "message": "Workflow resume recorded approval, but the plugin reported a failed writeback result.",
+        "approval_required": false,
+        "run_id": "run_546e49bea41842ec96401843d0de23ab",
+        "thread_id": "thread_resume_digest",
+        "proposal_id": "prop_digest_resume",
+        "fixture_id": "resume_waiting_digest",
+        "fixture_db_path": "/var/folders/k1/fyz1kmds28dbvwxxbrrxt4rw0000gn/T/ks_eval_resume_fixture_writeback_failure_fic25ci7/knowledge_steward.sqlite3",
+        "trace_path_exists": false,
+        "proposal": {
+          "present": true,
+          "proposal_id": "prop_digest_resume",
+          "target_note_path": "/vault/Digest/2026-03-14.md",
+          "summary": "Insert the generated digest into the daily review note.",
+          "risk_level": "high",
+          "patch_ops": [
+            "frontmatter_merge",
+            "insert_under_heading"
+          ],
+          "evidence_count": 1,
+          "evidence_paths": [
+            "/vault/Daily/2026-03-14.md"
+          ]
+        },
+        "approval_decision": {
+          "approved": true,
+          "reviewer": "eval_failed_reviewer",
+          "comment": "record the failure",
+          "approved_patch_op_count": 2
+        },
+        "audit_event_id": "audit_d39c053cb7844884b97cf8b1efd36c6a",
+        "writeback_result": {
+          "present": true,
+          "applied": false,
+          "target_note_path": "/vault/Digest/2026-03-14.md",
+          "before_hash": "sha256:current_hash",
+          "after_hash": null,
+          "applied_patch_op_count": 0,
+          "error": "before_hash mismatch: current file changed"
+        },
+        "checkpoint": {
+          "present": true,
+          "status": "completed",
+          "approval_required": false,
+          "patch_plan_count": 2,
+          "approval_decision_approved": true,
+          "writeback_result_present": true,
+          "writeback_applied": false,
+          "writeback_after_hash": null,
+          "writeback_error": "before_hash mismatch: current file changed"
+        },
+        "audit_log": {
+          "present": true,
+          "proposal_id": "prop_digest_resume",
+          "approval_status": "approved",
+          "reviewer": "eval_failed_reviewer",
+          "approval_comment": "record the failure",
+          "before_hash": "sha256:current_hash",
+          "after_hash": null,
+          "writeback_applied": false,
+          "error": "before_hash mismatch: current file changed"
+        },
+        "quality_metrics": {
+          "faithfulness": {
+            "score": null,
+            "reason": "not_applicable"
+          },
+          "relevancy": {
+            "score": 1.0,
+            "matched_output_hint_count": 1,
+            "expected_output_hint_count": 1
+          },
+          "context_precision": {
+            "score": 0.0,
+            "matched_context_count": 0,
+            "actual_context_count": 1
+          },
+          "context_recall": {
+            "score": null,
+            "matched_context_count": 0,
+            "reference_context_count": 0
+          }
+        }
+      },
+      "error": null
+    }
+  ]
+}

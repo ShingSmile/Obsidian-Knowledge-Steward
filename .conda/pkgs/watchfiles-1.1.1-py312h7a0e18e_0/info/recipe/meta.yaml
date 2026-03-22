@@ -1,0 +1,131 @@
+# This file created by conda-build 25.9.0
+# meta.yaml template originally from:
+# /Users/runner/work/1/s/recipe, last modified Tue Oct 14 15:42:41 2025
+# ------------------------------------------------
+
+package:
+  name: watchfiles
+  version: 1.1.1
+source:
+  url: https://pypi.org/packages/source/w/watchfiles/watchfiles-1.1.1.tar.gz
+  sha256: a173cb5c16c4f40ab19cecf48a534c409f7ea983ab8fed0741304a1c0a31b3f2
+build:
+  number: '0'
+  script:
+    - /Users/runner/miniforge3/conda-bld/watchfiles_1760456949431/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehol/bin/python
+      -m pip install . -vv
+    - cargo-bundle-licenses --format yaml --output THIRDPARTY.yml
+  entry_points:
+    - watchfiles = watchfiles.cli:cli
+  string: py312h7a0e18e_0
+requirements:
+  build:
+    - bzip2 1.0.8 h500dc9f_8
+    - ca-certificates 2025.10.5 hbd8a1cb_0
+    - cargo-bundle-licenses 4.0.0 hb23bff6_1
+    - cctools_osx-64 1024.3 llvm19_1_h3b512aa_5
+    - cctools_osx-arm64 1024.3 llvm19_1_h5cc7f4e_5
+    - clang 19.1.7 default_h1323312_5
+    - clang-19 19.1.7 default_hc369343_5
+    - clang_impl_osx-arm64 19.1.7 h4fa02b8_25
+    - clang_osx-arm64 19.1.7 h1728699_25
+    - clangxx 19.1.7 default_h1c12a56_5
+    - clangxx_impl_osx-arm64 19.1.7 hd0141c2_25
+    - compiler-rt 19.1.7 he914875_1
+    - compiler-rt_osx-64 19.1.7 h138dee1_1
+    - cross-python_osx-arm64 3.12 53_cpython
+    - crossenv 1.5.0 pyhcf101f3_3
+    - ld64_osx-64 955.13 llvm19_1_h466f870_5
+    - ld64_osx-arm64 955.13 llvm19_1_hcfa1dea_5
+    - libclang-cpp19.1 19.1.7 default_hc369343_5
+    - libcxx 21.1.3 h3d58e20_0
+    - libcxx-devel 19.1.7 h7c275be_1
+    - libexpat 2.7.1 h21dd04a_0
+    - libffi 3.4.6 h281671d_1
+    - libgit2 1.9.1 h790a94b_1
+    - libiconv 1.18 h57a12c2_2
+    - libintl 0.25.1 h3184127_1
+    - libllvm19 19.1.7 h56e7563_2
+    - liblzma 5.8.1 hd471939_2
+    - libsqlite 3.50.4 h39a8b3b_0
+    - libssh2 1.11.1 hed3591d_0
+    - libxml2 2.15.0 h23bb396_1
+    - libxml2-16 2.15.0 h0ad03eb_1
+    - libzlib 1.3.1 hd23fc13_2
+    - llvm-tools 19.1.7 hb0207f0_2
+    - llvm-tools-19 19.1.7 h879f4bc_2
+    - lz4-c 1.10.0 h240833e_1
+    - macosx_deployment_target_osx-arm64 11.0 h6553868_2
+    - maturin 1.9.6 py310h765790a_0
+    - ncurses 6.5 h0622a9a_3
+    - openssl 3.5.4 h230baf5_0
+    - pcre2 10.46 ha3e7e28_0
+    - popt 1.16 h7b079dc_2002
+    - python 3.12.12 h3999593_0_cpython
+    - readline 8.2 h7cca4af_2
+    - rsync 3.4.1 hf2bfba0_2
+    - rust 1.90.0 h34a2095_0
+    - rust-std-aarch64-apple-darwin 1.90.0 hf6ec828_0
+    - rust-std-x86_64-apple-darwin 1.90.0 h38e4360_0
+    - rust_osx-arm64 1.90.0 hb33a62e_0
+    - sed 4.9 hf9b2955_0
+    - sigtool 0.1.3 h88f4db0_0
+    - tapi 1300.6.5 h390ca13_0
+    - tk 8.6.13 hf689a15_2
+    - tomli 2.3.0 pyhcf101f3_0
+    - tzdata 2025b h78e105d_0
+    - xxhash 0.8.3 h13e91ac_0
+    - zstd 1.5.7 h8210216_2
+  host:
+    - bzip2 1.0.8 hd037594_8
+    - ca-certificates 2025.10.5 hbd8a1cb_0
+    - icu 75.1 hfee45f7_0
+    - libexpat 2.7.1 hec049ff_0
+    - libffi 3.4.6 h1da3d7d_1
+    - liblzma 5.8.1 h39f12f2_2
+    - libsqlite 3.50.4 h4237e3c_0
+    - libzlib 1.3.1 h8359307_2
+    - maturin 1.9.6 py310h34f76f2_0
+    - ncurses 6.5 h5e97a16_3
+    - openssl 3.5.4 h5503f6c_0
+    - pip 25.2 pyh8b19718_0
+    - python 3.12.12 hec0b533_0_cpython
+    - readline 8.2 h1d1bf99_2
+    - setuptools 80.9.0 pyhff2d567_0
+    - tk 8.6.13 h892fb3f_2
+    - tomli 2.3.0 pyhcf101f3_0
+    - tzdata 2025b h78e105d_0
+    - wheel 0.45.1 pyhd8ed1ab_1
+  run:
+    - __osx >=11.0
+    - anyio >=3.0.0
+    - python >=3.12,<3.13.0a0
+    - python >=3.12,<3.13.0a0 *_cpython
+    - python_abi 3.12.* *_cp312
+  run_constrained:
+    - __osx >=11.0
+test:
+  requires:
+    - pip
+  imports:
+    - watchfiles
+  commands:
+    - pip check
+    - watchfiles -h
+about:
+  home: https://watchfiles.helpmanual.io
+  summary: Simple, modern and high performance file watching and code reload in python.
+  dev_url: https://github.com/samuelcolvin/watchfiles
+  license: MIT
+  license_file:
+    - LICENSE
+    - THIRDPARTY.yml
+extra:
+  recipe-maintainers:
+    - davidbrochart
+    - samuelcolvin
+  final: true
+  copy_test_source_files: true
+  flow_run_id: azure_20251014.2.1
+  remote_url: https://github.com/conda-forge/watchfiles-feedstock
+  sha: b6cc929c67ca1bbf0a7837499492fa26ea1de5e9

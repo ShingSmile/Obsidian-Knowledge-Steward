@@ -1,0 +1,13 @@
+{
+  "build": "pyhcf101f3_0",
+  "build_number": 0,
+  "depends": [
+    "python >=3.10"
+  ],
+  "license": "BSD-3-Clause",
+  "name": "python-dotenv",
+  "noarch": "python",
+  "subdir": "noarch",
+  "timestamp": 1772388605021,
+  "version": "1.2.2"
+}

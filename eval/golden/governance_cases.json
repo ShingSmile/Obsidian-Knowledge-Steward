@@ -1,0 +1,152 @@
+{
+  "suite": "governance",
+  "schema_version": 1,
+  "cases": [
+    {
+      "case_id": "governance_fixture_waiting_proposal_hybrid",
+      "scenario": "governance",
+      "fixture": "governance_basic",
+      "description": "单 note scoped ingest 在 proposal 模式下应产出真实治理 proposal，并在 deterministic embedding mock 下显式消费 hybrid related candidate。",
+      "quality_reference": {
+        "reference_context_path_suffixes": [
+          "Alpha.md",
+          "Beta.md"
+        ]
+      },
+      "request": {
+        "thread_id": "thread_eval_governance_waiting",
+        "action_type": "ingest_steward",
+        "note_path": "Alpha.md",
+        "require_approval": true,
+        "metadata": {
+          "approval_mode": "proposal"
+        }
+      },
+      "setup": {
+        "provider_mode": "none",
+        "mock_embedding_profile": "alpha_beta_hybrid",
+        "prewarm_requests": [
+          {
+            "thread_id": "thread_eval_governance_prewarm",
+            "action_type": "ingest_steward"
+          }
+        ]
+      },
+      "expected": {
+        "http_status": 202,
+        "workflow_status": "waiting_for_approval",
+        "message_contains": "waiting for approval",
+        "approval_required": true,
+        "ingest_result": {
+          "scanned_notes": 1
+        },
+        "analysis_result": {
+          "fallback_used": false,
+          "min_related_candidate_count": 1,
+          "finding_types_contains": [
+            "orphan_hint",
+            "missing_frontmatter"
+          ],
+          "related_candidate_path_suffixes": [
+            "Beta.md"
+          ],
+          "related_candidate_sources_contains": [
+            "hybrid_rrf"
+          ]
+        },
+        "proposal": {
+          "present": true,
+          "patch_ops": [
+            "merge_frontmatter",
+            "insert_under_heading"
+          ],
+          "target_note_path_suffix": "Alpha.md",
+          "summary_contains": "Alpha",
+          "min_evidence_count": 2,
+          "evidence_path_suffixes": [
+            "Alpha.md",
+            "2026-03-18.md"
+          ]
+        },
+        "quality_metrics": {
+          "faithfulness": {
+            "min": 1.0
+          },
+          "relevancy": {
+            "min": 1.0
+          },
+          "context_precision": {
+            "min": 0.6
+          },
+          "context_recall": {
+            "min": 1.0
+          }
+        }
+      }
+    },
+    {
+      "case_id": "governance_fixture_no_proposal_fallback",
+      "scenario": "governance",
+      "fixture": "governance_basic",
+      "description": "结构稳定的 daily note 在 proposal 模式下应安全退回 completed，而不是硬造治理 proposal。",
+      "quality_reference": {
+        "reference_context_path_suffixes": [
+          "Alpha.md"
+        ]
+      },
+      "request": {
+        "thread_id": "thread_eval_governance_completed",
+        "action_type": "ingest_steward",
+        "note_path": "2026-03-18.md",
+        "require_approval": true,
+        "metadata": {
+          "approval_mode": "proposal"
+        }
+      },
+      "setup": {
+        "provider_mode": "none",
+        "prewarm_requests": [
+          {
+            "thread_id": "thread_eval_governance_completed_prewarm",
+            "action_type": "ingest_steward"
+          }
+        ]
+      },
+      "expected": {
+        "http_status": 200,
+        "workflow_status": "completed",
+        "message_contains": "no approval proposal was generated",
+        "approval_required": false,
+        "proposal": {
+          "present": false
+        },
+        "ingest_result": {
+          "scanned_notes": 1
+        },
+        "analysis_result": {
+          "fallback_used": true,
+          "fallback_reason": "no_governance_issues_detected",
+          "finding_count": 0,
+          "min_related_candidate_count": 1,
+          "related_candidate_path_suffixes": [
+            "Alpha.md"
+          ]
+        },
+        "quality_metrics": {
+          "faithfulness": {
+            "min": 1.0
+          },
+          "relevancy": {
+            "min": 1.0
+          },
+          "context_precision": {
+            "min": 0.5
+          },
+          "context_recall": {
+            "min": 1.0
+          }
+        }
+      }
+    }
+  ]
+}

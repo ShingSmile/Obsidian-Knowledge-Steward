@@ -1,0 +1,432 @@
+{
+  "schema_version": "1.0",
+  "generated_at": "2026-03-15T07:24:44.132073+00:00",
+  "backend_version": "0.1.0",
+  "selected_case_ids": [
+    "ask_sample_retrieval_only_daily_notes",
+    "ask_sample_filter_fallback",
+    "ask_fixture_generated_answer_citation_valid",
+    "ask_fixture_invalid_citation_downgrades",
+    "ask_fixture_no_hits",
+    "digest_sample_structured_result",
+    "digest_sample_waiting_proposal",
+    "digest_fixture_empty_index_fallback"
+  ],
+  "summary": {
+    "selected_case_count": 8,
+    "passed_case_count": 8,
+    "failed_case_count": 0
+  },
+  "cases": [
+    {
+      "case_id": "ask_sample_retrieval_only_daily_notes",
+      "suite": "ask",
+      "suite_file": "eval/golden/ask_cases.json",
+      "scenario": "ask",
+      "fixture": "sample_vault",
+      "description": "基于真实 sample_vault 的最小问答回归，确认无 provider 时仍能返回 retrieval_only 证据结果。",
+      "started_at": "2026-03-15T07:24:43.329006+00:00",
+      "duration_ms": 195.18,
+      "outcome": "passed",
+      "expected": {
+        "http_status": 200,
+        "workflow_status": "completed",
+        "message_contains": "retrieval-only fallback",
+        "approval_required": false,
+        "ask_result": {
+          "mode": "retrieval_only",
+          "model_fallback_used": true,
+          "model_fallback_reason": "no_available_chat_provider",
+          "retrieval_fallback_used": false,
+          "min_citation_count": 1,
+          "min_retrieved_candidate_count": 1,
+          "answer_contains": "当前未使用模型生成答案"
+        }
+      },
+      "actual": {
+        "http_status": 200,
+        "workflow_status": "completed",
+        "message": "Ask workflow completed with retrieval-only fallback.",
+        "approval_required": false,
+        "run_id": "run_b4778b807dc548f48643b34c4c176357",
+        "thread_id": "thread_1380d6d5e8d3465d918f6c56432141c0",
+        "fixture_id": "sample_vault",
+        "fixture_db_path": "/var/folders/k1/fyz1kmds28dbvwxxbrrxt4rw0000gn/T/ks_eval_ask_sample_retrieval_only_daily_notes_xapz56bv/knowledge_steward.sqlite3",
+        "trace_path_exists": true,
+        "ask_result": {
+          "mode": "retrieval_only",
+          "answer": "当前未使用模型生成答案，先返回与问题“总结”最相关的检索证据。\n[1] 2024-01-26_星期五.md / Summary (lines 21-43): ...想吐槽的，有什么问题但不一定能解决\n* 有什么idea\n* 讨论环节\n* action\n\n* [总结]\n\t* 业务\n\t\t* 坑\n\t* 技术\n\t* 模块化\n* session\n\t* 分享...\n[2] 2023-11-06_星期一.md / Summary (lines 21-34): # Summary\n\n* 要什么东西，提供什么功能\n* 这周四之前完成复盘、[总结]、和task\n* 正常的码单数据在下单收银之后会被直接删除，但是预订单的码单头部数据会保留\n* 类内部调用事务方法会导致事务失效\n\t* transactional基于aop，基于动态代理，调用内部类方法使用this对象不走动态代理...",
+          "citation_count": 2,
+          "retrieved_candidate_count": 2,
+          "retrieval_fallback_used": false,
+          "retrieval_fallback_reason": null,
+          "model_fallback_used": true,
+          "model_fallback_reason": "no_available_chat_provider",
+          "provider_name": null,
+          "model_name": null
+        },
+        "digest_result": null,
+        "proposal": null
+      },
+      "error": null
+    },
+    {
+      "case_id": "ask_sample_filter_fallback",
+      "suite": "ask",
+      "suite_file": "eval/golden/ask_cases.json",
+      "scenario": "ask",
+      "fixture": "sample_vault",
+      "description": "真实 sample_vault 下的 metadata filter 过严时，应稳定退回纯 FTS 结果。",
+      "started_at": "2026-03-15T07:24:43.524273+00:00",
+      "duration_ms": 195.28,
+      "outcome": "passed",
+      "expected": {
+        "http_status": 200,
+        "workflow_status": "completed",
+        "message_contains": "retrieval-only fallback",
+        "approval_required": false,
+        "ask_result": {
+          "mode": "retrieval_only",
+          "model_fallback_used": true,
+          "model_fallback_reason": "no_available_chat_provider",
+          "retrieval_fallback_used": true,
+          "retrieval_fallback_reason": "metadata_filters_too_strict",
+          "min_citation_count": 1,
+          "min_retrieved_candidate_count": 1,
+          "answer_contains": [
+            "当前未使用模型生成答案",
+            "检索已退回纯 FTS 结果"
+          ]
+        }
+      },
+      "actual": {
+        "http_status": 200,
+        "workflow_status": "completed",
+        "message": "Ask workflow completed with retrieval-only fallback.",
+        "approval_required": false,
+        "run_id": "run_b0bc642cb0d849c1a6513ca8e035d37e",
+        "thread_id": "thread_9527f0a0ebdc4d4883ad7721ab58a092",
+        "fixture_id": "sample_vault",
+        "fixture_db_path": "/var/folders/k1/fyz1kmds28dbvwxxbrrxt4rw0000gn/T/ks_eval_ask_sample_filter_fallback_eyw0tipp/knowledge_steward.sqlite3",
+        "trace_path_exists": true,
+        "ask_result": {
+          "mode": "retrieval_only",
+          "answer": "当前未使用模型生成答案，先返回与问题“总结”最相关的检索证据。\n注意：结构化过滤条件过严，检索已退回纯 FTS 结果。\n[1] v6.3.0迭代总结.md / 二、任务总结 > 5、总结 (lines 30-34): 二、任务总结 > 5、[总结]\n[2] v6.2.5迭代总结.md / 二、任务总结 > 5、总结 (lines 42-46): 二、任务总结 > 5、[总结]\n[3] 2024-01-26_星期五.md / Summary (lines 21-43): ...想吐槽的，有什么问题但不一定能解决\n* 有什么idea\n* 讨论环节\n* action\n\n* [总结]\n\t* 业务\n\t\t* 坑\n\t* 技术\n\t* 模块化\n* session\n\t* 分享...\n[4] 2023-11-06_星期一.md / Summary (lines 21-34): # Summary\n\n* 要什么东西，提供什么功能\n* 这周四之前完成复盘、[总结]、和task\n* 正常的码单数据在下单收银之后会被直接删除，但是预订单的码单头部数据会保留\n* 类内部调用事务方法会导致事务失效\n\t* transactional基于aop，基于动态代理，调用内部类方法使用this对象不走动态代理...",
+          "citation_count": 4,
+          "retrieved_candidate_count": 4,
+          "retrieval_fallback_used": true,
+          "retrieval_fallback_reason": "metadata_filters_too_strict",
+          "model_fallback_used": true,
+          "model_fallback_reason": "no_available_chat_provider",
+          "provider_name": null,
+          "model_name": null
+        },
+        "digest_result": null,
+        "proposal": null
+      },
+      "error": null
+    },
+    {
+      "case_id": "ask_fixture_generated_answer_citation_valid",
+      "suite": "ask",
+      "suite_file": "eval/golden/ask_cases.json",
+      "scenario": "ask",
+      "fixture": "ask_basic",
+      "description": "deterministic fixture 下 provider 返回合法 [1] 引用时，应保留 generated_answer。",
+      "started_at": "2026-03-15T07:24:43.719584+00:00",
+      "duration_ms": 19.15,
+      "outcome": "passed",
+      "expected": {
+        "http_status": 200,
+        "workflow_status": "completed",
+        "message_contains": "grounded answer",
+        "approval_required": false,
+        "ask_result": {
+          "mode": "generated_answer",
+          "model_fallback_used": false,
+          "provider_name": "openai-compatible",
+          "min_citation_count": 1,
+          "min_retrieved_candidate_count": 1,
+          "answer_contains": "[1]"
+        }
+      },
+      "actual": {
+        "http_status": 200,
+        "workflow_status": "completed",
+        "message": "Ask workflow completed with a grounded answer.",
+        "approval_required": false,
+        "run_id": "run_0232c9f0daf842da8c9d393d17037334",
+        "thread_id": "thread_60a0044cf4a34221813a2bca00177f8f",
+        "fixture_id": "ask_basic",
+        "fixture_db_path": "/var/folders/k1/fyz1kmds28dbvwxxbrrxt4rw0000gn/T/ks_eval_ask_fixture_generated_answer_citation_valid_ycv7u97l/knowledge_steward.sqlite3",
+        "trace_path_exists": true,
+        "ask_result": {
+          "mode": "generated_answer",
+          "answer": "Roadmap 已拆成检索与 ask 两段实现。[1]",
+          "citation_count": 2,
+          "retrieved_candidate_count": 2,
+          "retrieval_fallback_used": false,
+          "retrieval_fallback_reason": null,
+          "model_fallback_used": false,
+          "model_fallback_reason": null,
+          "provider_name": "openai-compatible",
+          "model_name": "gpt-eval"
+        },
+        "digest_result": null,
+        "proposal": null
+      },
+      "error": null
+    },
+    {
+      "case_id": "ask_fixture_invalid_citation_downgrades",
+      "suite": "ask",
+      "suite_file": "eval/golden/ask_cases.json",
+      "scenario": "ask",
+      "fixture": "ask_basic",
+      "description": "deterministic fixture 下 provider 返回越界编号时，应保守降级为 retrieval_only。",
+      "started_at": "2026-03-15T07:24:43.738740+00:00",
+      "duration_ms": 18.5,
+      "outcome": "passed",
+      "expected": {
+        "http_status": 200,
+        "workflow_status": "completed",
+        "message_contains": "retrieval-only fallback",
+        "approval_required": false,
+        "ask_result": {
+          "mode": "retrieval_only",
+          "model_fallback_used": true,
+          "model_fallback_reason": "citation_alignment_out_of_range",
+          "min_citation_count": 1,
+          "min_retrieved_candidate_count": 1,
+          "answer_contains": [
+            "当前未使用模型生成答案",
+            "[1]"
+          ]
+        }
+      },
+      "actual": {
+        "http_status": 200,
+        "workflow_status": "completed",
+        "message": "Ask workflow completed with retrieval-only fallback.",
+        "approval_required": false,
+        "run_id": "run_4650e71d36074c1d85960abe5f3963ab",
+        "thread_id": "thread_6593a69808e74177bc71d165265fa9f3",
+        "fixture_id": "ask_basic",
+        "fixture_db_path": "/var/folders/k1/fyz1kmds28dbvwxxbrrxt4rw0000gn/T/ks_eval_ask_fixture_invalid_citation_downgrades_375aj_8y/knowledge_steward.sqlite3",
+        "trace_path_exists": true,
+        "ask_result": {
+          "mode": "retrieval_only",
+          "answer": "当前未使用模型生成答案，先返回与问题“Roadmap”最相关的检索证据。\n[1] Roadmap.md / Roadmap (lines 1-4): # [Roadmap]\n\nThe [roadmap] details live here.\n[2] Roadmap.md / Roadmap > Ask (lines 5-7): [Roadmap]",
+          "citation_count": 2,
+          "retrieved_candidate_count": 2,
+          "retrieval_fallback_used": false,
+          "retrieval_fallback_reason": null,
+          "model_fallback_used": true,
+          "model_fallback_reason": "citation_alignment_out_of_range",
+          "provider_name": null,
+          "model_name": null
+        },
+        "digest_result": null,
+        "proposal": null
+      },
+      "error": null
+    },
+    {
+      "case_id": "ask_fixture_no_hits",
+      "suite": "ask",
+      "suite_file": "eval/golden/ask_cases.json",
+      "scenario": "ask",
+      "fixture": "ask_basic",
+      "description": "无命中 query 应走 no_hits，而不是伪造 citation 或空 retrieval_only。",
+      "started_at": "2026-03-15T07:24:43.757253+00:00",
+      "duration_ms": 19.38,
+      "outcome": "passed",
+      "expected": {
+        "http_status": 200,
+        "workflow_status": "completed",
+        "message_contains": "without matching evidence",
+        "approval_required": false,
+        "ask_result": {
+          "mode": "no_hits",
+          "model_fallback_used": false,
+          "min_citation_count": 0,
+          "answer_contains": "未找到可支撑回答的笔记片段"
+        }
+      },
+      "actual": {
+        "http_status": 200,
+        "workflow_status": "completed",
+        "message": "Ask workflow completed without matching evidence.",
+        "approval_required": false,
+        "run_id": "run_f615feb2120c4020ba2a71912a4908c8",
+        "thread_id": "thread_b02e30b5cf644723bf1a947423d577c7",
+        "fixture_id": "ask_basic",
+        "fixture_db_path": "/var/folders/k1/fyz1kmds28dbvwxxbrrxt4rw0000gn/T/ks_eval_ask_fixture_no_hits_ctn_lapc/knowledge_steward.sqlite3",
+        "trace_path_exists": true,
+        "ask_result": {
+          "mode": "no_hits",
+          "answer": "未找到可支撑回答的笔记片段，当前无法返回带引用的答案。",
+          "citation_count": 0,
+          "retrieved_candidate_count": 0,
+          "retrieval_fallback_used": false,
+          "retrieval_fallback_reason": null,
+          "model_fallback_used": false,
+          "model_fallback_reason": null,
+          "provider_name": null,
+          "model_name": null
+        },
+        "digest_result": null,
+        "proposal": null
+      },
+      "error": null
+    },
+    {
+      "case_id": "digest_sample_structured_result",
+      "suite": "digest",
+      "suite_file": "eval/golden/digest_cases.json",
+      "scenario": "digest",
+      "fixture": "sample_vault",
+      "description": "基于真实 sample_vault 的最小 DAILY_DIGEST 回归，确认当前至少能稳定产出结构化摘要。",
+      "started_at": "2026-03-15T07:24:43.776638+00:00",
+      "duration_ms": 182.02,
+      "outcome": "passed",
+      "expected": {
+        "http_status": 200,
+        "workflow_status": "completed",
+        "message_contains": "indexed note digest",
+        "approval_required": false,
+        "digest_result": {
+          "fallback_used": false,
+          "min_source_note_count": 1,
+          "markdown_contains": [
+            "本次 DAILY_DIGEST 基于最近",
+            "重点来源"
+          ]
+        }
+      },
+      "actual": {
+        "http_status": 200,
+        "workflow_status": "completed",
+        "message": "Digest workflow completed with indexed note digest.",
+        "approval_required": false,
+        "run_id": "run_4046dc0bd2a64aa999049dee2441e0ad",
+        "thread_id": "thread_78f91042dcc141e1875699442995c648",
+        "fixture_id": "sample_vault",
+        "fixture_db_path": "/var/folders/k1/fyz1kmds28dbvwxxbrrxt4rw0000gn/T/ks_eval_digest_sample_structured_result__4_pedns/knowledge_steward.sqlite3",
+        "trace_path_exists": true,
+        "ask_result": null,
+        "digest_result": {
+          "source_note_count": 6,
+          "fallback_used": false,
+          "fallback_reason": null,
+          "digest_markdown": "本次 DAILY_DIGEST 基于最近 6 篇已索引笔记生成。\n来源分布：daily_note 6 篇。\n覆盖日期：2024-03-23 至 2025-03-02。\n待跟进任务：当前来源笔记中未检测到任务项。\n\n## 重点来源\n- Task Planner（daily_note，2025-03-02，任务 0 项）\n- Task Planner（daily_note，2024-03-27，任务 0 项）\n- Task Planner（daily_note，2024-03-26，任务 0 项）\n- Task Planner（daily_note，2024-03-25，任务 0 项）\n\n其余 2 篇笔记已保留在 source_notes 中，可供后续扩展节点继续消费。"
+        },
+        "proposal": null
+      },
+      "error": null
+    },
+    {
+      "case_id": "digest_sample_waiting_proposal",
+      "suite": "digest",
+      "suite_file": "eval/golden/digest_cases.json",
+      "scenario": "digest",
+      "fixture": "sample_vault",
+      "description": "真实 sample_vault 下启用 proposal 模式时，应返回 waiting_for_approval 和结构化 proposal。",
+      "started_at": "2026-03-15T07:24:43.958684+00:00",
+      "duration_ms": 159.53,
+      "outcome": "passed",
+      "expected": {
+        "http_status": 202,
+        "workflow_status": "waiting_for_approval",
+        "message_contains": "waiting for approval",
+        "approval_required": true,
+        "digest_result": {
+          "fallback_used": false,
+          "min_source_note_count": 1,
+          "markdown_contains": "本次 DAILY_DIGEST 基于最近"
+        },
+        "proposal": {
+          "present": true,
+          "patch_ops": [
+            "merge_frontmatter",
+            "insert_under_heading"
+          ],
+          "target_note_path_suffix": ".md",
+          "summary_contains": "DAILY_DIGEST"
+        }
+      },
+      "actual": {
+        "http_status": 202,
+        "workflow_status": "waiting_for_approval",
+        "message": "Digest workflow generated a proposal and is waiting for approval.",
+        "approval_required": true,
+        "run_id": "run_ba54bb3962b949ada5ddb5ec545b936c",
+        "thread_id": "thread_c78cc501527840519a248d750e322a71",
+        "fixture_id": "sample_vault",
+        "fixture_db_path": "/var/folders/k1/fyz1kmds28dbvwxxbrrxt4rw0000gn/T/ks_eval_digest_sample_waiting_proposal_0dvga8ok/knowledge_steward.sqlite3",
+        "trace_path_exists": true,
+        "ask_result": null,
+        "digest_result": {
+          "source_note_count": 6,
+          "fallback_used": false,
+          "fallback_reason": null,
+          "digest_markdown": "本次 DAILY_DIGEST 基于最近 6 篇已索引笔记生成。\n来源分布：daily_note 6 篇。\n覆盖日期：2024-03-23 至 2025-03-02。\n待跟进任务：当前来源笔记中未检测到任务项。\n\n## 重点来源\n- Task Planner（daily_note，2025-03-02，任务 0 项）\n- Task Planner（daily_note，2024-03-27，任务 0 项）\n- Task Planner（daily_note，2024-03-26，任务 0 项）\n- Task Planner（daily_note，2024-03-25，任务 0 项）\n\n其余 2 篇笔记已保留在 source_notes 中，可供后续扩展节点继续消费。"
+        },
+        "proposal": {
+          "proposal_id": "prop_digest_ac8c3535bdbfefe2",
+          "target_note_path": "/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/sample_vault/日常/2025-03-02_星期日.md",
+          "summary": "将本次 DAILY_DIGEST 写入 Task Planner，并标记这次摘要需要人工审批。",
+          "risk_level": "medium",
+          "patch_ops": [
+            "merge_frontmatter",
+            "insert_under_heading"
+          ]
+        }
+      },
+      "error": null
+    },
+    {
+      "case_id": "digest_fixture_empty_index_fallback",
+      "suite": "digest",
+      "suite_file": "eval/golden/digest_cases.json",
+      "scenario": "digest",
+      "fixture": "empty_index",
+      "description": "空索引下 digest 应返回安全 fallback，而不是抛异常或空 proposal。",
+      "started_at": "2026-03-15T07:24:44.118241+00:00",
+      "duration_ms": 13.82,
+      "outcome": "passed",
+      "expected": {
+        "http_status": 200,
+        "workflow_status": "completed",
+        "message_contains": "safe fallback",
+        "approval_required": false,
+        "digest_result": {
+          "fallback_used": true,
+          "fallback_reason": "no_indexed_notes",
+          "source_note_count": 0,
+          "markdown_contains": "请先执行一次 INGEST_STEWARD"
+        }
+      },
+      "actual": {
+        "http_status": 200,
+        "workflow_status": "completed",
+        "message": "Digest workflow completed with safe fallback.",
+        "approval_required": false,
+        "run_id": "run_ef2f6fe75cc2454f95a2932976d33bc0",
+        "thread_id": "thread_bc414bcb1f04490f862d9788957fb4f3",
+        "fixture_id": "empty_index",
+        "fixture_db_path": "/var/folders/k1/fyz1kmds28dbvwxxbrrxt4rw0000gn/T/ks_eval_digest_fixture_empty_index_fallback_ut92mq3l/knowledge_steward.sqlite3",
+        "trace_path_exists": true,
+        "ask_result": null,
+        "digest_result": {
+          "source_note_count": 0,
+          "fallback_used": true,
+          "fallback_reason": "no_indexed_notes",
+          "digest_markdown": "当前索引中还没有可用于生成 DAILY_DIGEST 的笔记。\n请先执行一次 INGEST_STEWARD，再重新触发 digest。"
+        },
+        "proposal": null
+      },
+      "error": null
+    }
+  ]
+}

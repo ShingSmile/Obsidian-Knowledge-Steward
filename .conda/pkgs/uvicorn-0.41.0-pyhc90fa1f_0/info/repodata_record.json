@@ -1,0 +1,26 @@
+{
+  "build": "pyhc90fa1f_0",
+  "build_number": 0,
+  "channel": "https://mirrors.tuna.tsinghua.edu.cn/anaconda/cloud/conda-forge/noarch",
+  "constrains": [],
+  "depends": [
+    "__unix",
+    "click >=7.0",
+    "h11 >=0.8",
+    "python >=3.10",
+    "typing_extensions >=4.0",
+    "python"
+  ],
+  "fn": "uvicorn-0.41.0-pyhc90fa1f_0.conda",
+  "license": "BSD-3-Clause",
+  "md5": "10d80692c8c9c05b7d4b0a1531208ad7",
+  "name": "uvicorn",
+  "noarch": "python",
+  "package_type": "noarch_python",
+  "sha256": "199731b8a86d18d89a9236225cf3e618aef467f628bc6f6bb2875a28f24f3dd4",
+  "size": 54913,
+  "subdir": "noarch",
+  "timestamp": 1771328143000,
+  "url": "https://mirrors.tuna.tsinghua.edu.cn/anaconda/cloud/conda-forge/noarch/uvicorn-0.41.0-pyhc90fa1f_0.conda",
+  "version": "0.41.0"
+}

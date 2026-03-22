@@ -1,0 +1,37 @@
+{
+  "paths": [
+    {
+      "_path": "include/yaml.h",
+      "path_type": "hardlink",
+      "sha256": "de39c9fc2b2c8584775e6d0dc0f13c8e778ceba47d419cff9d85465ca35d6954",
+      "size_in_bytes": 54439
+    },
+    {
+      "_path": "lib/libyaml-0.2.dylib",
+      "path_type": "hardlink",
+      "sha256": "bd35850ed8775cb164780d4b74ac8c8e79e02485704f9e246d418a2ec89a8e2a",
+      "size_in_bytes": 140640
+    },
+    {
+      "_path": "lib/libyaml.a",
+      "path_type": "hardlink",
+      "sha256": "d0ea64ff768d0cb855f08b551fb82d0facd19543a3ada6168d05e2c0bb225d14",
+      "size_in_bytes": 141552
+    },
+    {
+      "_path": "lib/libyaml.dylib",
+      "path_type": "softlink",
+      "sha256": "bd35850ed8775cb164780d4b74ac8c8e79e02485704f9e246d418a2ec89a8e2a",
+      "size_in_bytes": 17
+    },
+    {
+      "_path": "lib/pkgconfig/yaml-0.1.pc",
+      "path_type": "hardlink",
+      "file_mode": "text",
+      "prefix_placeholder": "/Users/runner/miniforge3/conda-bld/bld/rattler-build_yaml_1753484079/host_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeho",
+      "sha256": "a7b26310d099c8e4e636c3cc6cc3c34f7d6c7328b74c7dadc120ad4a4df3de32",
+      "size_in_bytes": 463
+    }
+  ],
+  "paths_version": 1
+}

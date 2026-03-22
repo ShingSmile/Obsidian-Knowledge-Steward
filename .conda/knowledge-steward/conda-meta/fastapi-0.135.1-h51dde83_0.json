@@ -1,0 +1,41 @@
+{
+  "build": "h51dde83_0",
+  "build_number": 0,
+  "channel": "https://mirrors.tuna.tsinghua.edu.cn/anaconda/cloud/conda-forge/noarch",
+  "constrains": [],
+  "depends": [
+    "fastapi-core ==0.135.1 pyhcf101f3_0",
+    "email_validator",
+    "fastapi-cli",
+    "httpx",
+    "jinja2",
+    "pydantic-settings",
+    "pydantic-extra-types",
+    "python-multipart",
+    "uvicorn-standard"
+  ],
+  "extracted_package_dir": "/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/.conda/pkgs/fastapi-0.135.1-h51dde83_0",
+  "files": [],
+  "fn": "fastapi-0.135.1-h51dde83_0.conda",
+  "license": "MIT",
+  "link": {
+    "source": "/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/.conda/pkgs/fastapi-0.135.1-h51dde83_0",
+    "type": 1
+  },
+  "md5": "3c9b30ad953b11e9c485e67942d0f429",
+  "name": "fastapi",
+  "noarch": "generic",
+  "package_tarball_full_path": "/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/.conda/pkgs/fastapi-0.135.1-h51dde83_0.conda",
+  "package_type": "noarch_generic",
+  "paths_data": {
+    "paths": [],
+    "paths_version": 1
+  },
+  "requested_spec": "fastapi",
+  "sha256": "9a78ea02ba7d35172bb8be9595bbbc302812510bc2975b37cb9689b6258ea99c",
+  "size": 4819,
+  "subdir": "noarch",
+  "timestamp": 1772408030000,
+  "url": "https://mirrors.tuna.tsinghua.edu.cn/anaconda/cloud/conda-forge/noarch/fastapi-0.135.1-h51dde83_0.conda",
+  "version": "0.135.1"
+}

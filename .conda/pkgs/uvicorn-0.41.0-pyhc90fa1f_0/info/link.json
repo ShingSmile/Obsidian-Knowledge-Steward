@@ -1,0 +1,9 @@
+{
+  "noarch": {
+    "type": "python",
+    "entry_points": [
+      "uvicorn = uvicorn.main:main"
+    ]
+  },
+  "package_metadata_version": 1
+}

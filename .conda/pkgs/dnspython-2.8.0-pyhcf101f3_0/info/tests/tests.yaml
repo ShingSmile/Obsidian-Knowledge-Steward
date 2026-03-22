@@ -1,0 +1,8 @@
+- python:
+    imports:
+    - dns
+    - dns.rdtypes
+    - dns.rdtypes.ANY
+    - dns.rdtypes.IN
+    - dns.rdtypes.CH
+    python_version: 3.10.*

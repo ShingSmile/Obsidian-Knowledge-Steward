@@ -1,0 +1,24 @@
+{
+  "build": "pyhd8ed1ab_0",
+  "build_number": 0,
+  "channel": "https://mirrors.tuna.tsinghua.edu.cn/anaconda/cloud/conda-forge/noarch",
+  "constrains": [],
+  "depends": [
+    "pydantic >=2.7.0",
+    "python >=3.10",
+    "python-dotenv >=0.21.0",
+    "typing-inspection >=0.4.0"
+  ],
+  "fn": "pydantic-settings-2.13.1-pyhd8ed1ab_0.conda",
+  "license": "MIT",
+  "md5": "cc0da73801948100ae97383b8da12993",
+  "name": "pydantic-settings",
+  "noarch": "python",
+  "package_type": "noarch_python",
+  "sha256": "343988d65c08477a87268d4fbeba59d0295514143965d2755ac4519b73155479",
+  "size": 49319,
+  "subdir": "noarch",
+  "timestamp": 1771527313000,
+  "url": "https://mirrors.tuna.tsinghua.edu.cn/anaconda/cloud/conda-forge/noarch/pydantic-settings-2.13.1-pyhd8ed1ab_0.conda",
+  "version": "2.13.1"
+}

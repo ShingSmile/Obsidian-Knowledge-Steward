@@ -1,0 +1,19 @@
+{
+  "build": "pyhcf101f3_1",
+  "build_number": 1,
+  "depends": [
+    "typing-inspection >=0.4.2",
+    "typing_extensions >=4.14.1",
+    "python >=3.10",
+    "typing-extensions >=4.6.1",
+    "annotated-types >=0.6.0",
+    "pydantic-core ==2.41.5",
+    "python"
+  ],
+  "license": "MIT",
+  "name": "pydantic",
+  "noarch": "python",
+  "subdir": "noarch",
+  "timestamp": 1764434463101,
+  "version": "2.12.5"
+}

@@ -1,0 +1,13 @@
+{
+  "channels": [
+    "https://conda.anaconda.org/conda-forge/"
+  ],
+  "extra": {
+    "flow_run_id": "azure_20251111.2.1",
+    "remote_url": "https://github.com/conda-forge/annotated-doc-feedstock",
+    "sha": "b11c950353b75742b418d0e5e1c7f734da23674c"
+  },
+  "home": "https://github.com/fastapi/annotated-doc",
+  "license": "MIT",
+  "summary": "Document parameters, class attributes, return types, and variables inline, with Annotated."
+}

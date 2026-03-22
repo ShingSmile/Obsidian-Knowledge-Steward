@@ -1,0 +1,22 @@
+{
+  "build": "pyhcf101f3_0",
+  "build_number": 0,
+  "channel": "https://mirrors.tuna.tsinghua.edu.cn/anaconda/cloud/conda-forge/noarch",
+  "constrains": [],
+  "depends": [
+    "python >=3.10",
+    "python"
+  ],
+  "fn": "annotated-doc-0.0.4-pyhcf101f3_0.conda",
+  "license": "MIT",
+  "md5": "52be5139047efadaeeb19c6a5103f92a",
+  "name": "annotated-doc",
+  "noarch": "python",
+  "package_type": "noarch_python",
+  "sha256": "cc9fbc50d4ee7ee04e49ee119243e6f1765750f0fd0b4d270d5ef35461b643b1",
+  "size": 14222,
+  "subdir": "noarch",
+  "timestamp": 1762868213000,
+  "url": "https://mirrors.tuna.tsinghua.edu.cn/anaconda/cloud/conda-forge/noarch/annotated-doc-0.0.4-pyhcf101f3_0.conda",
+  "version": "0.0.4"
+}

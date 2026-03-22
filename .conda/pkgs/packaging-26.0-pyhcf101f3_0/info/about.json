@@ -1,0 +1,15 @@
+{
+  "channels": [
+    "https://conda.anaconda.org/conda-forge/"
+  ],
+  "dev_url": "https://github.com/pypa/packaging",
+  "doc_url": "https://packaging.pypa.io/",
+  "extra": {
+    "flow_run_id": "azure_20260122.2.1",
+    "remote_url": "https://github.com/conda-forge/packaging-feedstock",
+    "sha": "7e94dcdd2d3a1b235f9d34158afadb22322589aa"
+  },
+  "home": "https://github.com/pypa/packaging",
+  "license": "Apache-2.0",
+  "summary": "Core utilities for Python packages"
+}

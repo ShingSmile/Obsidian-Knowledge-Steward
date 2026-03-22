@@ -1,0 +1,28 @@
+{
+  "build": "pyhcf101f3_0",
+  "build_number": 0,
+  "channel": "https://mirrors.tuna.tsinghua.edu.cn/anaconda/cloud/conda-forge/noarch",
+  "constrains": [
+    "trio >=0.32.0",
+    "uvloop >=0.21"
+  ],
+  "depends": [
+    "exceptiongroup >=1.0.2",
+    "idna >=2.8",
+    "python >=3.10",
+    "typing_extensions >=4.5",
+    "python"
+  ],
+  "fn": "anyio-4.12.1-pyhcf101f3_0.conda",
+  "license": "MIT",
+  "md5": "11a2b8c732d215d977998ccd69a9d5e8",
+  "name": "anyio",
+  "noarch": "python",
+  "package_type": "noarch_python",
+  "sha256": "eb0c4e2b24f1fbefaf96ce6c992c6bd64340bc3c06add4d7415ab69222b201da",
+  "size": 145175,
+  "subdir": "noarch",
+  "timestamp": 1767719033000,
+  "url": "https://mirrors.tuna.tsinghua.edu.cn/anaconda/cloud/conda-forge/noarch/anyio-4.12.1-pyhcf101f3_0.conda",
+  "version": "4.12.1"
+}
