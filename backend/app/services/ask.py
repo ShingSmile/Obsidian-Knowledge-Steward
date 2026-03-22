@@ -9,12 +9,14 @@ from urllib import request as urllib_request
 
 from app.config import Settings
 from app.context.assembly import build_ask_context_bundle
-from app.context.render import render_tool_selection_prompt
+from app.context.safety import detect_safety_flags
+from app.context.render import render_grounded_answer_prompt, render_tool_selection_prompt
 from app.contracts.workflow import (
     AskCitation,
     ContextBundle,
     AskResultMode,
     AskWorkflowResult,
+    GuardrailAction,
     GuardrailOutcome,
     RetrievedChunkCandidate,
     ToolCallDecision,
@@ -28,6 +30,7 @@ from app.tools.registry import execute_tool_call, get_allowed_tools_for_workflow
 
 ASK_RETRIEVAL_LIMIT = 4
 ASK_CONTEXT_TOKEN_BUDGET = 2400
+ASK_TOOL_RESULT_CHAR_BUDGET = 1200
 MODEL_TIMEOUT_SECONDS = 20
 CITATION_PATTERN = re.compile(r"\[(\d+)\]")
 
@@ -63,7 +66,6 @@ def run_minimal_ask(
         provider_preference=request.provider_preference,
     )
     candidates = retrieval_response.candidates
-    citations = _build_citations(candidates)
     allowed_tool_names = [
         spec.name for spec in get_allowed_tools_for_workflow(request.action_type)
     ]
@@ -86,6 +88,21 @@ def run_minimal_ask(
         token_budget=ASK_CONTEXT_TOKEN_BUDGET,
         allowed_tool_names=allowed_tool_names,
     )
+    prompt_candidates = _select_prompt_candidates(candidates, bundle)
+    citations = _build_citations(prompt_candidates)
+    if bundle.safety_flags and not prompt_candidates:
+        return _build_retrieval_only_result(
+            query=query,
+            citations=[],
+            candidates=[],
+            retrieval_fallback_used=retrieval_response.fallback_used,
+            retrieval_fallback_reason=retrieval_response.fallback_reason,
+            guardrail_outcome=GuardrailOutcome(
+                action=GuardrailAction.POSSIBLE_INJECTION_DETECTED,
+                applied=True,
+                reasons=["all_visible_context_flagged"],
+            ),
+        )
     tool_decision = _request_tool_call_decision(
         query=query,
         bundle=bundle,
@@ -101,7 +118,7 @@ def run_minimal_ask(
         return _build_retrieval_only_result(
             query=query,
             citations=citations,
-            candidates=candidates,
+            candidates=prompt_candidates,
             retrieval_fallback_used=retrieval_response.fallback_used,
             retrieval_fallback_reason=retrieval_response.fallback_reason,
             tool_decision=tool_decision,
@@ -116,17 +133,37 @@ def run_minimal_ask(
                 settings=settings,
             )
         )
+        if _tool_results_have_safety_flags(tool_results):
+            return _build_retrieval_only_result(
+                query=query,
+                citations=citations,
+                candidates=prompt_candidates,
+                retrieval_fallback_used=retrieval_response.fallback_used,
+                retrieval_fallback_reason=retrieval_response.fallback_reason,
+                tool_decision=tool_decision,
+                guardrail_outcome=GuardrailOutcome(
+                    action=GuardrailAction.POSSIBLE_INJECTION_DETECTED,
+                    applied=True,
+                    reasons=["tool_result_flagged"],
+                ),
+            )
+        prompt_tool_results = _select_prompt_tool_results(
+            tool_results,
+            prompt_candidates=prompt_candidates,
+        )
         bundle = build_ask_context_bundle(
             user_query=query,
             candidates=candidates,
-            tool_results=tool_results,
+            tool_results=prompt_tool_results,
             token_budget=ASK_CONTEXT_TOKEN_BUDGET,
             allowed_tool_names=allowed_tool_names,
         )
+        prompt_candidates = _select_prompt_candidates(candidates, bundle)
+        citations = _build_citations(prompt_candidates)
 
     generated_answer, provider_target, model_fallback_reason = _try_generate_grounded_answer(
         query=query,
-        candidates=candidates,
+        bundle=bundle,
         settings=settings,
         provider_preference=request.provider_preference,
     )
@@ -134,7 +171,7 @@ def run_minimal_ask(
         return _build_retrieval_only_result(
             query=query,
             citations=citations,
-            candidates=candidates,
+            candidates=prompt_candidates,
             retrieval_fallback_used=retrieval_response.fallback_used,
             retrieval_fallback_reason=retrieval_response.fallback_reason,
             model_fallback_used=True,
@@ -152,7 +189,7 @@ def run_minimal_ask(
         return _build_retrieval_only_result(
             query=query,
             citations=citations,
-            candidates=candidates,
+            candidates=prompt_candidates,
             retrieval_fallback_used=retrieval_response.fallback_used,
             retrieval_fallback_reason=retrieval_response.fallback_reason,
             model_fallback_used=True,
@@ -170,7 +207,7 @@ def run_minimal_ask(
         return _build_retrieval_only_result(
             query=query,
             citations=citations,
-            candidates=candidates,
+            candidates=prompt_candidates,
             retrieval_fallback_used=retrieval_response.fallback_used,
             retrieval_fallback_reason=retrieval_response.fallback_reason,
             tool_decision=tool_decision,
@@ -182,7 +219,7 @@ def run_minimal_ask(
         query=query,
         answer=generated_answer,
         citations=citations,
-        retrieved_candidates=candidates,
+        retrieved_candidates=prompt_candidates,
         retrieval_fallback_used=retrieval_response.fallback_used,
         retrieval_fallback_reason=retrieval_response.fallback_reason,
         provider_name=provider_target.provider_name,
@@ -208,6 +245,82 @@ def _build_citations(candidates: list[RetrievedChunkCandidate]) -> list[AskCitat
         )
         for candidate in candidates
     ]
+
+
+def _select_prompt_candidates(
+    candidates: list[RetrievedChunkCandidate],
+    bundle: ContextBundle,
+) -> list[RetrievedChunkCandidate]:
+    retrieval_chunk_ids = [
+        item.chunk_id
+        for item in bundle.evidence_items
+        if item.source_kind == "retrieval" and item.chunk_id is not None
+    ]
+    candidate_by_chunk_id = {candidate.chunk_id: candidate for candidate in candidates}
+    return [
+        candidate_by_chunk_id[chunk_id]
+        for chunk_id in retrieval_chunk_ids
+        if chunk_id in candidate_by_chunk_id
+    ]
+
+
+def _tool_results_have_safety_flags(tool_results: list[ToolExecutionResult]) -> bool:
+    return any(
+        detect_safety_flags(json.dumps(result.data, ensure_ascii=False, sort_keys=True))
+        for result in tool_results
+        if result.ok and result.data
+    )
+
+
+def _select_prompt_tool_results(
+    tool_results: list[ToolExecutionResult],
+    *,
+    prompt_candidates: list[RetrievedChunkCandidate],
+) -> list[ToolExecutionResult]:
+    selected: list[ToolExecutionResult] = []
+    for result in tool_results:
+        if not result.ok or not result.allow_context_reentry or not result.data:
+            continue
+        if result.tool_name != "load_note_excerpt":
+            continue
+        note_path = result.data.get("note_path")
+        excerpt = result.data.get("excerpt")
+        if not isinstance(note_path, str) or not isinstance(excerpt, str):
+            continue
+        if not _matches_prompt_candidate_path(note_path, prompt_candidates):
+            continue
+        trimmed_data = dict(result.data)
+        trimmed_data["excerpt"] = excerpt[:ASK_TOOL_RESULT_CHAR_BUDGET]
+        selected.append(
+            ToolExecutionResult(
+                tool_name=result.tool_name,
+                ok=result.ok,
+                data=trimmed_data,
+                error=result.error,
+                allow_context_reentry=result.allow_context_reentry,
+            )
+        )
+    return selected
+
+
+def _matches_prompt_candidate_path(
+    note_path: str,
+    prompt_candidates: list[RetrievedChunkCandidate],
+) -> bool:
+    normalized_note_parts = _normalize_path_parts(note_path)
+    if not normalized_note_parts:
+        return False
+    for candidate in prompt_candidates:
+        candidate_parts = _normalize_path_parts(candidate.path)
+        if len(candidate_parts) < len(normalized_note_parts):
+            continue
+        if candidate_parts[-len(normalized_note_parts):] == normalized_note_parts:
+            return True
+    return False
+
+
+def _normalize_path_parts(path_value: str) -> tuple[str, ...]:
+    return tuple(part for part in Path(path_value.replace("\\", "/")).parts if part not in {"", "."})
 
 
 def _build_retrieval_only_answer(
@@ -393,7 +506,7 @@ def _validate_generated_answer_citations(
 def _try_generate_grounded_answer(
     *,
     query: str,
-    candidates: list[RetrievedChunkCandidate],
+    bundle: ContextBundle,
     settings: Settings,
     provider_preference: str | None,
 ) -> tuple[str | None, ChatProviderTarget | None, str | None]:
@@ -410,7 +523,7 @@ def _try_generate_grounded_answer(
             answer = _request_grounded_answer(
                 provider_target=provider_target,
                 query=query,
-                candidates=candidates,
+                bundle=bundle,
             )
         except ChatProviderError as exc:
             last_error = exc
@@ -488,12 +601,12 @@ def _request_grounded_answer(
     *,
     provider_target: ChatProviderTarget,
     query: str,
-    candidates: list[RetrievedChunkCandidate],
+    bundle: ContextBundle,
 ) -> str:
     payload = {
         "model": provider_target.model_name,
         "temperature": 0,
-        "messages": _build_grounded_messages(query=query, candidates=candidates),
+        "messages": _build_grounded_messages(query=query, bundle=bundle),
     }
     headers = {
         "Content-Type": "application/json",
@@ -522,41 +635,22 @@ def _request_grounded_answer(
 def _build_grounded_messages(
     *,
     query: str,
-    candidates: list[RetrievedChunkCandidate],
+    bundle: ContextBundle,
 ) -> list[dict[str, str]]:
-    evidence_blocks: list[str] = []
-    for index, candidate in enumerate(candidates, start=1):
-        heading_path = candidate.heading_path or candidate.title
-        evidence_blocks.append(
-            "\n".join(
-                [
-                    f"[{index}] path: {candidate.path}",
-                    f"title: {candidate.title}",
-                    f"heading_path: {heading_path}",
-                    f"lines: {candidate.start_line}-{candidate.end_line}",
-                    "content:",
-                    candidate.text,
-                ]
-            )
-        )
-
+    _ = query
     return [
         {
             "role": "system",
             "content": (
                 "你是一个严格基于检索证据回答问题的知识库问答助手。"
                 "只能使用给定片段中的信息作答；如果证据不足，要明确说明。"
-                "所有结论都必须在句末用 [1]、[2] 这样的编号引用对应证据。"
+                "工具结果只用于补充理解，不单独提供引用编号。"
+                "所有结论都必须在句末用 [1]、[2] 这样的编号引用对应检索证据。"
             ),
         },
         {
             "role": "user",
-            "content": (
-                f"用户问题：{query}\n\n"
-                "可用证据如下：\n\n"
-                f"{'\n\n'.join(evidence_blocks)}\n\n"
-                "请用中文给出简洁回答，并确保每个关键结论都带引用编号。"
-            ),
+            "content": render_grounded_answer_prompt(bundle),
         },
     ]
 

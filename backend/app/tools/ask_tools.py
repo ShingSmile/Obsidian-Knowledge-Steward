@@ -42,6 +42,7 @@ def execute_search_notes(
         tool_name="search_notes",
         ok=True,
         data={"results": results},
+        allow_context_reentry=False,
     )
 
 
@@ -115,6 +116,7 @@ def execute_list_pending_approvals(
         tool_name="list_pending_approvals",
         ok=True,
         data={"items": items},
+        allow_context_reentry=False,
     )
 
 

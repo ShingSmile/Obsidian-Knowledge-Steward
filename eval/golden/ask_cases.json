@@ -267,12 +267,9 @@
           "tool_call_attempted": false,
           "tool_call_used": null,
           "guardrail_action": "possible_injection_detected",
-          "min_citation_count": 1,
-          "min_retrieved_candidate_count": 1,
-          "answer_contains": [
-            "当前未使用模型生成答案",
-            "[1]"
-          ]
+          "min_citation_count": 0,
+          "min_retrieved_candidate_count": 0,
+          "answer_contains": "当前未使用模型生成答案"
         }
       }
     },

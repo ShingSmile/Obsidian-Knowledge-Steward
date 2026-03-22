@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterable
+import json
 
 from app.context.safety import detect_safety_flags
 from app.contracts.workflow import (
@@ -79,6 +80,9 @@ def build_ask_context_bundle(
 ) -> ContextBundle:
     deduped, deduped_removed = _dedupe_candidates(candidates)
     trimmed, trimmed_removed = _trim_candidates_to_budget(deduped, token_budget)
+    suspicious_trimmed = [
+        item for item in trimmed if detect_safety_flags(item.text)
+    ]
 
     evidence_items = [
         ContextEvidenceItem(
@@ -98,6 +102,8 @@ def build_ask_context_bundle(
         assembly_notes.append(f"deduplicated:{deduped_removed}")
     if trimmed_removed:
         assembly_notes.append(f"trimmed_for_budget:{trimmed_removed}")
+    if suspicious_trimmed:
+        assembly_notes.append(f"filtered_suspicious:{len(suspicious_trimmed)}")
 
     return ContextBundle(
         user_intent=user_query,
@@ -106,7 +112,16 @@ def build_ask_context_bundle(
         tool_results=tool_results,
         allowed_tool_names=allowed_tool_names,
         token_budget=token_budget,
-        safety_flags=_collect_flags(deduped),
+        safety_flags=_collect_text_flags(
+            [
+                *(item.text for item in suspicious_trimmed),
+                *(
+                    json.dumps(result.data, ensure_ascii=False, sort_keys=True)
+                    for result in tool_results
+                    if result.allow_context_reentry and result.ok and result.data
+                ),
+            ]
+        ),
         assembly_notes=assembly_notes,
     )
 
