@@ -2,11 +2,12 @@ from __future__ import annotations
 
 import unittest
 
-from app.context.assembly import build_ask_context_bundle
+from app.context.assembly import build_ask_context_bundle, build_ingest_context_bundle
 from app.context.render import render_tool_selection_prompt
 from app.contracts.workflow import (
     ContextBundle,
     ContextEvidenceItem,
+    ProposalEvidence,
     RetrievedChunkCandidate,
     WorkflowAction,
 )
@@ -67,6 +68,47 @@ class ContextContractTests(unittest.TestCase):
 
 
 class ContextAssemblyTests(unittest.TestCase):
+    def test_build_ingest_context_bundle_orders_findings_before_related_candidates(
+        self,
+    ) -> None:
+        bundle = build_ingest_context_bundle(
+            target_note_path="Alpha.md",
+            proposal_evidence=[
+                ProposalEvidence(
+                    source_path="Alpha.md",
+                    heading_path="Alpha",
+                    chunk_id="finding-1",
+                    reason="missing_frontmatter",
+                ),
+                ProposalEvidence(
+                    source_path="Beta.md",
+                    heading_path="Beta",
+                    chunk_id="finding-2",
+                    reason="orphan_hint",
+                ),
+            ],
+            related_candidates=[
+                _make_candidate(
+                    path="Gamma.md",
+                    chunk_id="related-1",
+                    heading_path="Gamma",
+                    text="related note context",
+                    score=0.7,
+                )
+            ],
+            token_budget=400,
+        )
+        self.assertEqual(bundle.workflow_action, WorkflowAction.INGEST_STEWARD)
+        self.assertEqual(
+            [(item.source_kind, item.chunk_id) for item in bundle.evidence_items],
+            [
+                ("proposal", "finding-1"),
+                ("proposal", "finding-2"),
+                ("retrieval", "related-1"),
+            ],
+        )
+        self.assertTrue(bundle.assembly_notes)
+
     def test_build_ask_context_bundle_deduplicates_candidates_and_marks_suspicious_evidence(
         self,
     ) -> None:

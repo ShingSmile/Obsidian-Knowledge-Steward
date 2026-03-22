@@ -7,6 +7,7 @@ import re
 from typing import Sequence
 
 from app.config import Settings
+from app.context.assembly import build_ingest_context_bundle
 from app.contracts.workflow import (
     IngestAnalysisFinding,
     IngestAnalysisResult,
@@ -30,6 +31,7 @@ MAX_RELATED_CANDIDATE_COUNT = 3
 MAX_RETRIEVAL_QUERY_COUNT = 4
 RELATED_RETRIEVAL_LIMIT = 8
 SEARCHABLE_TERM_RE = re.compile(r"[0-9A-Za-z_\u4e00-\u9fff]+")
+INGEST_CONTEXT_TOKEN_BUDGET = 1200
 
 
 @dataclass(frozen=True)
@@ -198,6 +200,18 @@ def build_scoped_ingest_approval_proposal(
             "analysis_finding_types": [finding.finding_type for finding in findings],
         }
     )
+    proposal_evidence = _build_proposal_evidence(findings=findings)
+    context_bundle = build_ingest_context_bundle(
+        target_note_path=str(target_note_path),
+        proposal_evidence=proposal_evidence,
+        related_candidates=related_candidates,
+        token_budget=INGEST_CONTEXT_TOKEN_BUDGET,
+    )
+    note_meta["context_bundle_summary"] = {
+        "evidence_count": len(context_bundle.evidence_items),
+        "safety_flags": context_bundle.safety_flags,
+        "assembly_notes": context_bundle.assembly_notes,
+    }
 
     if not findings:
         skip_reason = "no_governance_issues_detected"
@@ -237,7 +251,7 @@ def build_scoped_ingest_approval_proposal(
             related_candidates=related_candidates,
         ),
         risk_level=_select_risk_level(findings=findings),
-        evidence=_build_proposal_evidence(findings=findings),
+        evidence=proposal_evidence,
         patch_ops=[
             PatchOp(
                 op="merge_frontmatter",

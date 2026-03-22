@@ -18,9 +18,44 @@ from app.indexing.store import connect_sqlite, load_proposal
 from app.main import invoke_workflow, list_pending_approvals_endpoint
 from app.observability.runtime_trace import query_run_trace_events_in_db
 from app.retrieval.embeddings import EmbeddingBatchResult
+from app.services.ingest_proposal import build_scoped_ingest_approval_proposal
 
 
 class IngestWorkflowTests(unittest.TestCase):
+    def test_scoped_ingest_proposal_records_context_bundle_summary(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_root = Path(temp_dir)
+            vault_path = self._build_vault_fixture(temp_root)
+            db_path = temp_root / "knowledge_steward.sqlite3"
+            trace_path = temp_root / "traces" / "runtime.jsonl"
+            settings = replace(
+                get_settings(),
+                sample_vault_dir=vault_path,
+                index_db_path=db_path,
+                ask_runtime_trace_path=trace_path,
+            )
+
+            with patch("app.main.settings", settings):
+                invoke_workflow(
+                    WorkflowInvokeRequest(
+                        thread_id="thread_ingest_summary_prewarm",
+                        action_type=WorkflowAction.INGEST_STEWARD,
+                    ),
+                    Response(),
+                )
+
+            build_result = build_scoped_ingest_approval_proposal(
+                thread_id="thread_ingest_summary",
+                note_paths=[str(vault_path / "Alpha.md")],
+                db_path=db_path,
+                settings=settings,
+            )
+            self.assertIsNotNone(build_result.proposal)
+            self.assertIn("context_bundle_summary", build_result.note_meta)
+            bundle_summary = build_result.note_meta["context_bundle_summary"]
+            self.assertIsInstance(bundle_summary, dict)
+            self.assertGreaterEqual(bundle_summary.get("evidence_count", 0), 1)
+
     def test_invoke_ingest_graph_returns_stats_and_trace_events(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_root = Path(temp_dir)

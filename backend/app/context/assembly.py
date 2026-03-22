@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+from collections.abc import Iterable
+
 from app.context.safety import detect_safety_flags
 from app.contracts.workflow import (
     ContextBundle,
     ContextEvidenceItem,
+    ProposalEvidence,
     RetrievedChunkCandidate,
     ToolExecutionResult,
     WorkflowAction,
@@ -50,10 +53,14 @@ def _trim_candidates_to_budget(
 
 
 def _collect_flags(candidates: list[RetrievedChunkCandidate]) -> list[str]:
+    return _collect_text_flags(candidate.text for candidate in candidates)
+
+
+def _collect_text_flags(texts: Iterable[str]) -> list[str]:
     flags: list[str] = []
     seen: set[str] = set()
-    for candidate in candidates:
-        for flag in detect_safety_flags(candidate.text):
+    for text in texts:
+        for flag in detect_safety_flags(text):
             if flag in seen:
                 continue
             seen.add(flag)
@@ -99,5 +106,68 @@ def build_ask_context_bundle(
         allowed_tool_names=allowed_tool_names,
         token_budget=token_budget,
         safety_flags=_collect_flags(deduped),
+        assembly_notes=assembly_notes,
+    )
+
+
+def build_ingest_context_bundle(
+    *,
+    target_note_path: str,
+    proposal_evidence: list[ProposalEvidence],
+    related_candidates: list[RetrievedChunkCandidate],
+    token_budget: int,
+) -> ContextBundle:
+    proposal_items = [
+        ContextEvidenceItem(
+            source_path=evidence.source_path,
+            chunk_id=evidence.chunk_id,
+            heading_path=evidence.heading_path,
+            text=evidence.reason,
+            score=None,
+            source_kind="proposal",
+        )
+        for evidence in proposal_evidence
+    ]
+
+    deduped_related, deduped_removed = _dedupe_candidates(related_candidates)
+    trimmed_related, trimmed_removed = _trim_candidates_to_budget(
+        deduped_related,
+        token_budget,
+    )
+    retrieval_items = [
+        ContextEvidenceItem(
+            source_path=item.path,
+            chunk_id=item.chunk_id,
+            heading_path=item.heading_path,
+            text=item.text,
+            score=item.score,
+            source_kind="retrieval",
+        )
+        for item in trimmed_related
+    ]
+
+    assembly_notes = [
+        "ordered:proposal_then_related",
+        f"proposal_evidence:{len(proposal_items)}",
+        f"related_candidates:{len(trimmed_related)}",
+    ]
+    if deduped_removed:
+        assembly_notes.append(f"deduplicated:{deduped_removed}")
+    if trimmed_removed:
+        assembly_notes.append(f"trimmed_for_budget:{trimmed_removed}")
+
+    return ContextBundle(
+        user_intent=f"Review governance signals for {target_note_path}",
+        workflow_action=WorkflowAction.INGEST_STEWARD,
+        evidence_items=[*proposal_items, *retrieval_items],
+        tool_results=[],
+        allowed_tool_names=[],
+        token_budget=token_budget,
+        safety_flags=_collect_text_flags(
+            [
+                *(item.reason for item in proposal_evidence),
+                *(candidate.text for candidate in deduped_related),
+            ]
+        ),
         assembly_notes=assembly_notes,
     )
