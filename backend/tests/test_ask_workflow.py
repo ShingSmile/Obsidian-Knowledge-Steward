@@ -521,6 +521,38 @@ class AskWorkflowTests(unittest.TestCase):
                 )
             )
 
+    def test_invoke_ask_graph_emits_tool_and_guardrail_trace_fields(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            db_path = self._build_index_fixture(Path(temp_dir))
+            settings = replace(
+                get_settings(),
+                index_db_path=db_path,
+                cloud_base_url="",
+                cloud_chat_model="",
+                local_chat_model="",
+            )
+
+            execution = invoke_ask_graph(
+                WorkflowInvokeRequest(
+                    thread_id="thread_trace_metadata",
+                    action_type=WorkflowAction.ASK_QA,
+                    user_query="Roadmap",
+                ),
+                settings=settings,
+                thread_id="thread_trace_metadata",
+                run_id="run_trace_metadata",
+            )
+
+            execute_event = next(
+                event
+                for event in execution.trace_events
+                if event["node_name"] == "execute_ask"
+            )
+            details = execute_event["details"]
+            self.assertIn("tool_call_attempted", details)
+            self.assertIn("tool_call_used", details)
+            self.assertIn("guardrail_action", details)
+
     def test_invoke_workflow_persists_run_trace_rows_and_supports_query(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             db_path = self._build_index_fixture(Path(temp_dir))

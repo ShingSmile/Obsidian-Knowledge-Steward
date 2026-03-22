@@ -196,6 +196,13 @@ def _execute_ask_node(
             "candidate_count": len(ask_result.retrieved_candidates),
             "retrieval_fallback_used": ask_result.retrieval_fallback_used,
             "model_fallback_used": ask_result.model_fallback_used,
+            "tool_call_attempted": ask_result.tool_call_attempted,
+            "tool_call_used": ask_result.tool_call_used or "",
+            "guardrail_action": (
+                ask_result.guardrail_action.value
+                if ask_result.guardrail_action
+                else ""
+            ),
         },
         trace_hook=trace_hook,
     )
