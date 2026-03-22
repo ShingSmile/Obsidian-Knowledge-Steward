@@ -129,6 +129,32 @@ class ContextAssemblyTests(unittest.TestCase):
         self.assertIn("[1] Alpha.md", rendered)
         self.assertIn("search_notes", rendered)
 
+    def test_build_ask_context_bundle_drops_oversized_first_candidate(self) -> None:
+        candidates = [
+            _make_candidate(
+                path="Large.md",
+                chunk_id="c1",
+                heading_path="Large",
+                text="X" * 100,
+                score=0.9,
+            ),
+            _make_candidate(
+                path="Small.md",
+                chunk_id="c2",
+                heading_path="Small",
+                text="short",
+                score=0.8,
+            ),
+        ]
+        bundle = build_ask_context_bundle(
+            user_query="Find concise mention",
+            candidates=candidates,
+            tool_results=[],
+            token_budget=40,
+            allowed_tool_names=["search_notes"],
+        )
+        self.assertEqual([item.chunk_id for item in bundle.evidence_items], ["c2"])
+
 
 if __name__ == "__main__":
     unittest.main()

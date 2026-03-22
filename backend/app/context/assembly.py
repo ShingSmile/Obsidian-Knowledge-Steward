@@ -41,7 +41,7 @@ def _trim_candidates_to_budget(
     dropped = 0
     for candidate in candidates:
         candidate_chars = _estimate_candidate_chars(candidate)
-        if kept and consumed + candidate_chars > token_budget:
+        if consumed + candidate_chars > token_budget:
             dropped += 1
             continue
         kept.append(candidate)
@@ -101,4 +101,3 @@ def build_ask_context_bundle(
         safety_flags=_collect_flags(deduped),
         assembly_notes=assembly_notes,
     )
-
