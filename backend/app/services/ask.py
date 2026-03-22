@@ -8,17 +8,26 @@ from urllib import error as urllib_error
 from urllib import request as urllib_request
 
 from app.config import Settings
+from app.context.assembly import build_ask_context_bundle
+from app.context.render import render_tool_selection_prompt
 from app.contracts.workflow import (
     AskCitation,
+    ContextBundle,
     AskResultMode,
     AskWorkflowResult,
+    GuardrailOutcome,
     RetrievedChunkCandidate,
+    ToolCallDecision,
+    ToolExecutionResult,
     WorkflowInvokeRequest,
 )
+from app.guardrails.ask import evaluate_final_ask_response, evaluate_tool_call_outcome
 from app.retrieval.hybrid import search_hybrid_chunks_in_db
+from app.tools.registry import execute_tool_call, get_allowed_tools_for_workflow
 
 
 ASK_RETRIEVAL_LIMIT = 4
+ASK_CONTEXT_TOKEN_BUDGET = 2400
 MODEL_TIMEOUT_SECONDS = 20
 CITATION_PATTERN = re.compile(r"\[(\d+)\]")
 
@@ -55,6 +64,9 @@ def run_minimal_ask(
     )
     candidates = retrieval_response.candidates
     citations = _build_citations(candidates)
+    allowed_tool_names = [
+        spec.name for spec in get_allowed_tools_for_workflow(request.action_type)
+    ]
 
     if not candidates:
         return AskWorkflowResult(
@@ -67,62 +79,117 @@ def run_minimal_ask(
             retrieval_fallback_reason=retrieval_response.fallback_reason,
         )
 
+    bundle = build_ask_context_bundle(
+        user_query=query,
+        candidates=candidates,
+        tool_results=[],
+        token_budget=ASK_CONTEXT_TOKEN_BUDGET,
+        allowed_tool_names=allowed_tool_names,
+    )
+    tool_decision = _request_tool_call_decision(
+        query=query,
+        bundle=bundle,
+        settings=settings,
+        provider_preference=request.provider_preference,
+    )
+    tool_guardrail = evaluate_tool_call_outcome(
+        tool_decision,
+        workflow_action=request.action_type,
+    )
+    tool_results: list[ToolExecutionResult] = []
+    if tool_guardrail.applied:
+        return _build_retrieval_only_result(
+            query=query,
+            citations=citations,
+            candidates=candidates,
+            retrieval_fallback_used=retrieval_response.fallback_used,
+            retrieval_fallback_reason=retrieval_response.fallback_reason,
+            tool_decision=tool_decision,
+            guardrail_outcome=tool_guardrail,
+        )
+
+    if tool_decision.requested:
+        tool_results.append(
+            execute_tool_call(
+                tool_decision,
+                workflow_action=request.action_type,
+                settings=settings,
+            )
+        )
+        bundle = build_ask_context_bundle(
+            user_query=query,
+            candidates=candidates,
+            tool_results=tool_results,
+            token_budget=ASK_CONTEXT_TOKEN_BUDGET,
+            allowed_tool_names=allowed_tool_names,
+        )
+
     generated_answer, provider_target, model_fallback_reason = _try_generate_grounded_answer(
         query=query,
         candidates=candidates,
         settings=settings,
         provider_preference=request.provider_preference,
     )
-    if generated_answer is not None and provider_target is not None:
-        citation_alignment_error = _validate_generated_answer_citations(
-            answer=generated_answer,
-            candidate_count=len(citations),
-        )
-        # 这里在 service 层做程序级编号校验，是为了把“模型返回了文本、但引用已经缺失或漂移”
-        # 的 bad case 截停在响应落地之前。当前任务只做编号对齐，不假装已经完成语义级 groundedness。
-        if citation_alignment_error is None:
-            return AskWorkflowResult(
-                mode=AskResultMode.GENERATED_ANSWER,
-                query=query,
-                answer=generated_answer,
-                citations=citations,
-                retrieved_candidates=candidates,
-                retrieval_fallback_used=retrieval_response.fallback_used,
-                retrieval_fallback_reason=retrieval_response.fallback_reason,
-                provider_name=provider_target.provider_name,
-                model_name=provider_target.model_name,
-            )
-
-        return AskWorkflowResult(
-            mode=AskResultMode.RETRIEVAL_ONLY,
+    if generated_answer is None or provider_target is None:
+        return _build_retrieval_only_result(
             query=query,
-            answer=_build_retrieval_only_answer(
-                query=query,
-                citations=citations,
-                retrieval_fallback_used=retrieval_response.fallback_used,
-            ),
             citations=citations,
-            retrieved_candidates=candidates,
+            candidates=candidates,
+            retrieval_fallback_used=retrieval_response.fallback_used,
+            retrieval_fallback_reason=retrieval_response.fallback_reason,
+            model_fallback_used=True,
+            model_fallback_reason=model_fallback_reason,
+            tool_decision=tool_decision,
+        )
+
+    citation_alignment_error = _validate_generated_answer_citations(
+        answer=generated_answer,
+        candidate_count=len(citations),
+    )
+    # 这里在 service 层做程序级编号校验，是为了把“模型返回了文本、但引用已经缺失或漂移”
+    # 的 bad case 截停在响应落地之前。当前任务只做编号对齐，不假装已经完成语义级 groundedness。
+    if citation_alignment_error is not None:
+        return _build_retrieval_only_result(
+            query=query,
+            citations=citations,
+            candidates=candidates,
             retrieval_fallback_used=retrieval_response.fallback_used,
             retrieval_fallback_reason=retrieval_response.fallback_reason,
             model_fallback_used=True,
             model_fallback_reason=citation_alignment_error,
+            tool_decision=tool_decision,
+        )
+
+    final_guardrail = evaluate_final_ask_response(
+        answer_text=generated_answer,
+        citations=citations,
+        bundle=bundle,
+        tool_results=tool_results,
+    )
+    if final_guardrail.applied:
+        return _build_retrieval_only_result(
+            query=query,
+            citations=citations,
+            candidates=candidates,
+            retrieval_fallback_used=retrieval_response.fallback_used,
+            retrieval_fallback_reason=retrieval_response.fallback_reason,
+            tool_decision=tool_decision,
+            guardrail_outcome=final_guardrail,
         )
 
     return AskWorkflowResult(
-        mode=AskResultMode.RETRIEVAL_ONLY,
+        mode=AskResultMode.GENERATED_ANSWER,
         query=query,
-        answer=_build_retrieval_only_answer(
-            query=query,
-            citations=citations,
-            retrieval_fallback_used=retrieval_response.fallback_used,
-        ),
+        answer=generated_answer,
         citations=citations,
         retrieved_candidates=candidates,
         retrieval_fallback_used=retrieval_response.fallback_used,
         retrieval_fallback_reason=retrieval_response.fallback_reason,
-        model_fallback_used=True,
-        model_fallback_reason=model_fallback_reason,
+        provider_name=provider_target.provider_name,
+        model_name=provider_target.model_name,
+        tool_call_attempted=tool_decision.requested,
+        tool_call_used=tool_decision.tool_name,
+        guardrail_action=final_guardrail.action,
     )
 
 
@@ -164,6 +231,137 @@ def _build_retrieval_only_answer(
             f"(lines {citation.start_line}-{citation.end_line}): {citation.snippet}"
         )
     return "\n".join(lines)
+
+
+def _build_retrieval_only_result(
+    *,
+    query: str,
+    citations: list[AskCitation],
+    candidates: list[RetrievedChunkCandidate],
+    retrieval_fallback_used: bool,
+    retrieval_fallback_reason: str | None,
+    model_fallback_used: bool = False,
+    model_fallback_reason: str | None = None,
+    tool_decision: ToolCallDecision | None = None,
+    guardrail_outcome: GuardrailOutcome | None = None,
+) -> AskWorkflowResult:
+    return AskWorkflowResult(
+        mode=AskResultMode.RETRIEVAL_ONLY,
+        query=query,
+        answer=_build_retrieval_only_answer(
+            query=query,
+            citations=citations,
+            retrieval_fallback_used=retrieval_fallback_used,
+        ),
+        citations=citations,
+        retrieved_candidates=candidates,
+        retrieval_fallback_used=retrieval_fallback_used,
+        retrieval_fallback_reason=retrieval_fallback_reason,
+        model_fallback_used=model_fallback_used,
+        model_fallback_reason=model_fallback_reason,
+        tool_call_attempted=tool_decision.requested if tool_decision is not None else False,
+        tool_call_used=tool_decision.tool_name if tool_decision is not None else None,
+        guardrail_action=guardrail_outcome.action if guardrail_outcome is not None else None,
+    )
+
+
+def _request_tool_call_decision(
+    *,
+    query: str,
+    bundle: ContextBundle,
+    settings: Settings,
+    provider_preference: str | None,
+) -> ToolCallDecision:
+    provider_targets = _resolve_chat_provider_targets(
+        settings=settings,
+        provider_preference=provider_preference,
+    )
+    if not provider_targets:
+        return ToolCallDecision(requested=False)
+
+    for provider_target in provider_targets:
+        try:
+            payload = {
+                "model": provider_target.model_name,
+                "temperature": 0,
+                "messages": _build_tool_selection_messages(query=query, bundle=bundle),
+            }
+            headers = {
+                "Content-Type": "application/json",
+            }
+            if provider_target.api_key:
+                headers["Authorization"] = f"Bearer {provider_target.api_key}"
+
+            request = urllib_request.Request(
+                _build_chat_completions_url(provider_target.base_url),
+                data=json.dumps(payload, ensure_ascii=False).encode("utf-8"),
+                headers=headers,
+                method="POST",
+            )
+            with urllib_request.urlopen(request, timeout=MODEL_TIMEOUT_SECONDS) as response:
+                response_payload = json.loads(response.read().decode("utf-8"))
+        except (
+            urllib_error.HTTPError,
+            urllib_error.URLError,
+            TimeoutError,
+            json.JSONDecodeError,
+            OSError,
+        ):
+            continue
+
+        raw_text = _extract_chat_completion_text(response_payload)
+        if not raw_text:
+            continue
+        return _parse_tool_call_decision(raw_text)
+
+    return ToolCallDecision(requested=False)
+
+
+def _build_tool_selection_messages(
+    *,
+    query: str,
+    bundle: ContextBundle,
+) -> list[dict[str, str]]:
+    _ = query
+    return [
+        {
+            "role": "system",
+            "content": (
+                "You decide whether exactly one read-only tool call is needed before answering. "
+                "Return strict JSON only with keys requested, tool_name, arguments, rationale. "
+                "If no tool is needed, return "
+                "{\"requested\": false, \"tool_name\": null, \"arguments\": {}, \"rationale\": \"\"}."
+            ),
+        },
+        {
+            "role": "user",
+            "content": render_tool_selection_prompt(bundle),
+        },
+    ]
+
+
+def _parse_tool_call_decision(raw_text: str) -> ToolCallDecision:
+    try:
+        payload = json.loads(raw_text)
+    except json.JSONDecodeError:
+        return ToolCallDecision(requested=False)
+
+    if not isinstance(payload, dict):
+        return ToolCallDecision(requested=False)
+
+    requested = payload.get("requested")
+    if not isinstance(requested, bool) or not requested:
+        return ToolCallDecision(requested=False)
+
+    tool_name = payload.get("tool_name")
+    arguments = payload.get("arguments")
+    rationale = payload.get("rationale")
+    return ToolCallDecision(
+        requested=True,
+        tool_name=tool_name if isinstance(tool_name, str) else None,
+        arguments=arguments if isinstance(arguments, dict) else {},
+        rationale=rationale if isinstance(rationale, str) else None,
+    )
 
 
 def _validate_generated_answer_citations(

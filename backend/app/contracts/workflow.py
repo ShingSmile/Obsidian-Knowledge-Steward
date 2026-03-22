@@ -264,6 +264,9 @@ class AskWorkflowResult(BaseModel):
     model_fallback_reason: str | None = None
     provider_name: str | None = None
     model_name: str | None = None
+    tool_call_attempted: bool = False
+    tool_call_used: str | None = None
+    guardrail_action: GuardrailAction | None = None
 
 
 class IngestWorkflowResult(BaseModel):

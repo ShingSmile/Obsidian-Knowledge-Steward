@@ -12,8 +12,11 @@ from fastapi import HTTPException, Response
 from app.config import get_settings
 from app.contracts.workflow import (
     AskResultMode,
+    GuardrailAction,
     RetrievalMetadataFilter,
     RunStatus,
+    ToolCallDecision,
+    ToolExecutionResult,
     WorkflowAction,
     WorkflowInvokeRequest,
 )
@@ -78,6 +81,94 @@ class AskWorkflowTests(unittest.TestCase):
             self.assertEqual(result.model_name, "gpt-test")
             self.assertIn("[1]", result.answer)
             mocked_request.assert_called_once()
+
+    def test_run_minimal_ask_executes_registered_tool_and_reassembles_context(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            db_path = self._build_index_fixture(Path(temp_dir))
+            settings = replace(
+                get_settings(),
+                index_db_path=db_path,
+                cloud_base_url="https://example.com",
+                cloud_chat_model="gpt-test",
+                local_chat_model="",
+            )
+
+            with patch(
+                "app.services.ask._request_tool_call_decision",
+                return_value=ToolCallDecision(
+                    requested=True,
+                    tool_name="load_note_excerpt",
+                    arguments={"note_path": "Roadmap.md", "max_chars": 200},
+                    rationale="Need the note body for a precise answer.",
+                ),
+            ) as mocked_decision:
+                with patch(
+                    "app.services.ask.execute_tool_call",
+                    return_value=ToolExecutionResult(
+                        tool_name="load_note_excerpt",
+                        ok=True,
+                        data={
+                            "note_path": "Roadmap.md",
+                            "excerpt": "The roadmap details live here.",
+                            "line_count": 4,
+                        },
+                    ),
+                ) as mocked_execute:
+                    with patch(
+                        "app.services.ask._request_grounded_answer",
+                        return_value="Roadmap 已拆成检索与 ask 两段实现。[1]",
+                    ):
+                        result = run_minimal_ask(
+                            WorkflowInvokeRequest(
+                                action_type=WorkflowAction.ASK_QA,
+                                user_query="Roadmap",
+                            ),
+                            settings=settings,
+                        )
+
+            self.assertEqual(result.mode, AskResultMode.GENERATED_ANSWER)
+            self.assertFalse(result.retrieval_fallback_used)
+            self.assertTrue(result.tool_call_attempted)
+            self.assertEqual(result.tool_call_used, "load_note_excerpt")
+            mocked_decision.assert_called_once()
+            mocked_execute.assert_called_once()
+
+    def test_run_minimal_ask_ignores_invalid_tool_and_downgrades_to_retrieval_only(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            db_path = self._build_index_fixture(Path(temp_dir))
+            settings = replace(
+                get_settings(),
+                index_db_path=db_path,
+                cloud_base_url="https://example.com",
+                cloud_chat_model="gpt-test",
+                local_chat_model="",
+            )
+
+            with patch(
+                "app.services.ask._request_tool_call_decision",
+                return_value=ToolCallDecision(
+                    requested=True,
+                    tool_name="delete_note",
+                    arguments={"note_path": "Roadmap.md"},
+                    rationale="Invalid tool should be rejected.",
+                ),
+            ) as mocked_decision:
+                with patch("app.services.ask.execute_tool_call") as mocked_execute:
+                    result = run_minimal_ask(
+                        WorkflowInvokeRequest(
+                            action_type=WorkflowAction.ASK_QA,
+                            user_query="Roadmap",
+                        ),
+                        settings=settings,
+                    )
+
+            self.assertEqual(result.mode, AskResultMode.RETRIEVAL_ONLY)
+            self.assertEqual(
+                result.guardrail_action,
+                GuardrailAction.DOWNGRADE_TO_RETRIEVAL_ONLY,
+            )
+            mocked_decision.assert_called_once()
+            mocked_execute.assert_not_called()
 
     def test_run_minimal_ask_consumes_hybrid_retrieval_candidates(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
