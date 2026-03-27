@@ -9,13 +9,18 @@ import {
 
 import type { Proposal, WritebackResult } from "../contracts";
 import {
+  applyAddWikilink,
   applyInsertUnderHeading,
+  applyReplaceSection,
   computeSha256Hash,
+  extractAddWikilinkPayload,
   extractHeadingInsertPayload,
+  extractReplaceSectionPayload,
   frontmatterContainsPatch,
   isPlainRecord,
   mergeFrontmatterValue,
   normalizePatchOp,
+  normalizeWikilinkTargetPath,
   sectionContainsInsertedContent,
   type NormalizedPatchOp
 } from "./helpers";
@@ -206,9 +211,36 @@ async function executePatchPlan(
       continue;
     }
 
-    const insertPayload = extractHeadingInsertPayload(patchOp);
-    workingMarkdown = applyInsertUnderHeading(workingMarkdown, insertPayload);
-    markdownDirty = true;
+    if (patchOp.normalizedOp === "insert_under_heading") {
+      const insertPayload = extractHeadingInsertPayload(patchOp);
+      workingMarkdown = applyInsertUnderHeading(workingMarkdown, insertPayload);
+      markdownDirty = true;
+      continue;
+    }
+
+    if (patchOp.normalizedOp === "replace_section") {
+      const replacePayload = extractReplaceSectionPayload(patchOp);
+      workingMarkdown = applyReplaceSection(workingMarkdown, replacePayload);
+      markdownDirty = true;
+      continue;
+    }
+
+    if (patchOp.normalizedOp === "add_wikilink") {
+      const wikilinkPayload = extractAddWikilinkPayload(patchOp);
+      const linkedNoteFile = resolveExistingFile(
+        app,
+        wikilinkPayload.linked_note_path,
+        "Linked note"
+      );
+      workingMarkdown = applyAddWikilink(workingMarkdown, {
+        heading: wikilinkPayload.heading,
+        linked_note_path: linkedNoteFile.path
+      });
+      markdownDirty = true;
+      continue;
+    }
+
+    throw new Error(`Unsupported patch op: ${patchOp.normalizedOp}`);
   }
 
   if (markdownDirty) {
@@ -235,10 +267,34 @@ async function isProposalAlreadyApplied(
       continue;
     }
 
-    const insertPayload = extractHeadingInsertPayload(patchOp);
-    if (!sectionContainsInsertedContent(currentMarkdown, insertPayload)) {
-      return false;
+    if (patchOp.normalizedOp === "insert_under_heading") {
+      const insertPayload = extractHeadingInsertPayload(patchOp);
+      if (!sectionContainsInsertedContent(currentMarkdown, insertPayload)) {
+        return false;
+      }
+      continue;
     }
+
+    if (patchOp.normalizedOp === "replace_section") {
+      const replacePayload = extractReplaceSectionPayload(patchOp);
+      if (applyReplaceSection(currentMarkdown, replacePayload) !== currentMarkdown) {
+        return false;
+      }
+      continue;
+    }
+
+    if (patchOp.normalizedOp === "add_wikilink") {
+      const wikilinkPayload = extractAddWikilinkPayload(patchOp);
+      const normalizedTargetPath = normalizeWikilinkTargetPath(
+        resolveVaultPath(app, wikilinkPayload.linked_note_path)
+      );
+      if (!sectionContainsWikilinkTarget(currentMarkdown, wikilinkPayload.heading, normalizedTargetPath)) {
+        return false;
+      }
+      continue;
+    }
+
+    return false;
   }
 
   return true;
@@ -259,8 +315,25 @@ function validatePatchPlan(
     }
 
     try {
-      const insertPayload = extractHeadingInsertPayload(patchOp);
-      workingMarkdown = applyInsertUnderHeading(workingMarkdown, insertPayload);
+      if (patchOp.normalizedOp === "insert_under_heading") {
+        const insertPayload = extractHeadingInsertPayload(patchOp);
+        workingMarkdown = applyInsertUnderHeading(workingMarkdown, insertPayload);
+        continue;
+      }
+
+      if (patchOp.normalizedOp === "replace_section") {
+        const replacePayload = extractReplaceSectionPayload(patchOp);
+        workingMarkdown = applyReplaceSection(workingMarkdown, replacePayload);
+        continue;
+      }
+
+      if (patchOp.normalizedOp === "add_wikilink") {
+        const wikilinkPayload = extractAddWikilinkPayload(patchOp);
+        workingMarkdown = applyAddWikilink(workingMarkdown, wikilinkPayload);
+        continue;
+      }
+
+      return `Unsupported patch op: ${patchOp.normalizedOp}`;
     } catch (error) {
       return error instanceof Error ? error.message : String(error);
     }
@@ -270,10 +343,14 @@ function validatePatchPlan(
 }
 
 function resolveTargetFile(app: App, targetPath: string): TFile {
+  return resolveExistingFile(app, targetPath, "Target note");
+}
+
+function resolveExistingFile(app: App, targetPath: string, label: string): TFile {
   const vaultPath = resolveVaultPath(app, targetPath);
   const abstractFile = app.vault.getAbstractFileByPath(vaultPath);
   if (!(abstractFile instanceof TFile)) {
-    throw new Error(`Target note was not found in the current vault: ${targetPath}`);
+    throw new Error(`${label} was not found in the current vault: ${targetPath}`);
   }
   return abstractFile;
 }
@@ -368,4 +445,25 @@ function buildSuccessfulWritebackExecution(
 
 function normalizeFilesystemPath(value: string): string {
   return value.replace(/\\/g, "/");
+}
+
+function sectionContainsWikilinkTarget(
+  markdown: string,
+  heading: string,
+  normalizedTargetPath: string
+): boolean {
+  const lines = markdown.split(/\r?\n/);
+  const bounds = findHeadingSectionBounds(lines, heading);
+  if (!bounds) {
+    return false;
+  }
+
+  const sectionText = lines.slice(bounds.headingIndex + 1, bounds.sectionEnd).join("\n");
+  const wikilinkPattern = /\[\[([^\]]+)\]\]/g;
+  for (const match of sectionText.matchAll(wikilinkPattern)) {
+    if (normalizeWikilinkTargetPath(match[1]) === normalizedTargetPath) {
+      return true;
+    }
+  }
+  return false;
 }

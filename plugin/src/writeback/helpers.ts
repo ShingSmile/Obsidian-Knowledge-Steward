@@ -1,8 +1,13 @@
 import { createHash } from "crypto";
+import path from "path";
 
 import type { PatchOp } from "../contracts";
 
-export type SupportedPatchOpName = "merge_frontmatter" | "insert_under_heading";
+export type SupportedPatchOpName =
+  | "merge_frontmatter"
+  | "insert_under_heading"
+  | "replace_section"
+  | "add_wikilink";
 
 export interface NormalizedPatchOp extends PatchOp {
   normalizedOp: SupportedPatchOpName;
@@ -11,6 +16,16 @@ export interface NormalizedPatchOp extends PatchOp {
 export interface HeadingInsertPayload {
   heading: string;
   content: string;
+}
+
+export interface ReplaceSectionPayload {
+  heading: string;
+  content: string;
+}
+
+export interface AddWikilinkPayload {
+  heading: string;
+  linked_note_path: string;
 }
 
 export function computeSha256Hash(input: string | Uint8Array): string {
@@ -23,6 +38,12 @@ export function normalizePatchOpName(op: string): SupportedPatchOpName | null {
   }
   if (op === "insert_under_heading") {
     return "insert_under_heading";
+  }
+  if (op === "replace_section") {
+    return "replace_section";
+  }
+  if (op === "add_wikilink") {
+    return "add_wikilink";
   }
   return null;
 }
@@ -94,6 +115,102 @@ export function applyInsertUnderHeading(
     ...lines.slice(bounds.sectionEnd)
   ];
   return resultLines.join(newline);
+}
+
+export function extractReplaceSectionPayload(patchOp: PatchOp): ReplaceSectionPayload {
+  const heading = firstNonEmptyString(
+    patchOp.payload.heading,
+    patchOp.payload.heading_path
+  );
+  const content = typeof patchOp.payload.content === "string"
+    ? patchOp.payload.content
+    : null;
+
+  if (!heading) {
+    throw new Error("replace_section payload must include heading or heading_path.");
+  }
+  if (content === null || content.trim().length === 0) {
+    throw new Error("replace_section payload must include non-empty content.");
+  }
+  return {
+    heading,
+    content
+  };
+}
+
+export function applyReplaceSection(
+  markdown: string,
+  payload: ReplaceSectionPayload
+): string {
+  const newline = markdown.includes("\r\n") ? "\r\n" : "\n";
+  const lines = markdown.split(/\r?\n/);
+  const bounds = findUniqueHeadingSectionBounds(lines, payload.heading, "replace_section");
+  if (!bounds) {
+    throw new Error(`Heading not found for replace_section: ${payload.heading}`);
+  }
+
+  const replacementLines = normalizeTextBlock(payload.content).split("\n");
+  if (
+    bounds.sectionEnd < lines.length
+    && replacementLines[replacementLines.length - 1]?.trim().length !== 0
+    && lines[bounds.sectionEnd]?.trim().length !== 0
+  ) {
+    replacementLines.push("");
+  }
+
+  const resultLines = [
+    ...lines.slice(0, bounds.headingIndex + 1),
+    ...replacementLines,
+    ...lines.slice(bounds.sectionEnd)
+  ];
+  return resultLines.join(newline);
+}
+
+export function extractAddWikilinkPayload(patchOp: PatchOp): AddWikilinkPayload {
+  const heading = firstNonEmptyString(
+    patchOp.payload.heading,
+    patchOp.payload.heading_path
+  );
+  const linkedNotePath = firstNonEmptyString(
+    patchOp.payload.linked_note_path
+  );
+
+  if (!heading) {
+    throw new Error("add_wikilink payload must include heading or heading_path.");
+  }
+  if (!linkedNotePath) {
+    throw new Error("add_wikilink payload must include linked_note_path.");
+  }
+  return {
+    heading,
+    linked_note_path: linkedNotePath
+  };
+}
+
+export function applyAddWikilink(
+  markdown: string,
+  payload: AddWikilinkPayload
+): string {
+  const lines = markdown.split(/\r?\n/);
+  const bounds = findUniqueHeadingSectionBounds(lines, payload.heading, "add_wikilink");
+  if (!bounds) {
+    throw new Error(`Heading not found for add_wikilink: ${payload.heading}`);
+  }
+
+  const normalizedTargetPath = normalizeWikilinkTargetPath(payload.linked_note_path);
+  const sectionText = normalizeTextBlock(
+    lines.slice(bounds.headingIndex + 1, bounds.sectionEnd).join("\n")
+  );
+  if (sectionContainsWikilinkTarget(sectionText, normalizedTargetPath)) {
+    throw new Error(
+      `Wikilink already exists in section for add_wikilink: [[${normalizedTargetPath}]]`
+    );
+  }
+
+  return applyInsertUnderHeading(markdown, {
+    heading: payload.heading,
+    content: `[[${normalizedTargetPath}]]`
+  });
 }
 
 export function sectionContainsInsertedContent(
@@ -212,6 +329,45 @@ function findHeadingSectionBounds(
     headingIndex,
     sectionEnd
   };
+}
+
+function findUniqueHeadingSectionBounds(
+  lines: string[],
+  heading: string,
+  opName: string
+): { headingIndex: number; sectionEnd: number } | null {
+  const normalizedHeading = heading.trim();
+  let matchCount = 0;
+  for (const line of lines) {
+    if (line.trim() === normalizedHeading) {
+      matchCount += 1;
+      if (matchCount > 1) {
+        throw new Error(`Heading matched multiple sections for ${opName}: ${heading}`);
+      }
+    }
+  }
+  if (matchCount === 0) {
+    return null;
+  }
+  return findHeadingSectionBounds(lines, heading);
+}
+
+function sectionContainsWikilinkTarget(sectionText: string, normalizedTargetPath: string): boolean {
+  const wikilinkPattern = /\[\[([^\]]+)\]\]/g;
+  for (const match of sectionText.matchAll(wikilinkPattern)) {
+    if (normalizeWikilinkTargetPath(match[1]) === normalizedTargetPath) {
+      return true;
+    }
+  }
+  return false;
+}
+
+export function normalizeWikilinkTargetPath(value: string): string {
+  const withoutAlias = value.split("|", 1)[0].split("#", 1)[0].trim();
+  if (withoutAlias.length === 0) {
+    throw new Error("linked_note_path must be a non-empty note path.");
+  }
+  return path.posix.normalize(withoutAlias.replace(/\\/g, "/")).replace(/\.(md|markdown)$/i, "");
 }
 
 function normalizeTextBlock(value: string): string {

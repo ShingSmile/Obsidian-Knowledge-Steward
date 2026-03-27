@@ -10,11 +10,16 @@ import {
   normalizePatchOpName,
   sectionContainsInsertedContent
 } from "./helpers.ts";
+import * as writebackHelpers from "./helpers.ts";
+
+const helperFns = writebackHelpers as unknown as Record<string, (...args: any[]) => any>;
 
 test("normalizePatchOpName accepts canonical and legacy frontmatter op names", () => {
   assert.equal(normalizePatchOpName("merge_frontmatter"), "merge_frontmatter");
   assert.equal(normalizePatchOpName("frontmatter_merge"), "merge_frontmatter");
   assert.equal(normalizePatchOpName("insert_under_heading"), "insert_under_heading");
+  assert.equal(normalizePatchOpName("replace_section"), "replace_section");
+  assert.equal(normalizePatchOpName("add_wikilink"), "add_wikilink");
   assert.equal(normalizePatchOpName("delete_block"), null);
 });
 
@@ -107,4 +112,74 @@ test("extractHeadingInsertPayload and computeSha256Hash keep protocol-compatible
     }
   );
   assert.match(computeSha256Hash("hello"), /^sha256:[a-f0-9]{64}$/);
+});
+
+test("extractReplaceSectionPayload and applyReplaceSection rewrite only the matched heading body", () => {
+  const markdown = [
+    "# Root",
+    "",
+    "## Review",
+    "- old line",
+    "",
+    "## Next",
+    "- keep me"
+  ].join("\n");
+
+  assert.deepEqual(
+    helperFns.extractReplaceSectionPayload({
+      op: "replace_section",
+      target_path: "Root.md",
+      payload: {
+        heading: "## Review",
+        content: "- new line"
+      }
+    }),
+    {
+      heading: "## Review",
+      content: "- new line"
+    }
+  );
+
+  assert.match(
+    helperFns.applyReplaceSection(markdown, {
+      heading: "## Review",
+      content: "- new line"
+    }),
+    /## Review\n- new line\n\n## Next\n- keep me/
+  );
+});
+
+test("extractAddWikilinkPayload and applyAddWikilink append a normalized wikilink and reject duplicates", () => {
+  const markdown = ["# Root", "", "## Links", "- [[Alpha]]"].join("\n");
+
+  assert.deepEqual(
+    helperFns.extractAddWikilinkPayload({
+      op: "add_wikilink",
+      target_path: "Root.md",
+      payload: {
+        heading: "## Links",
+        linked_note_path: "Alpha.md"
+      }
+    }),
+    {
+      heading: "## Links",
+      linked_note_path: "Alpha.md"
+    }
+  );
+
+  assert.match(
+    helperFns.applyAddWikilink(["# Root", "", "## Links"].join("\n"), {
+      heading: "## Links",
+      linked_note_path: "Alpha.md"
+    }),
+    /## Links\n\[\[Alpha\]\]/
+  );
+
+  assert.throws(
+    () => helperFns.applyAddWikilink(markdown, {
+      heading: "## Links",
+      linked_note_path: "Alpha.md"
+    }),
+    /already exists/
+  );
 });
