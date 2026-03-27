@@ -9,7 +9,7 @@ from pathlib import Path
 import sqlite3
 from typing import Any
 
-from app.config import get_settings
+from app.config import Settings, get_settings
 from app.contracts.workflow import (
     ApprovalDecision,
     AuditEvent,
@@ -868,6 +868,7 @@ def save_proposal(
     thread_id: str,
     proposal: Proposal,
     approval_required: bool,
+    settings: Settings | None = None,
     run_id: str | None = None,
     idempotency_key: str | None = None,
 ) -> None:
@@ -877,6 +878,7 @@ def save_proposal(
             thread_id=thread_id,
             proposal=proposal,
             approval_required=approval_required,
+            settings=settings,
             run_id=run_id,
             idempotency_key=idempotency_key,
         )
@@ -888,15 +890,17 @@ def save_proposal_record(
     thread_id: str,
     proposal: Proposal,
     approval_required: bool,
+    settings: Settings | None = None,
     run_id: str | None = None,
     idempotency_key: str | None = None,
 ) -> None:
     if not thread_id:
         raise ValueError("thread_id must not be empty when saving a proposal.")
 
+    effective_settings = settings or get_settings()
     validate_proposal_for_persistence(
         proposal,
-        settings=get_settings(),
+        settings=effective_settings,
     )
 
     proposal_params = {

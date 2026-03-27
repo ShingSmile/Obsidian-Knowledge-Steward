@@ -90,6 +90,38 @@ class ProposalValidationTests(unittest.TestCase):
             assert row is not None
             self.assertEqual(row[0], 0)
 
+    def test_save_proposal_uses_explicit_settings_for_vault_validation(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_root = Path(temp_dir)
+            vault_path = temp_root / "vault"
+            vault_path.mkdir()
+            db_path = temp_root / "knowledge_steward.sqlite3"
+            initialize_index_db(db_path)
+            proposal = self._build_proposal(
+                target_note_path=vault_path / "Digest" / "2026-03-14.md",
+            )
+            settings = replace(get_settings(), sample_vault_dir=vault_path)
+
+            connection = connect_sqlite(db_path)
+            try:
+                save_proposal(
+                    connection,
+                    thread_id="thread_validation_settings",
+                    proposal=proposal,
+                    approval_required=True,
+                    settings=settings,
+                )
+                row = connection.execute(
+                    "SELECT COUNT(*) FROM proposal WHERE proposal_id = ?;",
+                    (proposal.proposal_id,),
+                ).fetchone()
+            finally:
+                connection.close()
+
+            self.assertIsNotNone(row)
+            assert row is not None
+            self.assertEqual(row[0], 1)
+
     def _build_proposal(
         self,
         *,

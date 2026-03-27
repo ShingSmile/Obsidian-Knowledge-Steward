@@ -328,6 +328,7 @@ def _invoke_digest_graph_with_approval(
                 thread_id=cast(str, current_state["thread_id"]),
                 proposal=proposal,
                 approval_required=True,
+                settings=settings,
                 run_id=cast(str, current_state["run_id"]),
                 idempotency_key=f"digest_waiting:{current_state['thread_id']}",
             )
