@@ -11,7 +11,15 @@ from unittest.mock import patch
 from fastapi import HTTPException, Response
 
 from app.config import get_settings
-from app.contracts.workflow import RunStatus, WorkflowAction, WorkflowInvokeRequest
+from app.contracts.workflow import (
+    PatchOp,
+    Proposal,
+    RiskLevel,
+    RunStatus,
+    SafetyChecks,
+    WorkflowAction,
+    WorkflowInvokeRequest,
+)
 from app.graphs.checkpoint import WorkflowCheckpointStatus, load_graph_checkpoint
 from app.graphs.digest_graph import invoke_digest_graph
 from app.indexing.ingest import ingest_vault
@@ -246,6 +254,84 @@ class DigestWorkflowTests(unittest.TestCase):
                 ["prepare_digest", "build_digest", "build_digest_proposal", "human_approval"],
             )
             self.assertEqual(run_trace_events[-1].event_type, "waiting")
+
+    def test_invoke_workflow_rejects_out_of_vault_digest_patch_target_before_persist(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_root = Path(temp_dir)
+            vault_path = self._build_digest_vault_fixture(temp_root)
+            db_path = temp_root / "knowledge_steward.sqlite3"
+            trace_path = temp_root / "traces" / "runtime.jsonl"
+            ingest_vault(vault_path=vault_path, db_path=db_path)
+            bad_proposal = Proposal(
+                proposal_id="prop_digest_out_of_vault_target",
+                action_type=WorkflowAction.DAILY_DIGEST,
+                target_note_path=str((vault_path / "2026-03-14.md").resolve()),
+                summary="Reject a waiting digest proposal with an out-of-vault patch target.",
+                risk_level=RiskLevel.MEDIUM,
+                patch_ops=[
+                    PatchOp(
+                        op="merge_frontmatter",
+                        target_path=str((temp_root / "outside" / "digest-note.md").resolve()),
+                        payload={"ks_pending_digest_review": True},
+                    ),
+                    PatchOp(
+                        op="insert_under_heading",
+                        target_path=str((vault_path / "2026-03-14.md").resolve()),
+                        payload={
+                            "heading": "## Knowledge Steward Digest",
+                            "content": "Digest body that should never be persisted.",
+                        },
+                    ),
+                ],
+                safety_checks=SafetyChecks(
+                    before_hash="sha256:before",
+                    max_changed_lines=12,
+                    contains_delete=False,
+                ),
+            )
+
+            with patch(
+                "app.graphs.digest_graph.build_digest_approval_proposal",
+                return_value=bad_proposal,
+            ):
+                with patch(
+                    "app.main.settings",
+                    replace(
+                        get_settings(),
+                        sample_vault_dir=vault_path,
+                        index_db_path=db_path,
+                        ask_runtime_trace_path=trace_path,
+                    ),
+                ):
+                    with self.assertRaises(HTTPException) as context:
+                        invoke_workflow(
+                            WorkflowInvokeRequest(
+                                thread_id="thread_digest_out_of_vault_target",
+                                action_type=WorkflowAction.DAILY_DIGEST,
+                                require_approval=True,
+                                metadata={"approval_mode": "proposal"},
+                            ),
+                            Response(),
+                        )
+
+            self.assertEqual(context.exception.status_code, 400)
+            self.assertIn("within the configured vault", context.exception.detail)
+
+            connection = connect_sqlite(db_path)
+            try:
+                self.assertIsNone(
+                    load_proposal(connection, proposal_id=bad_proposal.proposal_id)
+                )
+            finally:
+                connection.close()
+
+            self.assertIsNone(
+                load_graph_checkpoint(
+                    db_path,
+                    thread_id="thread_digest_out_of_vault_target",
+                    graph_name="digest_graph",
+                )
+            )
 
     def test_pending_approvals_endpoint_lists_waiting_digest_proposal(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

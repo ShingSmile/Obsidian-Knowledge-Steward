@@ -11,7 +11,15 @@ from unittest.mock import patch
 from fastapi import HTTPException, Response
 
 from app.config import get_settings
-from app.contracts.workflow import RunStatus, WorkflowAction, WorkflowInvokeRequest
+from app.contracts.workflow import (
+    PatchOp,
+    Proposal,
+    RiskLevel,
+    RunStatus,
+    SafetyChecks,
+    WorkflowAction,
+    WorkflowInvokeRequest,
+)
 from app.graphs.checkpoint import WorkflowCheckpointStatus, load_graph_checkpoint
 from app.graphs.ingest_graph import invoke_ingest_graph
 from app.indexing.ingest import IngestRunStats
@@ -19,7 +27,10 @@ from app.indexing.store import connect_sqlite, load_proposal
 from app.main import invoke_workflow, list_pending_approvals_endpoint
 from app.observability.runtime_trace import query_run_trace_events_in_db
 from app.retrieval.embeddings import EmbeddingBatchResult
-from app.services.ingest_proposal import build_scoped_ingest_approval_proposal
+from app.services.ingest_proposal import (
+    IngestProposalBuildResult,
+    build_scoped_ingest_approval_proposal,
+)
 
 
 class IngestWorkflowTests(unittest.TestCase):
@@ -398,6 +409,89 @@ class IngestWorkflowTests(unittest.TestCase):
             )
             self.assertEqual(run_trace_events[-1].event_type, "waiting")
             self.assertGreater(run_trace_events[2].details["related_candidate_count"], 0)
+
+    def test_invoke_workflow_rejects_invalid_ingest_waiting_proposal_before_persist(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_root = Path(temp_dir)
+            vault_path = self._build_vault_fixture(temp_root)
+            db_path = temp_root / "knowledge_steward.sqlite3"
+            trace_path = temp_root / "traces" / "runtime.jsonl"
+            bad_proposal = Proposal(
+                proposal_id="prop_ingest_invalid_replace_section",
+                action_type=WorkflowAction.INGEST_STEWARD,
+                target_note_path=str((vault_path / "Alpha.md").resolve()),
+                summary="Reject an invalid replace_section writeback before persistence.",
+                risk_level=RiskLevel.HIGH,
+                patch_ops=[
+                    PatchOp(
+                        op="merge_frontmatter",
+                        target_path=str((vault_path / "Alpha.md").resolve()),
+                        payload={"ks_pending_review": True},
+                    ),
+                    PatchOp(
+                        op="replace_section",
+                        target_path=str((vault_path / "Alpha.md").resolve()),
+                        payload={
+                            "heading_path": "## Knowledge Steward Review",
+                            "content": "<script>alert('blocked')</script>",
+                        },
+                    ),
+                ],
+                safety_checks=SafetyChecks(
+                    before_hash="sha256:before",
+                    max_changed_lines=8,
+                    contains_delete=False,
+                ),
+            )
+
+            with patch(
+                "app.graphs.ingest_graph.build_scoped_ingest_approval_proposal",
+                return_value=IngestProposalBuildResult(
+                    proposal=bad_proposal,
+                    note_meta={"proposal_eligible": True},
+                    analysis_result=None,
+                    analysis_issues=[],
+                ),
+            ):
+                with patch(
+                    "app.main.settings",
+                    replace(
+                        get_settings(),
+                        sample_vault_dir=vault_path,
+                        index_db_path=db_path,
+                        ask_runtime_trace_path=trace_path,
+                    ),
+                ):
+                    with self.assertRaises(HTTPException) as context:
+                        invoke_workflow(
+                            WorkflowInvokeRequest(
+                                thread_id="thread_ingest_invalid_replace_section",
+                                action_type=WorkflowAction.INGEST_STEWARD,
+                                note_path="Alpha.md",
+                                require_approval=True,
+                                metadata={"approval_mode": "proposal"},
+                            ),
+                            Response(),
+                        )
+
+            self.assertEqual(context.exception.status_code, 400)
+            self.assertIn("replace_section", context.exception.detail)
+
+            connection = connect_sqlite(db_path)
+            try:
+                self.assertIsNone(
+                    load_proposal(connection, proposal_id=bad_proposal.proposal_id)
+                )
+            finally:
+                connection.close()
+
+            self.assertIsNone(
+                load_graph_checkpoint(
+                    db_path,
+                    thread_id="thread_ingest_invalid_replace_section",
+                    graph_name="ingest_graph",
+                )
+            )
 
     def test_pending_approvals_endpoint_lists_waiting_ingest_proposal(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
