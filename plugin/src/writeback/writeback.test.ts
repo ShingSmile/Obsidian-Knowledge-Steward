@@ -7,6 +7,7 @@ import {
   extractHeadingInsertPayload,
   frontmatterContainsPatch,
   mergeFrontmatterValue,
+  normalizePatchOp,
   normalizePatchOpName,
   sectionContainsInsertedContent
 } from "./helpers.ts";
@@ -181,5 +182,49 @@ test("extractAddWikilinkPayload and applyAddWikilink append a normalized wikilin
       linked_note_path: "Alpha.md"
     }),
     /already exists/
+  );
+});
+
+test("preparePatchOpsForExecution resolves add_wikilink targets before preflight and execution", () => {
+  const normalizedPatchOps = [
+    normalizePatchOp({
+      op: "merge_frontmatter",
+      target_path: "Root.md",
+      payload: {
+        tags: ["review"]
+      }
+    }),
+    normalizePatchOp({
+      op: "add_wikilink",
+      target_path: "Root.md",
+      payload: {
+        heading: "## Links",
+        linked_note_path: "Alpha.md"
+      }
+    })
+  ];
+
+  const prepared = helperFns.preparePatchOpsForExecution(
+    normalizedPatchOps,
+    (linkedNotePath: string) => {
+      assert.equal(linkedNotePath, "Alpha.md");
+      return "Notes/Alpha.md";
+    }
+  );
+
+  assert.equal(prepared[0].normalizedOp, "merge_frontmatter");
+  assert.equal(
+    prepared[1].payload.linked_note_path,
+    "Notes/Alpha.md"
+  );
+
+  assert.throws(
+    () => helperFns.preparePatchOpsForExecution(
+      [normalizedPatchOps[1]],
+      () => {
+        throw new Error("Linked note was not found");
+      }
+    ),
+    /Linked note was not found/
   );
 });

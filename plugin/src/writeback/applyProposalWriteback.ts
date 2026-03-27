@@ -21,6 +21,7 @@ import {
   mergeFrontmatterValue,
   normalizePatchOp,
   normalizeWikilinkTargetPath,
+  preparePatchOpsForExecution,
   sectionContainsInsertedContent,
   type NormalizedPatchOp
 } from "./helpers";
@@ -49,8 +50,12 @@ export async function applyProposalWriteback(
   try {
     const targetFile = resolveTargetFile(app, proposal.target_note_path);
     const normalizedPatchOps = proposal.patch_ops.map((patchOp) => normalizePatchOp(patchOp));
+    const preparedPatchOps = preparePatchOpsForExecution(
+      normalizedPatchOps,
+      (linkedNotePath) => resolveExistingFile(app, linkedNotePath, "Linked note").path
+    );
 
-    for (const patchOp of normalizedPatchOps) {
+    for (const patchOp of preparedPatchOps) {
       const patchTarget = resolveVaultPath(app, patchOp.target_path);
       if (patchTarget !== targetFile.path) {
         return buildFailedWritebackExecution(proposal, {
@@ -62,7 +67,7 @@ export async function applyProposalWriteback(
     const currentHash = await computeFileHash(app, targetFile);
     const currentMarkdown = await app.vault.cachedRead(targetFile);
 
-    const preflightError = validatePatchPlan(currentMarkdown, normalizedPatchOps);
+    const preflightError = validatePatchPlan(currentMarkdown, preparedPatchOps);
     if (preflightError) {
       return buildFailedWritebackExecution(proposal, {
         beforeHash: currentHash,
@@ -72,7 +77,7 @@ export async function applyProposalWriteback(
 
     const expectedBeforeHash = proposal.safety_checks.before_hash;
     if (expectedBeforeHash && currentHash !== expectedBeforeHash) {
-      if (await isProposalAlreadyApplied(app, targetFile, normalizedPatchOps)) {
+      if (await isProposalAlreadyApplied(app, targetFile, preparedPatchOps)) {
         return buildSuccessfulWritebackExecution(
           {
             applied: true,
@@ -103,7 +108,7 @@ export async function applyProposalWriteback(
       before_hash: expectedBeforeHash ?? currentHash,
       after_hash: null
     };
-    await executePatchPlan(app, targetFile, normalizedPatchOps);
+    await executePatchPlan(app, targetFile, preparedPatchOps);
     const afterHash = await computeFileHash(app, targetFile);
     rollbackContext.after_hash = afterHash;
     return buildSuccessfulWritebackExecution(
@@ -227,14 +232,9 @@ async function executePatchPlan(
 
     if (patchOp.normalizedOp === "add_wikilink") {
       const wikilinkPayload = extractAddWikilinkPayload(patchOp);
-      const linkedNoteFile = resolveExistingFile(
-        app,
-        wikilinkPayload.linked_note_path,
-        "Linked note"
-      );
       workingMarkdown = applyAddWikilink(workingMarkdown, {
         heading: wikilinkPayload.heading,
-        linked_note_path: linkedNoteFile.path
+        linked_note_path: wikilinkPayload.linked_note_path
       });
       markdownDirty = true;
       continue;
@@ -286,7 +286,7 @@ async function isProposalAlreadyApplied(
     if (patchOp.normalizedOp === "add_wikilink") {
       const wikilinkPayload = extractAddWikilinkPayload(patchOp);
       const normalizedTargetPath = normalizeWikilinkTargetPath(
-        resolveVaultPath(app, wikilinkPayload.linked_note_path)
+        wikilinkPayload.linked_note_path
       );
       if (!sectionContainsWikilinkTarget(currentMarkdown, wikilinkPayload.heading, normalizedTargetPath)) {
         return false;

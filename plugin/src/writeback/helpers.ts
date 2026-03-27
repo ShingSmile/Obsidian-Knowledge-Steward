@@ -213,6 +213,27 @@ export function applyAddWikilink(
   });
 }
 
+export function preparePatchOpsForExecution(
+  patchOps: NormalizedPatchOp[],
+  resolveLinkedNotePath: (linkedNotePath: string) => string
+): NormalizedPatchOp[] {
+  return patchOps.map((patchOp) => {
+    if (patchOp.normalizedOp !== "add_wikilink") {
+      return patchOp;
+    }
+
+    const wikilinkPayload = extractAddWikilinkPayload(patchOp);
+    return {
+      ...patchOp,
+      payload: {
+        ...patchOp.payload,
+        heading: wikilinkPayload.heading,
+        linked_note_path: resolveLinkedNotePath(wikilinkPayload.linked_note_path)
+      }
+    };
+  });
+}
+
 export function sectionContainsInsertedContent(
   markdown: string,
   payload: {
