@@ -88,7 +88,14 @@ TOOL_REGISTRY: dict[str, ToolSpec] = {
                 "note_path": {"type": "string"},
                 "title": {"type": "string"},
                 "has_frontmatter": {"type": "boolean"},
-                "frontmatter_summary": {"type": "object"},
+                "frontmatter_summary": {
+                    "type": "object",
+                    "properties": {
+                        "raw_text": {"type": "string"},
+                        "line_count": {"type": "integer"},
+                        "char_count": {"type": "integer"},
+                    },
+                },
                 "headings": {
                     "type": "array",
                     "items": {

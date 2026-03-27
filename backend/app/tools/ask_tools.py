@@ -11,6 +11,9 @@ from app.retrieval.hybrid import search_hybrid_chunks_in_db
 from app.tools.backlinks import collect_verified_backlinks
 
 
+FRONTMATTER_RE = re.compile(r"^---\n.*?\n---\n?", re.DOTALL)
+
+
 def execute_search_notes(
     arguments: dict[str, object],
     *,
@@ -203,7 +206,7 @@ def execute_find_backlinks(
             tool_name="find_backlinks",
             ok=False,
             error="note_path_outside_vault",
-            diagnostics={"failure_code": "index_stale"},
+            diagnostics={"failure_code": "note_path_outside_vault"},
             allow_context_reentry=False,
         )
     if not resolved_note.exists() or not resolved_note.is_file():
@@ -273,52 +276,14 @@ def _resolve_note_path(vault_root: Path, note_path: str) -> Path | None:
         return None
     return resolved_note
 
-
-FRONTMATTER_RE = re.compile(r"^---\n(.*?)\n---\n?", re.DOTALL)
-
-
 def _summarize_frontmatter(text: str) -> dict[str, object]:
     match = FRONTMATTER_RE.match(text)
     if match is None:
         return {}
 
-    summary: dict[str, object] = {}
-    current_key: str | None = None
-    for raw_line in match.group(1).splitlines():
-        line = raw_line.rstrip()
-        if not line.strip():
-            continue
-        if line.startswith("  - ") and current_key:
-            items = summary.get(current_key)
-            if not isinstance(items, list):
-                items = [] if items is None else [items]
-                summary[current_key] = items
-            items.append(_coerce_frontmatter_scalar(line[4:].strip()))
-            continue
-        if ":" not in line:
-            current_key = None
-            continue
-
-        key, value = line.split(":", 1)
-        key = key.strip()
-        value = value.strip()
-        if not key:
-            current_key = None
-            continue
-        if value:
-            summary[key] = _coerce_frontmatter_scalar(value)
-            current_key = None
-        else:
-            summary[key] = []
-            current_key = key
-    return summary
-
-
-def _coerce_frontmatter_scalar(value: str) -> object:
-    if value.lower() == "true":
-        return True
-    if value.lower() == "false":
-        return False
-    if value.isdigit():
-        return int(value)
-    return value
+    raw_text = match.group(0)
+    return {
+        "raw_text": raw_text,
+        "line_count": len(raw_text.splitlines()),
+        "char_count": len(raw_text),
+    }
