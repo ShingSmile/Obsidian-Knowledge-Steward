@@ -192,6 +192,135 @@ class AskWorkflowTests(unittest.TestCase):
             mocked_decision.assert_called_once()
             mocked_execute.assert_not_called()
 
+    def test_run_minimal_ask_downgrades_when_requested_tool_fails(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            db_path = self._build_index_fixture(Path(temp_dir))
+            settings = replace(
+                get_settings(),
+                index_db_path=db_path,
+                cloud_base_url="https://example.com",
+                cloud_chat_model="gpt-test",
+                local_chat_model="",
+            )
+
+            with patch(
+                "app.services.ask._request_tool_call_decision",
+                return_value=ToolCallDecision(
+                    requested=True,
+                    tool_name="get_note_outline",
+                    arguments={"note_path": "Roadmap.md"},
+                    rationale="Need a verified outline before answering.",
+                ),
+            ) as mocked_decision:
+                with patch(
+                    "app.services.ask.execute_tool_call",
+                    return_value=ToolExecutionResult(
+                        tool_name="get_note_outline",
+                        ok=False,
+                        error="tool_failed",
+                        diagnostics={"failure_code": "read_error"},
+                        allow_context_reentry=False,
+                    ),
+                ) as mocked_execute:
+                    with patch("app.services.ask._request_grounded_answer") as mocked_answer:
+                        result = run_minimal_ask(
+                            WorkflowInvokeRequest(
+                                action_type=WorkflowAction.ASK_QA,
+                                user_query="Roadmap",
+                            ),
+                            settings=settings,
+                        )
+
+            self.assertEqual(result.mode, AskResultMode.RETRIEVAL_ONLY)
+            self.assertTrue(result.tool_call_attempted)
+            self.assertEqual(result.tool_call_used, "get_note_outline")
+            self.assertEqual(result.guardrail_action, GuardrailAction.TOOL_RESULT_INSUFFICIENT)
+            self.assertFalse(result.model_fallback_used)
+            mocked_decision.assert_called_once()
+            mocked_execute.assert_called_once()
+            mocked_answer.assert_not_called()
+
+    def test_run_minimal_ask_includes_verified_outline_payload_in_prompt(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            db_path = self._build_index_fixture(Path(temp_dir))
+            settings = replace(
+                get_settings(),
+                index_db_path=db_path,
+                cloud_base_url="https://example.com",
+                cloud_chat_model="gpt-test",
+                local_chat_model="",
+            )
+
+            with patch(
+                "app.services.ask._request_tool_call_decision",
+                return_value=ToolCallDecision(
+                    requested=True,
+                    tool_name="get_note_outline",
+                    arguments={"note_path": "Roadmap.md"},
+                    rationale="Need a verified outline before answering.",
+                ),
+            ):
+                with patch(
+                    "app.services.ask.execute_tool_call",
+                    return_value=ToolExecutionResult(
+                        tool_name="get_note_outline",
+                        ok=True,
+                        data={
+                            "note_path": "Roadmap.md",
+                            "title": "Roadmap",
+                            "has_frontmatter": True,
+                            "frontmatter_summary": {
+                                "line_count": 3,
+                                "char_count": 42,
+                                "raw_text": "---\ntags:\n  - roadmap\n---\n",
+                            },
+                            "headings": [
+                                {
+                                    "level": 1,
+                                    "text": "Roadmap",
+                                    "line_no": 1,
+                                    "heading_path": "Roadmap",
+                                }
+                            ],
+                        },
+                        diagnostics={"source": "verified_outline"},
+                        allow_context_reentry=True,
+                    ),
+                ):
+                    captured_messages: dict[str, list[dict[str, str]]] = {}
+
+                    def _capture_grounded_answer(
+                        *,
+                        provider_target: object,
+                        query: str,
+                        bundle: object,
+                    ) -> str:
+                        del provider_target
+                        captured_messages["messages"] = ask_service._build_grounded_messages(
+                            query=query,
+                            bundle=bundle,
+                        )
+                        return "Roadmap 的结构已确认。[1]"
+
+                    with patch(
+                        "app.services.ask._request_grounded_answer",
+                        side_effect=_capture_grounded_answer,
+                    ):
+                        result = run_minimal_ask(
+                            WorkflowInvokeRequest(
+                                action_type=WorkflowAction.ASK_QA,
+                                user_query="Roadmap",
+                            ),
+                            settings=settings,
+                        )
+
+            self.assertEqual(result.mode, AskResultMode.GENERATED_ANSWER)
+            self.assertIn("messages", captured_messages)
+            grounded_prompt = captured_messages["messages"][1]["content"]
+            self.assertIn('"title": "Roadmap"', grounded_prompt)
+            self.assertIn('"headings"', grounded_prompt)
+            self.assertNotIn("verified_outline", grounded_prompt)
+
     def test_run_minimal_ask_short_circuits_when_all_visible_context_is_flagged(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_root = Path(temp_dir)

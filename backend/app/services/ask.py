@@ -33,6 +33,11 @@ ASK_CONTEXT_TOKEN_BUDGET = 2400
 ASK_TOOL_RESULT_CHAR_BUDGET = 1200
 MODEL_TIMEOUT_SECONDS = 20
 CITATION_PATTERN = re.compile(r"\[(\d+)\]")
+PROMPT_VISIBLE_TOOL_NAMES = {
+    "load_note_excerpt",
+    "get_note_outline",
+    "find_backlinks",
+}
 
 
 @dataclass(frozen=True)
@@ -126,13 +131,26 @@ def run_minimal_ask(
         )
 
     if tool_decision.requested:
-        tool_results.append(
-            execute_tool_call(
-                tool_decision,
-                workflow_action=request.action_type,
-                settings=settings,
-            )
+        tool_result = execute_tool_call(
+            tool_decision,
+            workflow_action=request.action_type,
+            settings=settings,
         )
+        if not tool_result.ok:
+            return _build_retrieval_only_result(
+                query=query,
+                citations=citations,
+                candidates=prompt_candidates,
+                retrieval_fallback_used=retrieval_response.fallback_used,
+                retrieval_fallback_reason=retrieval_response.fallback_reason,
+                tool_decision=tool_decision,
+                guardrail_outcome=GuardrailOutcome(
+                    action=GuardrailAction.TOOL_RESULT_INSUFFICIENT,
+                    applied=True,
+                    reasons=[tool_result.error or "tool_failed"],
+                ),
+            )
+        tool_results.append(tool_result)
         if _tool_results_have_safety_flags(tool_results):
             return _build_retrieval_only_result(
                 query=query,
@@ -279,25 +297,34 @@ def _select_prompt_tool_results(
 ) -> list[ToolExecutionResult]:
     selected: list[ToolExecutionResult] = []
     for result in tool_results:
-        if not result.ok or not result.allow_context_reentry or not result.data:
+        if not result.ok or not result.data:
             continue
-        if result.tool_name != "load_note_excerpt":
-            continue
-        note_path = result.data.get("note_path")
-        excerpt = result.data.get("excerpt")
-        if not isinstance(note_path, str) or not isinstance(excerpt, str):
-            continue
-        if not _matches_prompt_candidate_path(note_path, prompt_candidates):
+        if result.tool_name not in PROMPT_VISIBLE_TOOL_NAMES:
             continue
         trimmed_data = dict(result.data)
-        trimmed_data["excerpt"] = excerpt[:ASK_TOOL_RESULT_CHAR_BUDGET]
+        if result.tool_name == "load_note_excerpt":
+            note_path = trimmed_data.get("note_path")
+            excerpt = trimmed_data.get("excerpt")
+            if not isinstance(note_path, str) or not isinstance(excerpt, str):
+                continue
+            if not _matches_prompt_candidate_path(note_path, prompt_candidates):
+                continue
+            trimmed_data["excerpt"] = excerpt[:ASK_TOOL_RESULT_CHAR_BUDGET]
+        elif result.tool_name == "get_note_outline":
+            note_path = trimmed_data.get("note_path")
+            if not isinstance(note_path, str) or not _matches_prompt_candidate_path(note_path, prompt_candidates):
+                continue
+        elif result.tool_name == "find_backlinks":
+            target_path = trimmed_data.get("target_path")
+            if not isinstance(target_path, str) or not _matches_prompt_candidate_path(target_path, prompt_candidates):
+                continue
         selected.append(
             ToolExecutionResult(
                 tool_name=result.tool_name,
                 ok=result.ok,
                 data=trimmed_data,
                 error=result.error,
-                allow_context_reentry=result.allow_context_reentry,
+                allow_context_reentry=True,
             )
         )
     return selected
