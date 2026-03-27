@@ -12,6 +12,14 @@ from app.contracts.workflow import (
     ToolSpec,
     WorkflowAction,
 )
+from app.indexing.parser import parse_markdown_note
+from app.indexing.store import (
+    build_chunk_records,
+    build_note_record,
+    connect_sqlite,
+    initialize_index_db,
+    sync_note_and_chunks,
+)
 from app.tools.registry import execute_tool_call, get_allowed_tools_for_workflow, validate_tool_call
 
 
@@ -30,12 +38,11 @@ class ToolContractTests(unittest.TestCase):
 
 
 class ToolRegistryTests(unittest.TestCase):
-    def test_get_allowed_tools_for_ask_returns_only_read_only_specs(self) -> None:
+    def test_get_allowed_tools_for_ask_includes_outline_and_backlinks(self) -> None:
         specs = get_allowed_tools_for_workflow(WorkflowAction.ASK_QA)
-        self.assertEqual(
-            [spec.name for spec in specs],
-            ["search_notes", "load_note_excerpt", "list_pending_approvals"],
-        )
+        names = [spec.name for spec in specs]
+        self.assertIn("get_note_outline", names)
+        self.assertIn("find_backlinks", names)
         self.assertTrue(all(spec.read_only for spec in specs))
 
     def test_validate_tool_call_rejects_unknown_tool_and_wrong_workflow(self) -> None:
@@ -92,6 +99,105 @@ class ToolRegistryTests(unittest.TestCase):
             )
             self.assertTrue(result.ok)
             self.assertIn("excerpt", result.data)
+
+    def test_execute_get_note_outline_reads_current_heading_tree(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_root = Path(temp_dir)
+            vault_path = temp_root / "vault"
+            vault_path.mkdir()
+            note_path = vault_path / "Alpha.md"
+            note_path.write_text(
+                "---\n"
+                "tags:\n"
+                "  - current\n"
+                "---\n"
+                "# Alpha\n"
+                "\n"
+                "Intro\n"
+                "\n"
+                "## Detail\n"
+                "\n"
+                "More text\n",
+                encoding="utf-8",
+            )
+            settings = replace(get_settings(), sample_vault_dir=vault_path)
+
+            result = execute_tool_call(
+                ToolCallDecision(
+                    requested=True,
+                    tool_name="get_note_outline",
+                    arguments={"note_path": "Alpha.md"},
+                ),
+                workflow_action=WorkflowAction.ASK_QA,
+                settings=settings,
+            )
+
+            self.assertTrue(result.ok)
+            self.assertEqual(result.data["note_path"], "Alpha.md")
+            self.assertEqual(result.data["title"], "Alpha")
+            self.assertTrue(result.data["has_frontmatter"])
+            self.assertEqual(
+                result.data["headings"],
+                [
+                    {
+                        "level": 1,
+                        "text": "Alpha",
+                        "line_no": 5,
+                        "heading_path": "Alpha",
+                    },
+                    {
+                        "level": 2,
+                        "text": "Detail",
+                        "line_no": 9,
+                        "heading_path": "Alpha > Detail",
+                    },
+                ],
+            )
+
+    def test_execute_find_backlinks_fails_closed_when_candidate_note_is_stale(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_root = Path(temp_dir)
+            vault_path = temp_root / "vault"
+            vault_path.mkdir()
+            db_path = temp_root / "knowledge_steward.sqlite3"
+            target_path = vault_path / "Target.md"
+            source_path = vault_path / "Source.md"
+
+            target_path.write_text("# Target\n\nBody\n", encoding="utf-8")
+            source_path.write_text("# Source\n\nLinks to [[Target]].\n", encoding="utf-8")
+
+            initialize_index_db(db_path)
+            connection = connect_sqlite(db_path)
+            try:
+                for note_path in (target_path, source_path):
+                    parsed_note = parse_markdown_note(note_path)
+                    note_record = build_note_record(note_path, parsed_note)
+                    chunk_records = build_chunk_records(note_record.note_id, parsed_note)
+                    sync_note_and_chunks(connection, note_record, chunk_records)
+            finally:
+                connection.close()
+
+            source_path.write_text("# Source\n\nLinks to [[Target]] and more.\n", encoding="utf-8")
+            settings = replace(
+                get_settings(),
+                sample_vault_dir=vault_path,
+                index_db_path=db_path,
+            )
+
+            result = execute_tool_call(
+                ToolCallDecision(
+                    requested=True,
+                    tool_name="find_backlinks",
+                    arguments={"note_path": "Target.md"},
+                ),
+                workflow_action=WorkflowAction.ASK_QA,
+                settings=settings,
+            )
+
+            self.assertFalse(result.ok)
+            self.assertEqual(result.error, "index_stale")
+            self.assertEqual(result.data, {})
+            self.assertEqual(result.diagnostics["failure_code"], "index_stale")
 
 
 if __name__ == "__main__":

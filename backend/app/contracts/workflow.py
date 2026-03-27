@@ -55,6 +55,7 @@ class ToolExecutionResult(BaseModel):
     tool_name: str
     ok: bool
     data: dict[str, object] = Field(default_factory=dict)
+    diagnostics: dict[str, object] = Field(default_factory=dict)
     error: str | None = None
     allow_context_reentry: bool = True
 

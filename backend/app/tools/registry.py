@@ -10,6 +10,8 @@ from app.contracts.workflow import (
     WorkflowAction,
 )
 from app.tools.ask_tools import (
+    execute_find_backlinks,
+    execute_get_note_outline,
     execute_list_pending_approvals,
     execute_load_note_excerpt,
     execute_search_notes,
@@ -68,6 +70,88 @@ TOOL_REGISTRY: dict[str, ToolSpec] = {
         risk_level="low",
         read_only=True,
     ),
+    "get_note_outline": ToolSpec(
+        name="get_note_outline",
+        purpose="Read the current heading tree from a note on disk.",
+        allowed_workflows=[WorkflowAction.ASK_QA],
+        input_schema={
+            "type": "object",
+            "properties": {
+                "note_path": {"type": "string"},
+            },
+            "required": ["note_path"],
+            "additionalProperties": False,
+        },
+        output_schema={
+            "type": "object",
+            "properties": {
+                "note_path": {"type": "string"},
+                "title": {"type": "string"},
+                "has_frontmatter": {"type": "boolean"},
+                "frontmatter_summary": {"type": "object"},
+                "headings": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "level": {"type": "integer"},
+                            "text": {"type": "string"},
+                            "line_no": {"type": "integer"},
+                            "heading_path": {"type": "string"},
+                        },
+                        "required": ["level", "text", "line_no", "heading_path"],
+                    },
+                },
+            },
+            "required": ["note_path", "title", "has_frontmatter", "frontmatter_summary", "headings"],
+        },
+        risk_level="low",
+        read_only=True,
+    ),
+    "find_backlinks": ToolSpec(
+        name="find_backlinks",
+        purpose="Find verified backlinks to a note from the SQLite index.",
+        allowed_workflows=[WorkflowAction.ASK_QA],
+        input_schema={
+            "type": "object",
+            "properties": {
+                "note_path": {"type": "string"},
+            },
+            "required": ["note_path"],
+            "additionalProperties": False,
+        },
+        output_schema={
+            "type": "object",
+            "properties": {
+                "target_path": {"type": "string"},
+                "backlinks": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "source_path": {"type": "string"},
+                            "chunk_id": {"type": "string"},
+                            "heading_path": {"type": ["string", "null"]},
+                            "start_line": {"type": "integer"},
+                            "end_line": {"type": "integer"},
+                            "link_text": {"type": "string"},
+                        },
+                        "required": [
+                            "source_path",
+                            "chunk_id",
+                            "heading_path",
+                            "start_line",
+                            "end_line",
+                            "link_text",
+                        ],
+                    },
+                },
+            },
+            "required": ["target_path", "backlinks"],
+        },
+        risk_level="low",
+        read_only=True,
+    ),
     "list_pending_approvals": ToolSpec(
         name="list_pending_approvals",
         purpose="List currently pending approval items.",
@@ -93,6 +177,8 @@ TOOL_REGISTRY: dict[str, ToolSpec] = {
 TOOL_EXECUTORS = {
     "search_notes": execute_search_notes,
     "load_note_excerpt": execute_load_note_excerpt,
+    "get_note_outline": execute_get_note_outline,
+    "find_backlinks": execute_find_backlinks,
     "list_pending_approvals": execute_list_pending_approvals,
 }
 
