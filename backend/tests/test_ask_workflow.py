@@ -15,6 +15,8 @@ from app.contracts.workflow import (
     AskResultMode,
     GuardrailAction,
     RetrievalMetadataFilter,
+    RetrievalSearchResponse,
+    RetrievedChunkCandidate,
     RunStatus,
     ToolCallDecision,
     ToolExecutionResult,
@@ -478,6 +480,283 @@ class AskWorkflowTests(unittest.TestCase):
             self.assertNotIn(
                 "This should not enter the grounded prompt.",
                 captured_messages["messages"][1]["content"],
+            )
+
+    def test_run_minimal_ask_does_not_reenter_find_backlinks_payload(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            db_path = self._build_index_fixture(Path(temp_dir))
+            settings = replace(
+                get_settings(),
+                index_db_path=db_path,
+                cloud_base_url="https://example.com",
+                cloud_chat_model="gpt-test",
+                local_chat_model="",
+            )
+
+            with patch(
+                "app.services.ask._request_tool_call_decision",
+                return_value=ToolCallDecision(
+                    requested=True,
+                    tool_name="find_backlinks",
+                    arguments={"note_path": "Roadmap.md"},
+                    rationale="Need verified backlinks.",
+                ),
+            ):
+                with patch(
+                    "app.services.ask.execute_tool_call",
+                    return_value=ToolExecutionResult(
+                        tool_name="find_backlinks",
+                        ok=True,
+                        data={
+                            "target_path": "Roadmap.md",
+                            "backlinks": [
+                                {
+                                    "source_path": "Other.md",
+                                    "chunk_id": "backlink-1",
+                                    "heading_path": "Other",
+                                    "start_line": 1,
+                                    "end_line": 2,
+                                    "link_text": "unique backlink marker",
+                                }
+                            ],
+                        },
+                        allow_context_reentry=True,
+                    ),
+                ):
+                    captured_messages: dict[str, list[dict[str, str]]] = {}
+
+                    def _capture_grounded_answer(
+                        *,
+                        provider_target: object,
+                        query: str,
+                        bundle: object,
+                    ) -> str:
+                        del provider_target
+                        captured_messages["messages"] = ask_service._build_grounded_messages(
+                            query=query,
+                            bundle=bundle,
+                        )
+                        return "Roadmap 的结构已确认。[1]"
+
+                    with patch(
+                        "app.services.ask._request_grounded_answer",
+                        side_effect=_capture_grounded_answer,
+                    ):
+                        result = run_minimal_ask(
+                            WorkflowInvokeRequest(
+                                action_type=WorkflowAction.ASK_QA,
+                                user_query="Roadmap",
+                            ),
+                            settings=settings,
+                        )
+
+            self.assertEqual(result.mode, AskResultMode.GENERATED_ANSWER)
+            self.assertIn("messages", captured_messages)
+            self.assertNotIn(
+                "unique backlink marker",
+                captured_messages["messages"][1]["content"],
+            )
+
+    def test_run_minimal_ask_suppresses_colliding_basename_reentry(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            db_path = self._build_index_fixture(Path(temp_dir))
+            settings = replace(
+                get_settings(),
+                index_db_path=db_path,
+                cloud_base_url="https://example.com",
+                cloud_chat_model="gpt-test",
+                local_chat_model="",
+            )
+
+            colliding_candidates = [
+                RetrievedChunkCandidate(
+                    retrieval_source="hybrid_rrf",
+                    chunk_id="roadmap-alpha",
+                    note_id="note_alpha",
+                    path="/vault/alpha/Roadmap.md",
+                    title="Roadmap",
+                    heading_path="Roadmap",
+                    note_type="summary_note",
+                    template_family="plain",
+                    daily_note_date=None,
+                    source_mtime_ns=1,
+                    start_line=1,
+                    end_line=3,
+                    score=1.0,
+                    snippet="alpha roadmap snippet",
+                    text="alpha roadmap snippet",
+                ),
+                RetrievedChunkCandidate(
+                    retrieval_source="hybrid_rrf",
+                    chunk_id="roadmap-beta",
+                    note_id="note_beta",
+                    path="/vault/beta/Roadmap.md",
+                    title="Roadmap",
+                    heading_path="Roadmap",
+                    note_type="summary_note",
+                    template_family="plain",
+                    daily_note_date=None,
+                    source_mtime_ns=1,
+                    start_line=1,
+                    end_line=3,
+                    score=0.9,
+                    snippet="beta roadmap snippet",
+                    text="beta roadmap snippet",
+                ),
+            ]
+
+            with patch(
+                "app.services.ask.search_hybrid_chunks_in_db",
+                return_value=RetrievalSearchResponse(candidates=colliding_candidates),
+            ):
+                with patch(
+                    "app.services.ask._request_tool_call_decision",
+                    return_value=ToolCallDecision(
+                        requested=True,
+                        tool_name="load_note_excerpt",
+                        arguments={"note_path": "Roadmap.md", "max_chars": 200},
+                        rationale="Need the note body for a precise answer.",
+                    ),
+                ):
+                    with patch(
+                        "app.services.ask.execute_tool_call",
+                        return_value=ToolExecutionResult(
+                            tool_name="load_note_excerpt",
+                            ok=True,
+                            data={
+                                "note_path": "Roadmap.md",
+                                "excerpt": "collision-sensitive excerpt should be hidden",
+                                "line_count": 4,
+                            },
+                        ),
+                    ):
+                        captured_messages: dict[str, list[dict[str, str]]] = {}
+
+                        def _capture_grounded_answer(
+                            *,
+                            provider_target: object,
+                            query: str,
+                            bundle: object,
+                        ) -> str:
+                            del provider_target
+                            captured_messages["messages"] = ask_service._build_grounded_messages(
+                                query=query,
+                                bundle=bundle,
+                            )
+                            return "Roadmap 已拆成检索与 ask 两段实现。[1]"
+
+                        with patch(
+                            "app.services.ask._request_grounded_answer",
+                            side_effect=_capture_grounded_answer,
+                        ):
+                            result = run_minimal_ask(
+                                WorkflowInvokeRequest(
+                                    action_type=WorkflowAction.ASK_QA,
+                                    user_query="Roadmap",
+                                ),
+                                settings=settings,
+                            )
+
+            self.assertEqual(result.mode, AskResultMode.GENERATED_ANSWER)
+            self.assertIn("messages", captured_messages)
+            self.assertNotIn(
+                "collision-sensitive excerpt should be hidden",
+                captured_messages["messages"][1]["content"],
+            )
+
+    def test_run_minimal_ask_trims_verified_outline_payload_before_prompt_rendering(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            db_path = self._build_index_fixture(Path(temp_dir))
+            settings = replace(
+                get_settings(),
+                index_db_path=db_path,
+                cloud_base_url="https://example.com",
+                cloud_chat_model="gpt-test",
+                local_chat_model="",
+            )
+
+            long_raw_text = "frontmatter-" + ("x" * ask_service.ASK_TOOL_RESULT_CHAR_BUDGET) + "TAIL_MARKER"
+            retained_prefix = long_raw_text[:200]
+            oversized_headings = [
+                {
+                    "level": 2,
+                    "text": f"Heading {index} " + ("y" * 80),
+                    "line_no": index + 2,
+                    "heading_path": f"Roadmap > Heading {index}",
+                }
+                for index in range(40)
+            ]
+
+            with patch(
+                "app.services.ask._request_tool_call_decision",
+                return_value=ToolCallDecision(
+                    requested=True,
+                    tool_name="get_note_outline",
+                    arguments={"note_path": "Roadmap.md"},
+                    rationale="Need the outline before answering.",
+                ),
+            ):
+                with patch(
+                    "app.services.ask.execute_tool_call",
+                    return_value=ToolExecutionResult(
+                        tool_name="get_note_outline",
+                        ok=True,
+                        data={
+                            "note_path": "Roadmap.md",
+                            "title": "Roadmap",
+                            "has_frontmatter": True,
+                            "frontmatter_summary": {
+                                "line_count": 3,
+                                "char_count": len(long_raw_text),
+                                "raw_text": long_raw_text,
+                            },
+                            "headings": oversized_headings,
+                        },
+                        diagnostics={"internal_marker": "outline-diagnostics"},
+                        allow_context_reentry=False,
+                    ),
+                ):
+                    captured_messages: dict[str, list[dict[str, str]]] = {}
+                    captured_bundle: dict[str, object] = {}
+
+                    def _capture_grounded_answer(
+                        *,
+                        provider_target: object,
+                        query: str,
+                        bundle: object,
+                    ) -> str:
+                        del provider_target
+                        captured_bundle["bundle"] = bundle
+                        captured_messages["messages"] = ask_service._build_grounded_messages(
+                            query=query,
+                            bundle=bundle,
+                        )
+                        return "Roadmap 的结构已确认。[1]"
+
+                    with patch(
+                        "app.services.ask._request_grounded_answer",
+                        side_effect=_capture_grounded_answer,
+                    ):
+                        result = run_minimal_ask(
+                            WorkflowInvokeRequest(
+                                action_type=WorkflowAction.ASK_QA,
+                                user_query="Roadmap",
+                            ),
+                            settings=settings,
+                        )
+
+            self.assertEqual(result.mode, AskResultMode.GENERATED_ANSWER)
+            self.assertIn("messages", captured_messages)
+            self.assertIn("bundle", captured_bundle)
+            grounded_prompt = captured_messages["messages"][1]["content"]
+            trimmed_payload = captured_bundle["bundle"].tool_results[0].data
+            self.assertIn(retained_prefix, grounded_prompt)
+            self.assertNotIn("TAIL_MARKER", grounded_prompt)
+            self.assertNotIn("Heading 39", grounded_prompt)
+            self.assertNotIn("outline-diagnostics", grounded_prompt)
+            self.assertLessEqual(
+                len(json.dumps(trimmed_payload, ensure_ascii=False, sort_keys=True)),
+                ask_service.ASK_TOOL_RESULT_CHAR_BUDGET,
             )
 
     def test_run_minimal_ask_consumes_hybrid_retrieval_candidates(self) -> None:

@@ -36,7 +36,6 @@ CITATION_PATTERN = re.compile(r"\[(\d+)\]")
 PROMPT_VISIBLE_TOOL_NAMES = {
     "load_note_excerpt",
     "get_note_outline",
-    "find_backlinks",
 }
 
 
@@ -307,17 +306,14 @@ def _select_prompt_tool_results(
             excerpt = trimmed_data.get("excerpt")
             if not isinstance(note_path, str) or not isinstance(excerpt, str):
                 continue
-            if not _matches_prompt_candidate_path(note_path, prompt_candidates):
+            if not _has_unique_prompt_candidate_path(note_path, prompt_candidates):
                 continue
             trimmed_data["excerpt"] = excerpt[:ASK_TOOL_RESULT_CHAR_BUDGET]
         elif result.tool_name == "get_note_outline":
             note_path = trimmed_data.get("note_path")
-            if not isinstance(note_path, str) or not _matches_prompt_candidate_path(note_path, prompt_candidates):
+            if not isinstance(note_path, str) or not _has_unique_prompt_candidate_path(note_path, prompt_candidates):
                 continue
-        elif result.tool_name == "find_backlinks":
-            target_path = trimmed_data.get("target_path")
-            if not isinstance(target_path, str) or not _matches_prompt_candidate_path(target_path, prompt_candidates):
-                continue
+            trimmed_data = _trim_outline_prompt_payload(trimmed_data)
         selected.append(
             ToolExecutionResult(
                 tool_name=result.tool_name,
@@ -326,24 +322,78 @@ def _select_prompt_tool_results(
                 error=result.error,
                 allow_context_reentry=True,
             )
-        )
+    )
     return selected
 
 
-def _matches_prompt_candidate_path(
+def _trim_outline_prompt_payload(data: dict[str, object]) -> dict[str, object]:
+    trimmed = dict(data)
+    frontmatter_summary = trimmed.get("frontmatter_summary")
+    if isinstance(frontmatter_summary, dict):
+        trimmed_frontmatter_summary = dict(frontmatter_summary)
+        raw_text = trimmed_frontmatter_summary.get("raw_text")
+        if isinstance(raw_text, str):
+            trimmed_frontmatter_summary["raw_text"] = raw_text[:ASK_TOOL_RESULT_CHAR_BUDGET]
+        trimmed["frontmatter_summary"] = trimmed_frontmatter_summary
+    headings = trimmed.get("headings")
+    if isinstance(headings, list):
+        trimmed["headings"] = [
+            dict(heading) if isinstance(heading, dict) else heading
+            for heading in headings
+        ]
+    while _serialized_tool_payload_chars(trimmed) > ASK_TOOL_RESULT_CHAR_BUDGET:
+        if _trim_outline_headings_once(trimmed):
+            continue
+        if _trim_outline_frontmatter_once(trimmed):
+            continue
+        break
+    return trimmed
+
+
+def _serialized_tool_payload_chars(data: dict[str, object]) -> int:
+    return len(json.dumps(data, ensure_ascii=False, sort_keys=True))
+
+
+def _trim_outline_headings_once(data: dict[str, object]) -> bool:
+    headings = data.get("headings")
+    if not isinstance(headings, list) or not headings:
+        return False
+    data["headings"] = headings[:-1]
+    return True
+
+
+def _trim_outline_frontmatter_once(data: dict[str, object]) -> bool:
+    frontmatter_summary = data.get("frontmatter_summary")
+    if not isinstance(frontmatter_summary, dict):
+        return False
+    raw_text = frontmatter_summary.get("raw_text")
+    if not isinstance(raw_text, str) or not raw_text:
+        return False
+    overflow = _serialized_tool_payload_chars(data) - ASK_TOOL_RESULT_CHAR_BUDGET
+    trim_amount = max(overflow + 32, max(1, len(raw_text) // 4))
+    trimmed_frontmatter_summary = dict(frontmatter_summary)
+    trimmed_frontmatter_summary["raw_text"] = raw_text[: max(0, len(raw_text) - trim_amount)]
+    data["frontmatter_summary"] = trimmed_frontmatter_summary
+    return True
+
+
+def _has_unique_prompt_candidate_path(
     note_path: str,
     prompt_candidates: list[RetrievedChunkCandidate],
 ) -> bool:
     normalized_note_parts = _normalize_path_parts(note_path)
     if not normalized_note_parts:
         return False
+    matching_candidate_paths: set[tuple[str, ...]] = set()
     for candidate in prompt_candidates:
         candidate_parts = _normalize_path_parts(candidate.path)
         if len(candidate_parts) < len(normalized_note_parts):
             continue
         if candidate_parts[-len(normalized_note_parts):] == normalized_note_parts:
-            return True
-    return False
+            matching_candidate_paths.add(candidate_parts)
+            if len(matching_candidate_paths) > 1:
+                return False
+    return len(matching_candidate_paths) == 1
 
 
 def _normalize_path_parts(path_value: str) -> tuple[str, ...]:
