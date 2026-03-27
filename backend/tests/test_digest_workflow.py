@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import replace
 import json
 from pathlib import Path
+import sqlite3
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -71,6 +72,7 @@ class DigestWorkflowTests(unittest.TestCase):
             self.assertEqual(execution.state["run_id"], "run_digest_graph")
             self.assertEqual(execution.digest_result.source_note_count, 3)
             self.assertFalse(execution.digest_result.fallback_used)
+            self.assertFalse(hasattr(execution, "used_langgraph"))
             self.assertIn("本次 DAILY_DIGEST 基于最近 3 篇已索引笔记生成。", execution.digest_result.digest_markdown)
             self.assertIn("重点来源", execution.digest_result.digest_markdown)
             self.assertEqual(len(execution.trace_events), 3)
@@ -87,6 +89,45 @@ class DigestWorkflowTests(unittest.TestCase):
             ]
             self.assertEqual(len(persisted_events), 3)
             self.assertTrue(all(event["graph_name"] == "digest_graph" for event in persisted_events))
+
+    def test_invoke_digest_graph_persists_langgraph_sqlite_checkpoints(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_root = Path(temp_dir)
+            vault_path = self._build_digest_vault_fixture(temp_root)
+            db_path = temp_root / "knowledge_steward.sqlite3"
+            ingest_vault(vault_path=vault_path, db_path=db_path)
+            settings = replace(
+                get_settings(),
+                sample_vault_dir=vault_path,
+                index_db_path=db_path,
+            )
+
+            execution = invoke_digest_graph(
+                WorkflowInvokeRequest(
+                    thread_id="thread_sqlitesaver_digest",
+                    action_type=WorkflowAction.DAILY_DIGEST,
+                ),
+                settings=settings,
+                thread_id="thread_sqlitesaver_digest",
+                run_id="run_sqlitesaver_digest",
+            )
+
+            connection = sqlite3.connect(db_path)
+            try:
+                checkpoint_rows = connection.execute(
+                    """
+                    SELECT thread_id, checkpoint_ns, checkpoint_id
+                    FROM checkpoints
+                    WHERE thread_id = ?
+                    ORDER BY checkpoint_id ASC
+                    """,
+                    ("thread_sqlitesaver_digest",),
+                ).fetchall()
+            finally:
+                connection.close()
+
+            self.assertEqual(execution.digest_result.source_note_count, 3)
+            self.assertGreaterEqual(len(checkpoint_rows), 1)
 
     def test_invoke_workflow_returns_safe_fallback_when_index_is_empty(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -310,14 +351,18 @@ class DigestWorkflowTests(unittest.TestCase):
                     side_effect=AssertionError("resume should not rebuild digest"),
                 ):
                     resumed_response = Response()
-                    resumed_result = invoke_workflow(
-                        WorkflowInvokeRequest(
-                            thread_id="thread_resume_digest",
-                            action_type=WorkflowAction.DAILY_DIGEST,
-                            resume_from_checkpoint=True,
-                        ),
-                        resumed_response,
-                    )
+                    with self.assertNoLogs(
+                        "langgraph.checkpoint.serde.jsonplus",
+                        level="WARNING",
+                    ):
+                        resumed_result = invoke_workflow(
+                            WorkflowInvokeRequest(
+                                thread_id="thread_resume_digest",
+                                action_type=WorkflowAction.DAILY_DIGEST,
+                                resume_from_checkpoint=True,
+                            ),
+                            resumed_response,
+                        )
 
             self.assertEqual(resumed_response.status_code, 200)
             self.assertEqual(resumed_result.message, "Digest workflow resumed from checkpoint.")

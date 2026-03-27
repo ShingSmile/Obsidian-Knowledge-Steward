@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import replace
 import json
 from pathlib import Path
+import sqlite3
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -612,15 +613,19 @@ class AskWorkflowTests(unittest.TestCase):
                     side_effect=AssertionError("resume should not rerun ask execution"),
                 ):
                     resumed_response = Response()
-                    resumed_result = invoke_workflow(
-                        WorkflowInvokeRequest(
-                            thread_id="thread_resume_ask",
-                            action_type=WorkflowAction.ASK_QA,
-                            user_query="Roadmap",
-                            resume_from_checkpoint=True,
-                        ),
-                        resumed_response,
-                    )
+                    with self.assertNoLogs(
+                        "langgraph.checkpoint.serde.jsonplus",
+                        level="WARNING",
+                    ):
+                        resumed_result = invoke_workflow(
+                            WorkflowInvokeRequest(
+                                thread_id="thread_resume_ask",
+                                action_type=WorkflowAction.ASK_QA,
+                                user_query="Roadmap",
+                                resume_from_checkpoint=True,
+                            ),
+                            resumed_response,
+                        )
 
             self.assertEqual(resumed_response.status_code, 200)
             self.assertEqual(resumed_result.message, "Ask workflow resumed from checkpoint.")
@@ -670,6 +675,7 @@ class AskWorkflowTests(unittest.TestCase):
             self.assertEqual(execution.state["thread_id"], "thread_graph_test")
             self.assertEqual(execution.state["run_id"], "run_graph_test")
             self.assertEqual(execution.ask_result.mode, AskResultMode.RETRIEVAL_ONLY)
+            self.assertFalse(hasattr(execution, "used_langgraph"))
             self.assertEqual(len(execution.trace_events), 3)
             self.assertEqual(
                 [event["node_name"] for event in execution.trace_events],
@@ -700,6 +706,45 @@ class AskWorkflowTests(unittest.TestCase):
                     for event in persisted_events
                 )
             )
+
+    def test_invoke_ask_graph_persists_langgraph_sqlite_checkpoints(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            db_path = self._build_index_fixture(Path(temp_dir))
+            settings = replace(
+                get_settings(),
+                index_db_path=db_path,
+                cloud_base_url="",
+                cloud_chat_model="",
+                local_chat_model="",
+            )
+
+            execution = invoke_ask_graph(
+                WorkflowInvokeRequest(
+                    thread_id="thread_sqlitesaver_ask",
+                    action_type=WorkflowAction.ASK_QA,
+                    user_query="Roadmap",
+                ),
+                settings=settings,
+                thread_id="thread_sqlitesaver_ask",
+                run_id="run_sqlitesaver_ask",
+            )
+
+            connection = sqlite3.connect(db_path)
+            try:
+                checkpoint_rows = connection.execute(
+                    """
+                    SELECT thread_id, checkpoint_ns, checkpoint_id
+                    FROM checkpoints
+                    WHERE thread_id = ?
+                    ORDER BY checkpoint_id ASC
+                    """,
+                    ("thread_sqlitesaver_ask",),
+                ).fetchall()
+            finally:
+                connection.close()
+
+            self.assertEqual(execution.ask_result.mode, AskResultMode.RETRIEVAL_ONLY)
+            self.assertGreaterEqual(len(checkpoint_rows), 1)
 
     def test_invoke_ask_graph_emits_tool_and_guardrail_trace_fields(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import cast
+from typing import Any, cast
 
 from app.config import Settings
 from app.contracts.workflow import (
@@ -29,7 +29,9 @@ from app.graphs.runtime import (
     build_base_workflow_state,
     build_workflow_graph_execution,
     build_workflow_runtime_trace_hook,
-    invoke_checkpointed_linear_graph,
+    invoke_checkpointed_compiled_graph,
+    open_sqlite_checkpointer,
+    save_business_checkpoint_safely,
 )
 from app.graphs.state import StewardState
 from app.indexing.ingest import ingest_vault, resolve_requested_markdown_notes
@@ -73,21 +75,43 @@ def invoke_ingest_graph(
             trace_hook=runtime_trace_hook,
         )
     else:
-        execution = invoke_checkpointed_linear_graph(
-            graph_name="ingest_graph",
-            steps=_build_ingest_steps(settings=settings, trace_hook=runtime_trace_hook),
-            initial_state=initial_state,
-            checkpoint_db_path=settings.index_db_path,
-            resume_from_checkpoint=request.resume_from_checkpoint,
-            trace_hook=runtime_trace_hook,
-            required_terminal_fields=("ingest_result",),
-            resume_match_fields=("note_paths",),
-        )
+        with open_sqlite_checkpointer(settings.index_db_path) as checkpointer:
+            graph = build_ingest_graph(
+                settings=settings,
+                trace_hook=runtime_trace_hook,
+                checkpointer=checkpointer,
+            )
+            execution = invoke_checkpointed_compiled_graph(
+                graph_name="ingest_graph",
+                graph=graph,
+                initial_state=initial_state,
+                checkpoint_db_path=settings.index_db_path,
+                resume_from_checkpoint=request.resume_from_checkpoint,
+                trace_hook=runtime_trace_hook,
+                required_terminal_fields=("ingest_result",),
+                resume_match_fields=("note_paths",),
+            )
     final_state = execution.state
 
     ingest_result = final_state.get("ingest_result")
     if ingest_result is None:
         raise RuntimeError("ingest_graph completed without producing ingest_result.")
+
+    if (
+        not _should_emit_ingest_approval_proposal(request)
+        and not (
+            execution.checkpoint_used
+            and execution.resumed_from_status == WorkflowCheckpointStatus.COMPLETED
+        )
+    ):
+        save_business_checkpoint_safely(
+            db_path=settings.index_db_path,
+            graph_name="ingest_graph",
+            checkpoint_status=WorkflowCheckpointStatus.COMPLETED,
+            last_completed_node=_resolve_last_completed_node(final_state),
+            next_node_name=None,
+            state=final_state,
+        )
 
     shared_execution = build_workflow_graph_execution(
         graph_name="ingest_graph",
@@ -102,7 +126,6 @@ def invoke_ingest_graph(
         run_id=shared_execution.run_id,
         state=shared_execution.state,
         trace_events=shared_execution.trace_events,
-        used_langgraph=shared_execution.used_langgraph,
         checkpoint_used=shared_execution.checkpoint_used,
         resumed_from_node=shared_execution.resumed_from_node,
         ingest_result=ingest_result,
@@ -148,6 +171,7 @@ def build_ingest_graph(
     *,
     settings: Settings,
     trace_hook: TraceHook | None = None,
+    checkpointer: Any | None = None,
 ):
     workflow = StateGraph(StewardState)
     steps = _build_ingest_steps(settings=settings, trace_hook=trace_hook)
@@ -157,7 +181,14 @@ def build_ingest_graph(
     for current_step, next_step in zip(steps, steps[1:]):
         workflow.add_edge(current_step.name, next_step.name)
     workflow.add_edge(steps[-1].name, END)
-    return workflow.compile()
+    return workflow.compile(checkpointer=checkpointer)
+
+
+def _resolve_last_completed_node(state: StewardState) -> str | None:
+    trace_events = state.get("trace_events", [])
+    if not trace_events:
+        return None
+    return trace_events[-1]["node_name"]
 
 
 def _build_ingest_steps(

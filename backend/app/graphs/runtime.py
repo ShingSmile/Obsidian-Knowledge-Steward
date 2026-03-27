@@ -1,23 +1,53 @@
 from __future__ import annotations
 
+from collections.abc import Iterator
+from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Callable, TypedDict, cast
+import sqlite3
+from typing import Any, Callable, TypedDict, cast
 
 from app.config import Settings
-from app.contracts.workflow import WorkflowAction, WorkflowInvokeRequest
+from app.contracts.workflow import (
+    ApprovalDecision,
+    AskCitation,
+    AskResultMode,
+    AskWorkflowResult,
+    DigestSourceNote,
+    DigestWorkflowResult,
+    GuardrailAction,
+    IngestAnalysisFinding,
+    IngestAnalysisResult,
+    IngestWorkflowResult,
+    PatchOp,
+    PostWritebackSyncResult,
+    Proposal,
+    ProposalEvidence,
+    RetrievalMetadataFilter,
+    RetrievedChunkCandidate,
+    RiskLevel,
+    SafetyChecks,
+    WorkflowAction,
+    WorkflowInvokeRequest,
+    WritebackResult,
+)
 from app.graphs.checkpoint import (
     WorkflowCheckpointStatus,
+    hydrate_business_checkpoint_state,
     load_graph_checkpoint,
     save_graph_checkpoint,
 )
 from app.graphs.state import StewardState
+from app.indexing.store import initialize_index_db
 from app.observability import (
     build_jsonl_trace_hook,
     build_sqlite_trace_hook,
     compose_trace_hooks,
 )
+from langgraph.checkpoint.sqlite import SqliteSaver
+from langgraph.checkpoint.serde.jsonplus import JsonPlusSerializer
+from langgraph.graph import END, START, StateGraph
 
 
 class RuntimeTraceEvent(TypedDict):
@@ -34,53 +64,28 @@ class RuntimeTraceEvent(TypedDict):
 TraceHook = Callable[[RuntimeTraceEvent], None]
 GraphNode = Callable[[StewardState], dict[str, object]]
 
-
-try:
-    from langgraph.graph import END, START, StateGraph
-
-    LANGGRAPH_AVAILABLE = True
-except ImportError:
-    LANGGRAPH_AVAILABLE = False
-    START = "__start__"
-    END = "__end__"
-
-    class _CompiledStateGraph:
-        """Minimal linear runner used when LangGraph is not yet installed locally."""
-
-        def __init__(
-            self,
-            *,
-            nodes: dict[str, GraphNode],
-            edges: dict[str, str],
-        ) -> None:
-            self._nodes = nodes
-            self._edges = edges
-
-        def invoke(self, state: StewardState) -> StewardState:
-            current_state = dict(state)
-            next_node = self._edges.get(START)
-            while next_node and next_node != END:
-                updates = self._nodes[next_node](cast(StewardState, current_state))
-                if updates:
-                    current_state.update(updates)
-                next_node = self._edges.get(next_node)
-            return cast(StewardState, current_state)
-
-    class StateGraph:  # type: ignore[override]
-        """Compatibility shim that preserves the minimal API used in this repository."""
-
-        def __init__(self, _state_type: object) -> None:
-            self._nodes: dict[str, GraphNode] = {}
-            self._edges: dict[str, str] = {}
-
-        def add_node(self, name: str, node: GraphNode) -> None:
-            self._nodes[name] = node
-
-        def add_edge(self, source: str, target: str) -> None:
-            self._edges[source] = target
-
-        def compile(self) -> _CompiledStateGraph:
-            return _CompiledStateGraph(nodes=self._nodes, edges=self._edges)
+CHECKPOINT_MSGPACK_ALLOWLIST = (
+    ApprovalDecision,
+    AskCitation,
+    AskResultMode,
+    AskWorkflowResult,
+    DigestSourceNote,
+    DigestWorkflowResult,
+    GuardrailAction,
+    IngestAnalysisFinding,
+    IngestAnalysisResult,
+    IngestWorkflowResult,
+    PatchOp,
+    PostWritebackSyncResult,
+    Proposal,
+    ProposalEvidence,
+    RetrievalMetadataFilter,
+    RetrievedChunkCandidate,
+    RiskLevel,
+    SafetyChecks,
+    WorkflowAction,
+    WritebackResult,
+)
 
 
 @dataclass(frozen=True)
@@ -105,7 +110,6 @@ class WorkflowGraphExecution:
     run_id: str
     state: StewardState
     trace_events: list[RuntimeTraceEvent]
-    used_langgraph: bool
     checkpoint_used: bool
     resumed_from_node: str | None
 
@@ -162,10 +166,63 @@ def build_workflow_graph_execution(
         run_id=cast(str, final_state["run_id"]),
         state=final_state,
         trace_events=cast(list[RuntimeTraceEvent], final_state.get("trace_events", [])),
-        used_langgraph=LANGGRAPH_AVAILABLE,
         checkpoint_used=checkpoint_run.checkpoint_used,
         resumed_from_node=checkpoint_run.resumed_from_node,
     )
+
+
+@contextmanager
+def open_sqlite_checkpointer(db_path: Path) -> Iterator[SqliteSaver]:
+    normalized_db_path = initialize_index_db(db_path)
+    connection = sqlite3.connect(str(normalized_db_path), check_same_thread=False)
+    try:
+        checkpointer = SqliteSaver(
+            connection,
+            serde=JsonPlusSerializer(
+                allowed_msgpack_modules=CHECKPOINT_MSGPACK_ALLOWLIST,
+            ),
+        )
+        yield checkpointer
+    finally:
+        connection.close()
+
+
+def build_graph_run_config(
+    *,
+    thread_id: str,
+    checkpoint_id: str | None = None,
+) -> dict[str, dict[str, str]]:
+    configurable = {"thread_id": thread_id}
+    if checkpoint_id is not None:
+        configurable["checkpoint_id"] = checkpoint_id
+    return {"configurable": configurable}
+
+
+def invoke_compiled_state_graph(
+    *,
+    graph: Any,
+    state: StewardState,
+    thread_id: str,
+) -> StewardState:
+    return cast(
+        StewardState,
+        graph.invoke(
+            state,
+            config=build_graph_run_config(thread_id=thread_id),
+        ),
+    )
+
+
+def load_compiled_graph_state(
+    *,
+    graph: Any,
+    thread_id: str,
+) -> StewardState | None:
+    state_snapshot = graph.get_state(build_graph_run_config(thread_id=thread_id))
+    snapshot_values = getattr(state_snapshot, "values", None)
+    if not snapshot_values:
+        return None
+    return cast(StewardState, dict(snapshot_values))
 
 
 def append_trace_event(
@@ -200,10 +257,10 @@ def append_trace_event(
     return trace_events
 
 
-def invoke_checkpointed_linear_graph(
+def invoke_checkpointed_compiled_graph(
     *,
     graph_name: str,
-    steps: list[GraphStep],
+    graph: Any,
     initial_state: StewardState,
     checkpoint_db_path: Path,
     resume_from_checkpoint: bool,
@@ -212,7 +269,6 @@ def invoke_checkpointed_linear_graph(
     resume_match_fields: tuple[str, ...] = (),
 ) -> CheckpointedGraphRun:
     current_state = cast(StewardState, dict(initial_state))
-    start_index = 0
     checkpoint_used = False
     resumed_from_node: str | None = None
     resumed_from_status: WorkflowCheckpointStatus | None = None
@@ -233,9 +289,13 @@ def invoke_checkpointed_linear_graph(
             and checkpoint.action_type == current_state["action_type"]
             and matches_resume_fields
         ):
-            resumed_state = _hydrate_state_from_checkpoint(
+            persisted_state = _load_compiled_graph_state_safely(
+                graph=graph,
+                state=current_state,
+            )
+            resumed_state = hydrate_business_checkpoint_state(
                 current_state=current_state,
-                checkpoint_state=checkpoint.state,
+                restored_state=persisted_state or checkpoint.state,
             )
             trace_events = append_trace_event(
                 resumed_state,
@@ -252,16 +312,10 @@ def invoke_checkpointed_linear_graph(
             )
             resumed_state["trace_events"] = trace_events
 
-            resume_index = _resolve_resume_index(
-                steps=steps,
-                next_node_name=checkpoint.next_node_name,
-                last_completed_node=checkpoint.last_completed_node,
-            )
             if (
                 checkpoint.checkpoint_status == WorkflowCheckpointStatus.COMPLETED
                 and _has_required_terminal_fields(resumed_state, required_terminal_fields)
             ):
-                # 已完成 checkpoint 直接短路返回，避免 ask 重打模型、ingest 重跑整库。
                 return CheckpointedGraphRun(
                     state=resumed_state,
                     checkpoint_used=True,
@@ -269,26 +323,10 @@ def invoke_checkpointed_linear_graph(
                     resumed_from_status=checkpoint.checkpoint_status,
                 )
 
-            if checkpoint.checkpoint_status == WorkflowCheckpointStatus.COMPLETED:
-                current_state = _build_fresh_state_after_invalid_checkpoint(
-                    initial_state=initial_state,
-                    previous_state=resumed_state,
-                    message=(
-                        "Completed checkpoint did not contain the required terminal state; "
-                        "starting a fresh execution."
-                    ),
-                )
-                start_index = 0
-                checkpoint_used = False
-                resumed_from_status = None
-                resumed_from_node = None
-            else:
-                current_state = resumed_state
-                start_index = resume_index
-                checkpoint_used = True
-                resumed_from_status = checkpoint.checkpoint_status
-                resumed_from_node = steps[resume_index].name if resume_index < len(steps) else None
-
+            current_state = resumed_state
+            checkpoint_used = True
+            resumed_from_status = checkpoint.checkpoint_status
+            resumed_from_node = checkpoint.next_node_name or checkpoint.last_completed_node
         else:
             mismatch_details: dict[str, object] = {
                 "resume_requested": True,
@@ -310,48 +348,13 @@ def invoke_checkpointed_linear_graph(
             )
             current_state["trace_events"] = trace_events
 
-    for step_index in range(start_index, len(steps)):
-        step = steps[step_index]
-        try:
-            updates = step.node(current_state)
-        except Exception as exc:
-            current_state["errors"] = _append_graph_error(
-                current_state,
-                error_source="checkpoint_runtime",
-                message=(
-                    f"{graph_name}.{step.name} raised {exc.__class__.__name__}: {exc}"
-                ),
-            )
-            _save_checkpoint_safely(
-                db_path=checkpoint_db_path,
-                graph_name=graph_name,
-                checkpoint_status=WorkflowCheckpointStatus.FAILED,
-                last_completed_node=steps[step_index - 1].name if step_index > 0 else None,
-                next_node_name=step.name,
-                state=current_state,
-            )
-            raise
-
-        if updates:
-            current_state.update(updates)
-
-        next_node_name = steps[step_index + 1].name if step_index + 1 < len(steps) else None
-        checkpoint_status = (
-            WorkflowCheckpointStatus.COMPLETED
-            if next_node_name is None
-            else WorkflowCheckpointStatus.IN_PROGRESS
-        )
-        _save_checkpoint_safely(
-            db_path=checkpoint_db_path,
-            graph_name=graph_name,
-            checkpoint_status=checkpoint_status,
-            last_completed_node=step.name,
-            next_node_name=next_node_name,
-            state=current_state,
-        )
-
-    return CheckpointedGraphRun(
+    final_state = invoke_compiled_state_graph(
+        graph=graph,
         state=current_state,
+        thread_id=cast(str, current_state["thread_id"]),
+    )
+    return CheckpointedGraphRun(
+        state=final_state,
         checkpoint_used=checkpoint_used,
         resumed_from_node=resumed_from_node,
         resumed_from_status=resumed_from_status,
@@ -406,37 +409,41 @@ def _save_checkpoint_safely(
         )
 
 
-def _hydrate_state_from_checkpoint(
+def save_business_checkpoint_safely(
     *,
-    current_state: StewardState,
-    checkpoint_state: StewardState,
-) -> StewardState:
-    resumed_state = cast(StewardState, dict(checkpoint_state))
-    # 恢复的是“业务状态”，不是把上一次 run 原封不动复制回来；
-    # 当前 run_id 和本次 trace 必须重新生成，否则一次恢复会和历史执行混成同一轮。
-    resumed_state["thread_id"] = current_state["thread_id"]
-    resumed_state["run_id"] = current_state["run_id"]
-    resumed_state["action_type"] = current_state["action_type"]
-    resumed_state["trace_events"] = []
-    resumed_state["transient_prompt_context"] = {}
-    return resumed_state
-
-
-def _resolve_resume_index(
-    *,
-    steps: list[GraphStep],
-    next_node_name: str | None,
+    db_path: Path,
+    graph_name: str,
+    checkpoint_status: WorkflowCheckpointStatus,
     last_completed_node: str | None,
-) -> int:
-    if next_node_name:
-        for index, step in enumerate(steps):
-            if step.name == next_node_name:
-                return index
-    if last_completed_node:
-        for index, step in enumerate(steps):
-            if step.name == last_completed_node:
-                return min(index + 1, len(steps))
-    return 0
+    next_node_name: str | None,
+    state: StewardState,
+) -> None:
+    _save_checkpoint_safely(
+        db_path=db_path,
+        graph_name=graph_name,
+        checkpoint_status=checkpoint_status,
+        last_completed_node=last_completed_node,
+        next_node_name=next_node_name,
+        state=state,
+    )
+
+def _load_compiled_graph_state_safely(
+    *,
+    graph: Any,
+    state: StewardState,
+) -> StewardState | None:
+    try:
+        return load_compiled_graph_state(
+            graph=graph,
+            thread_id=cast(str, state["thread_id"]),
+        )
+    except Exception as exc:
+        state["errors"] = _append_graph_error(
+            state,
+            error_source="checkpoint_load",
+            message=f"Failed to load compiled graph state: {exc.__class__.__name__}: {exc}",
+        )
+        return None
 
 
 def _has_required_terminal_fields(
@@ -478,22 +485,3 @@ def _append_graph_error(
         }
     )
     return errors
-
-
-def _build_fresh_state_after_invalid_checkpoint(
-    *,
-    initial_state: StewardState,
-    previous_state: StewardState,
-    message: str,
-) -> StewardState:
-    fresh_state = cast(StewardState, dict(initial_state))
-    fresh_state["trace_events"] = list(
-        cast(list[RuntimeTraceEvent], previous_state.get("trace_events", []))
-    )
-    fresh_state["errors"] = list(cast(list[dict[str, object]], previous_state.get("errors", [])))
-    fresh_state["errors"] = _append_graph_error(
-        fresh_state,
-        error_source="checkpoint_validation",
-        message=message,
-    )
-    return fresh_state

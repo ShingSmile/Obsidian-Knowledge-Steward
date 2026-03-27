@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Any
 
 from app.config import Settings
 from app.contracts.workflow import (
@@ -18,9 +19,12 @@ from app.graphs.runtime import (
     build_base_workflow_state,
     build_workflow_graph_execution,
     build_workflow_runtime_trace_hook,
-    invoke_checkpointed_linear_graph,
+    invoke_checkpointed_compiled_graph,
+    open_sqlite_checkpointer,
+    save_business_checkpoint_safely,
     WorkflowGraphExecution,
 )
+from app.graphs.checkpoint import WorkflowCheckpointStatus
 from app.graphs.state import StewardState
 from app.services.ask import run_minimal_ask
 
@@ -44,20 +48,39 @@ def invoke_ask_graph(
         run_id=run_id,
     )
     runtime_trace_hook = build_workflow_runtime_trace_hook(settings, trace_hook)
-    execution = invoke_checkpointed_linear_graph(
-        graph_name="ask_graph",
-        steps=_build_ask_steps(settings=settings, trace_hook=runtime_trace_hook),
-        initial_state=initial_state,
-        checkpoint_db_path=settings.index_db_path,
-        resume_from_checkpoint=request.resume_from_checkpoint,
-        trace_hook=runtime_trace_hook,
-        required_terminal_fields=("ask_result",),
-    )
+    with open_sqlite_checkpointer(settings.index_db_path) as checkpointer:
+        graph = build_ask_graph(
+            settings=settings,
+            trace_hook=runtime_trace_hook,
+            checkpointer=checkpointer,
+        )
+        execution = invoke_checkpointed_compiled_graph(
+            graph_name="ask_graph",
+            graph=graph,
+            initial_state=initial_state,
+            checkpoint_db_path=settings.index_db_path,
+            resume_from_checkpoint=request.resume_from_checkpoint,
+            trace_hook=runtime_trace_hook,
+            required_terminal_fields=("ask_result",),
+        )
     final_state = execution.state
 
     ask_result = final_state.get("ask_result")
     if ask_result is None:
         raise RuntimeError("ask_graph completed without producing ask_result.")
+
+    if not (
+        execution.checkpoint_used
+        and execution.resumed_from_status == WorkflowCheckpointStatus.COMPLETED
+    ):
+        save_business_checkpoint_safely(
+            db_path=settings.index_db_path,
+            graph_name="ask_graph",
+            checkpoint_status=WorkflowCheckpointStatus.COMPLETED,
+            last_completed_node=_resolve_last_completed_node(final_state),
+            next_node_name=None,
+            state=final_state,
+        )
 
     shared_execution = build_workflow_graph_execution(
         graph_name="ask_graph",
@@ -72,7 +95,6 @@ def invoke_ask_graph(
         run_id=shared_execution.run_id,
         state=shared_execution.state,
         trace_events=shared_execution.trace_events,
-        used_langgraph=shared_execution.used_langgraph,
         checkpoint_used=shared_execution.checkpoint_used,
         resumed_from_node=shared_execution.resumed_from_node,
         ask_result=ask_result,
@@ -99,6 +121,7 @@ def build_ask_graph(
     *,
     settings: Settings,
     trace_hook: TraceHook | None = None,
+    checkpointer: Any | None = None,
 ):
     workflow = StateGraph(StewardState)
     steps = _build_ask_steps(settings=settings, trace_hook=trace_hook)
@@ -108,7 +131,14 @@ def build_ask_graph(
     for current_step, next_step in zip(steps, steps[1:]):
         workflow.add_edge(current_step.name, next_step.name)
     workflow.add_edge(steps[-1].name, END)
-    return workflow.compile()
+    return workflow.compile(checkpointer=checkpointer)
+
+
+def _resolve_last_completed_node(state: StewardState) -> str | None:
+    trace_events = state.get("trace_events", [])
+    if not trace_events:
+        return None
+    return trace_events[-1]["node_name"]
 
 
 def _build_ask_steps(

@@ -9,6 +9,8 @@ import unittest
 
 from app.contracts.workflow import (
     ApprovalDecision,
+    AskResultMode,
+    AskWorkflowResult,
     AuditEvent,
     PatchOp,
     Proposal,
@@ -21,6 +23,7 @@ from app.contracts.workflow import (
 )
 from app.graphs.checkpoint import (
     WorkflowCheckpointStatus,
+    hydrate_business_checkpoint_state,
     load_graph_checkpoint,
     save_graph_checkpoint,
 )
@@ -320,6 +323,77 @@ body text
                 checkpoint.state["retrieval_filter"].note_types,
                 ["summary_note"],
             )
+
+    def test_save_and_load_graph_checkpoint_keeps_business_fields_without_trace_state(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            db_path = Path(temp_dir) / "knowledge_steward.sqlite3"
+            initialize_index_db(db_path)
+
+            save_graph_checkpoint(
+                db_path,
+                graph_name="ask_graph",
+                checkpoint_status=WorkflowCheckpointStatus.COMPLETED,
+                last_completed_node="finalize_ask",
+                next_node_name=None,
+                state={
+                    "thread_id": "thread_checkpoint_business_state",
+                    "run_id": "run_checkpoint_business_state",
+                    "action_type": WorkflowAction.ASK_QA,
+                    "user_query": "Roadmap",
+                    "ask_result": AskWorkflowResult(
+                        mode=AskResultMode.RETRIEVAL_ONLY,
+                        query="Roadmap",
+                        answer="Summary",
+                    ),
+                    "approval_required": False,
+                    "trace_events": [{"stale": True}],
+                    "transient_prompt_context": {"stale": True},
+                    "errors": [],
+                },
+            )
+
+            checkpoint = load_graph_checkpoint(
+                db_path,
+                thread_id="thread_checkpoint_business_state",
+                graph_name="ask_graph",
+            )
+
+            self.assertIsNotNone(checkpoint)
+            assert checkpoint is not None
+            self.assertEqual(checkpoint.checkpoint_status, WorkflowCheckpointStatus.COMPLETED)
+            self.assertEqual(checkpoint.last_completed_node, "finalize_ask")
+            self.assertEqual(checkpoint.last_run_id, "run_checkpoint_business_state")
+            self.assertEqual(checkpoint.state["ask_result"].answer, "Summary")
+            self.assertNotIn("trace_events", checkpoint.state)
+            self.assertNotIn("transient_prompt_context", checkpoint.state)
+
+    def test_hydrate_business_checkpoint_state_resets_run_identity_and_transient_fields(self) -> None:
+        hydrated_state = hydrate_business_checkpoint_state(
+            current_state={
+                "thread_id": "thread_current",
+                "run_id": "run_current",
+                "action_type": WorkflowAction.ASK_QA,
+            },
+            restored_state={
+                "thread_id": "thread_restored",
+                "run_id": "run_restored",
+                "action_type": WorkflowAction.ASK_QA,
+                "ask_result": AskWorkflowResult(
+                    mode=AskResultMode.RETRIEVAL_ONLY,
+                    query="Roadmap",
+                    answer="Summary",
+                ),
+                "trace_events": [{"old": True}],
+                "transient_prompt_context": {"old": True},
+            },
+        )
+
+        self.assertEqual(hydrated_state["thread_id"], "thread_current")
+        self.assertEqual(hydrated_state["run_id"], "run_current")
+        self.assertEqual(hydrated_state["action_type"], WorkflowAction.ASK_QA)
+        self.assertEqual(hydrated_state["trace_events"], [])
+        self.assertEqual(hydrated_state["transient_prompt_context"], {})
+        self.assertEqual(hydrated_state["ask_result"].answer, "Summary")
 
     def test_save_and_load_proposal_roundtrip(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

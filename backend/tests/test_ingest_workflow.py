@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import replace
 import json
 from pathlib import Path
+import sqlite3
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -90,6 +91,7 @@ class IngestWorkflowTests(unittest.TestCase):
             self.assertEqual(execution.ingest_result.scanned_notes, 2)
             self.assertEqual(execution.ingest_result.created_notes, 2)
             self.assertEqual(execution.ingest_result.updated_notes, 0)
+            self.assertFalse(hasattr(execution, "used_langgraph"))
             self.assertEqual(len(execution.trace_events), 3)
             self.assertEqual(
                 [event["node_name"] for event in execution.trace_events],
@@ -153,6 +155,44 @@ class IngestWorkflowTests(unittest.TestCase):
             self.assertIn("scanned_notes", run_trace_events[1].details)
             self.assertTrue(trace_path.exists())
 
+    def test_invoke_ingest_graph_persists_langgraph_sqlite_checkpoints(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_root = Path(temp_dir)
+            vault_path = self._build_vault_fixture(temp_root)
+            db_path = temp_root / "knowledge_steward.sqlite3"
+            settings = replace(
+                get_settings(),
+                sample_vault_dir=vault_path,
+                index_db_path=db_path,
+            )
+
+            execution = invoke_ingest_graph(
+                WorkflowInvokeRequest(
+                    thread_id="thread_sqlitesaver_ingest",
+                    action_type=WorkflowAction.INGEST_STEWARD,
+                ),
+                settings=settings,
+                thread_id="thread_sqlitesaver_ingest",
+                run_id="run_sqlitesaver_ingest",
+            )
+
+            connection = sqlite3.connect(db_path)
+            try:
+                checkpoint_rows = connection.execute(
+                    """
+                    SELECT thread_id, checkpoint_ns, checkpoint_id
+                    FROM checkpoints
+                    WHERE thread_id = ?
+                    ORDER BY checkpoint_id ASC
+                    """,
+                    ("thread_sqlitesaver_ingest",),
+                ).fetchall()
+            finally:
+                connection.close()
+
+            self.assertEqual(execution.ingest_result.scanned_notes, 2)
+            self.assertGreaterEqual(len(checkpoint_rows), 1)
+
     def test_invoke_workflow_resumes_completed_ingest_from_checkpoint(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_root = Path(temp_dir)
@@ -180,14 +220,18 @@ class IngestWorkflowTests(unittest.TestCase):
                     side_effect=AssertionError("resume should not rerun full ingest"),
                 ):
                     resumed_response = Response()
-                    resumed_result = invoke_workflow(
-                        WorkflowInvokeRequest(
-                            thread_id="thread_resume_ingest",
-                            action_type=WorkflowAction.INGEST_STEWARD,
-                            resume_from_checkpoint=True,
-                        ),
-                        resumed_response,
-                    )
+                    with self.assertNoLogs(
+                        "langgraph.checkpoint.serde.jsonplus",
+                        level="WARNING",
+                    ):
+                        resumed_result = invoke_workflow(
+                            WorkflowInvokeRequest(
+                                thread_id="thread_resume_ingest",
+                                action_type=WorkflowAction.INGEST_STEWARD,
+                                resume_from_checkpoint=True,
+                            ),
+                            resumed_response,
+                        )
 
             self.assertEqual(resumed_response.status_code, 200)
             self.assertEqual(resumed_result.message, "Ingest workflow resumed from checkpoint.")
@@ -654,15 +698,19 @@ class IngestWorkflowTests(unittest.TestCase):
                     ),
                 ) as mocked_ingest:
                     resumed_response = Response()
-                    resumed_result = invoke_workflow(
-                        WorkflowInvokeRequest(
-                            thread_id="thread_scope_change",
-                            action_type=WorkflowAction.INGEST_STEWARD,
-                            note_path="Beta.md",
-                            resume_from_checkpoint=True,
-                        ),
-                        resumed_response,
-                    )
+                    with self.assertNoLogs(
+                        "langgraph.checkpoint.serde.jsonplus",
+                        level="WARNING",
+                    ):
+                        resumed_result = invoke_workflow(
+                            WorkflowInvokeRequest(
+                                thread_id="thread_scope_change",
+                                action_type=WorkflowAction.INGEST_STEWARD,
+                                note_path="Beta.md",
+                                resume_from_checkpoint=True,
+                            ),
+                            resumed_response,
+                        )
 
             self.assertEqual(resumed_response.status_code, 200)
             self.assertEqual(

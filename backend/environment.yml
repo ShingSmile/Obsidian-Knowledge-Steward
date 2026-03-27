@@ -8,3 +8,4 @@ dependencies:
   - pydantic>=2.10,<3.0
   - pip:
       - langgraph
+      - langgraph-checkpoint-sqlite

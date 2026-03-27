@@ -297,6 +297,22 @@ def deserialize_state_from_checkpoint(payload: dict[str, Any]) -> StewardState:
     return cast(StewardState, state)
 
 
+def hydrate_business_checkpoint_state(
+    *,
+    current_state: StewardState,
+    restored_state: StewardState,
+) -> StewardState:
+    hydrated_state = cast(StewardState, dict(restored_state))
+    # 恢复的是“业务状态”，不是把上一次 run 原封不动复制回来；
+    # 当前 run_id 和本次 trace 必须重新生成，否则一次恢复会和历史执行混成同一轮。
+    hydrated_state["thread_id"] = current_state["thread_id"]
+    hydrated_state["run_id"] = current_state["run_id"]
+    hydrated_state["action_type"] = current_state["action_type"]
+    hydrated_state["trace_events"] = []
+    hydrated_state["transient_prompt_context"] = {}
+    return hydrated_state
+
+
 def _build_checkpoint_id(*, thread_id: str, graph_name: str) -> str:
     digest = hashlib.sha1(f"{thread_id}:{graph_name}".encode("utf-8")).hexdigest()
     return f"ckpt_{digest[:16]}"
