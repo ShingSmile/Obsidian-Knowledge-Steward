@@ -520,7 +520,7 @@ class AskWorkflowTests(unittest.TestCase):
                                 }
                             ],
                         },
-                        allow_context_reentry=True,
+                        allow_context_reentry=False,
                     ),
                 ):
                     with patch("app.services.ask._request_grounded_answer") as mocked_answer:
@@ -535,6 +535,60 @@ class AskWorkflowTests(unittest.TestCase):
             self.assertEqual(result.mode, AskResultMode.RETRIEVAL_ONLY)
             self.assertTrue(result.tool_call_attempted)
             self.assertEqual(result.tool_call_used, "find_backlinks")
+            self.assertEqual(result.guardrail_action, GuardrailAction.TOOL_RESULT_INSUFFICIENT)
+            mocked_answer.assert_not_called()
+
+    def test_run_minimal_ask_downgrades_when_search_notes_cannot_safely_reenter(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            db_path = self._build_index_fixture(Path(temp_dir))
+            settings = replace(
+                get_settings(),
+                index_db_path=db_path,
+                cloud_base_url="https://example.com",
+                cloud_chat_model="gpt-test",
+                local_chat_model="",
+            )
+
+            with patch(
+                "app.services.ask._request_tool_call_decision",
+                return_value=ToolCallDecision(
+                    requested=True,
+                    tool_name="search_notes",
+                    arguments={"query": "Roadmap", "limit": 3},
+                    rationale="Need search results before answering.",
+                ),
+            ):
+                with patch(
+                    "app.services.ask.execute_tool_call",
+                    return_value=ToolExecutionResult(
+                        tool_name="search_notes",
+                        ok=True,
+                        data={
+                            "results": [
+                                {
+                                    "path": "Roadmap.md",
+                                    "chunk_id": "roadmap-1",
+                                    "heading_path": "Roadmap",
+                                    "text": "search marker",
+                                    "score": 0.9,
+                                }
+                            ]
+                        },
+                        allow_context_reentry=False,
+                    ),
+                ):
+                    with patch("app.services.ask._request_grounded_answer") as mocked_answer:
+                        result = run_minimal_ask(
+                            WorkflowInvokeRequest(
+                                action_type=WorkflowAction.ASK_QA,
+                                user_query="Roadmap",
+                            ),
+                            settings=settings,
+                        )
+
+            self.assertEqual(result.mode, AskResultMode.RETRIEVAL_ONLY)
+            self.assertTrue(result.tool_call_attempted)
+            self.assertEqual(result.tool_call_used, "search_notes")
             self.assertEqual(result.guardrail_action, GuardrailAction.TOOL_RESULT_INSUFFICIENT)
             mocked_answer.assert_not_called()
 

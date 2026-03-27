@@ -37,10 +37,6 @@ PROMPT_VISIBLE_TOOL_NAMES = {
     "load_note_excerpt",
     "get_note_outline",
 }
-REQUIRED_PROMPT_VISIBLE_TOOL_NAMES = {
-    "get_note_outline",
-    "find_backlinks",
-}
 
 
 @dataclass(frozen=True)
@@ -172,7 +168,7 @@ def run_minimal_ask(
             tool_results,
             prompt_candidates=prompt_candidates,
         )
-        if tool_decision.tool_name in REQUIRED_PROMPT_VISIBLE_TOOL_NAMES and not prompt_tool_results:
+        if any(not result.allow_context_reentry for result in tool_results) and not prompt_tool_results:
             return _build_retrieval_only_result(
                 query=query,
                 citations=citations,
