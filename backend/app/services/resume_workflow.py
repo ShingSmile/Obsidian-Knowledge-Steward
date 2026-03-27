@@ -29,6 +29,10 @@ from app.indexing.store import (
     initialize_index_db,
     load_proposal,
 )
+from app.services.proposal_validation import (
+    ProposalValidationError,
+    validate_proposal_for_persistence,
+)
 
 
 class ResumeWorkflowError(ValueError):
@@ -83,6 +87,13 @@ def resume_workflow(
             raise ResumeWorkflowNotFoundError(
                 f"No persisted proposal was found for proposal_id={request.proposal_id!r}."
             )
+        try:
+            validate_proposal_for_persistence(
+                persisted_proposal.proposal,
+                settings=settings,
+            )
+        except ProposalValidationError as exc:
+            raise ResumeWorkflowValidationError(str(exc)) from exc
         if persisted_proposal.thread_id != request.thread_id:
             raise ResumeWorkflowConflictError(
                 "The provided proposal_id does not belong to the supplied thread_id."

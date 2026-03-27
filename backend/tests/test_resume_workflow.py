@@ -32,6 +32,7 @@ from app.graphs.checkpoint import (
 )
 from app.indexing.ingest import ingest_vault
 from app.indexing.store import connect_sqlite, initialize_index_db, load_proposal, save_proposal
+from app.services.resume_workflow import ResumeWorkflowValidationError, resume_workflow
 from app.main import (
     list_pending_approvals_endpoint,
     resume_workflow_endpoint,
@@ -505,6 +506,61 @@ class ResumeWorkflowTests(unittest.TestCase):
             self.assertEqual(raised.exception.status_code, 400)
             self.assertIn("must not include writeback_result", raised.exception.detail)
 
+    def test_resume_workflow_rejects_stored_proposal_that_fails_static_validation(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_root = Path(temp_dir)
+            vault_path = temp_root / "vault"
+            target_note_path = vault_path / "Digest" / "2026-03-14.md"
+            db_path = temp_root / "knowledge_steward.sqlite3"
+            proposal = self._seed_waiting_approval_fixture(
+                db_path,
+                target_note_path=target_note_path,
+            )
+
+            connection = sqlite3.connect(db_path)
+            try:
+                connection.execute(
+                    """
+                    UPDATE patch_op
+                    SET payload_json = ?
+                    WHERE proposal_id = ? AND ordinal = 1;
+                    """,
+                    (
+                        json.dumps(
+                            {
+                                "heading_path": "## Digest",
+                                "content": "<script>alert(1)</script>",
+                            }
+                        ),
+                        proposal.proposal_id,
+                    ),
+                )
+                connection.commit()
+            finally:
+                connection.close()
+
+            settings = replace(
+                get_settings(),
+                sample_vault_dir=vault_path,
+                index_db_path=db_path,
+            )
+
+            with self.assertRaises(ResumeWorkflowValidationError) as raised:
+                resume_workflow(
+                    WorkflowResumeRequest(
+                        thread_id="thread_resume_digest",
+                        proposal_id=proposal.proposal_id,
+                        approval_decision=ApprovalDecision(
+                            approved=True,
+                            reviewer="reviewer_static_validation",
+                        ),
+                    ),
+                    settings=settings,
+                    run_id="run_static_validation",
+                )
+
+            self.assertIn("script", str(raised.exception).lower())
+
     def test_resume_workflow_is_idempotent_for_the_same_approval_decision(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             db_path = Path(temp_dir) / "knowledge_steward.sqlite3"
@@ -787,7 +843,7 @@ class ResumeWorkflowTests(unittest.TestCase):
         normalized_target_note_path = (
             target_note_path.resolve()
             if target_note_path is not None
-            else Path("/vault/Digest/2026-03-14.md")
+            else get_settings().sample_vault_dir / "Digest" / "2026-03-14.md"
         )
         before_hash = (
             self._compute_file_hash(normalized_target_note_path)
@@ -829,17 +885,22 @@ class ResumeWorkflowTests(unittest.TestCase):
                 contains_delete=False,
             ),
         )
+        proposal_settings = replace(
+            get_settings(),
+            sample_vault_dir=normalized_target_note_path.parent.parent,
+        )
 
         connection = connect_sqlite(db_path)
         try:
-            save_proposal(
-                connection,
-                thread_id="thread_resume_digest",
-                proposal=proposal,
-                approval_required=True,
-                run_id="run_waiting_digest",
-                idempotency_key="resume_digest_20260314",
-            )
+            with patch("app.indexing.store.get_settings", return_value=proposal_settings):
+                save_proposal(
+                    connection,
+                    thread_id="thread_resume_digest",
+                    proposal=proposal,
+                    approval_required=True,
+                    run_id="run_waiting_digest",
+                    idempotency_key="resume_digest_20260314",
+                )
             persisted = load_proposal(connection, proposal_id=proposal.proposal_id)
             self.assertIsNotNone(persisted)
         finally:

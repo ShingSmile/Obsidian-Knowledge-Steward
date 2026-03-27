@@ -19,6 +19,7 @@ from app.contracts.workflow import (
     SafetyChecks,
 )
 from app.indexing.models import ParsedNote
+from app.services.proposal_validation import validate_proposal_for_persistence
 
 
 SCHEMA_VERSION = 7
@@ -892,6 +893,11 @@ def save_proposal_record(
 ) -> None:
     if not thread_id:
         raise ValueError("thread_id must not be empty when saving a proposal.")
+
+    validate_proposal_for_persistence(
+        proposal,
+        settings=get_settings(),
+    )
 
     proposal_params = {
         "proposal_id": proposal.proposal_id,
