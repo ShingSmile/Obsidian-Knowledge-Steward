@@ -37,6 +37,10 @@ PROMPT_VISIBLE_TOOL_NAMES = {
     "load_note_excerpt",
     "get_note_outline",
 }
+REQUIRED_PROMPT_VISIBLE_TOOL_NAMES = {
+    "get_note_outline",
+    "find_backlinks",
+}
 
 
 @dataclass(frozen=True)
@@ -168,6 +172,20 @@ def run_minimal_ask(
             tool_results,
             prompt_candidates=prompt_candidates,
         )
+        if tool_decision.tool_name in REQUIRED_PROMPT_VISIBLE_TOOL_NAMES and not prompt_tool_results:
+            return _build_retrieval_only_result(
+                query=query,
+                citations=citations,
+                candidates=prompt_candidates,
+                retrieval_fallback_used=retrieval_response.fallback_used,
+                retrieval_fallback_reason=retrieval_response.fallback_reason,
+                tool_decision=tool_decision,
+                guardrail_outcome=GuardrailOutcome(
+                    action=GuardrailAction.TOOL_RESULT_INSUFFICIENT,
+                    applied=True,
+                    reasons=["tool_result_not_prompt_safe"],
+                ),
+            )
         bundle = build_ask_context_bundle(
             user_query=query,
             candidates=candidates,
@@ -313,7 +331,8 @@ def _select_prompt_tool_results(
             note_path = trimmed_data.get("note_path")
             if not isinstance(note_path, str) or not _has_unique_prompt_candidate_path(note_path, prompt_candidates):
                 continue
-            trimmed_data = _trim_outline_prompt_payload(trimmed_data)
+            if _serialized_tool_payload_chars(trimmed_data) > ASK_TOOL_RESULT_CHAR_BUDGET:
+                continue
         selected.append(
             ToolExecutionResult(
                 tool_name=result.tool_name,
@@ -326,55 +345,8 @@ def _select_prompt_tool_results(
     return selected
 
 
-def _trim_outline_prompt_payload(data: dict[str, object]) -> dict[str, object]:
-    trimmed = dict(data)
-    frontmatter_summary = trimmed.get("frontmatter_summary")
-    if isinstance(frontmatter_summary, dict):
-        trimmed_frontmatter_summary = dict(frontmatter_summary)
-        raw_text = trimmed_frontmatter_summary.get("raw_text")
-        if isinstance(raw_text, str):
-            trimmed_frontmatter_summary["raw_text"] = raw_text[:ASK_TOOL_RESULT_CHAR_BUDGET]
-        trimmed["frontmatter_summary"] = trimmed_frontmatter_summary
-    headings = trimmed.get("headings")
-    if isinstance(headings, list):
-        trimmed["headings"] = [
-            dict(heading) if isinstance(heading, dict) else heading
-            for heading in headings
-        ]
-    while _serialized_tool_payload_chars(trimmed) > ASK_TOOL_RESULT_CHAR_BUDGET:
-        if _trim_outline_headings_once(trimmed):
-            continue
-        if _trim_outline_frontmatter_once(trimmed):
-            continue
-        break
-    return trimmed
-
-
 def _serialized_tool_payload_chars(data: dict[str, object]) -> int:
     return len(json.dumps(data, ensure_ascii=False, sort_keys=True))
-
-
-def _trim_outline_headings_once(data: dict[str, object]) -> bool:
-    headings = data.get("headings")
-    if not isinstance(headings, list) or not headings:
-        return False
-    data["headings"] = headings[:-1]
-    return True
-
-
-def _trim_outline_frontmatter_once(data: dict[str, object]) -> bool:
-    frontmatter_summary = data.get("frontmatter_summary")
-    if not isinstance(frontmatter_summary, dict):
-        return False
-    raw_text = frontmatter_summary.get("raw_text")
-    if not isinstance(raw_text, str) or not raw_text:
-        return False
-    overflow = _serialized_tool_payload_chars(data) - ASK_TOOL_RESULT_CHAR_BUDGET
-    trim_amount = max(overflow + 32, max(1, len(raw_text) // 4))
-    trimmed_frontmatter_summary = dict(frontmatter_summary)
-    trimmed_frontmatter_summary["raw_text"] = raw_text[: max(0, len(raw_text) - trim_amount)]
-    data["frontmatter_summary"] = trimmed_frontmatter_summary
-    return True
 
 
 def _has_unique_prompt_candidate_path(

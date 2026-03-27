@@ -482,7 +482,7 @@ class AskWorkflowTests(unittest.TestCase):
                 captured_messages["messages"][1]["content"],
             )
 
-    def test_run_minimal_ask_does_not_reenter_find_backlinks_payload(self) -> None:
+    def test_run_minimal_ask_downgrades_when_find_backlinks_cannot_safely_reenter(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             db_path = self._build_index_fixture(Path(temp_dir))
             settings = replace(
@@ -523,25 +523,7 @@ class AskWorkflowTests(unittest.TestCase):
                         allow_context_reentry=True,
                     ),
                 ):
-                    captured_messages: dict[str, list[dict[str, str]]] = {}
-
-                    def _capture_grounded_answer(
-                        *,
-                        provider_target: object,
-                        query: str,
-                        bundle: object,
-                    ) -> str:
-                        del provider_target
-                        captured_messages["messages"] = ask_service._build_grounded_messages(
-                            query=query,
-                            bundle=bundle,
-                        )
-                        return "Roadmap 的结构已确认。[1]"
-
-                    with patch(
-                        "app.services.ask._request_grounded_answer",
-                        side_effect=_capture_grounded_answer,
-                    ):
+                    with patch("app.services.ask._request_grounded_answer") as mocked_answer:
                         result = run_minimal_ask(
                             WorkflowInvokeRequest(
                                 action_type=WorkflowAction.ASK_QA,
@@ -550,12 +532,11 @@ class AskWorkflowTests(unittest.TestCase):
                             settings=settings,
                         )
 
-            self.assertEqual(result.mode, AskResultMode.GENERATED_ANSWER)
-            self.assertIn("messages", captured_messages)
-            self.assertNotIn(
-                "unique backlink marker",
-                captured_messages["messages"][1]["content"],
-            )
+            self.assertEqual(result.mode, AskResultMode.RETRIEVAL_ONLY)
+            self.assertTrue(result.tool_call_attempted)
+            self.assertEqual(result.tool_call_used, "find_backlinks")
+            self.assertEqual(result.guardrail_action, GuardrailAction.TOOL_RESULT_INSUFFICIENT)
+            mocked_answer.assert_not_called()
 
     def test_run_minimal_ask_suppresses_colliding_basename_reentry(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -664,7 +645,7 @@ class AskWorkflowTests(unittest.TestCase):
                 captured_messages["messages"][1]["content"],
             )
 
-    def test_run_minimal_ask_trims_verified_outline_payload_before_prompt_rendering(self) -> None:
+    def test_run_minimal_ask_downgrades_when_verified_outline_exceeds_prompt_budget(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             db_path = self._build_index_fixture(Path(temp_dir))
             settings = replace(
@@ -676,7 +657,6 @@ class AskWorkflowTests(unittest.TestCase):
             )
 
             long_raw_text = "frontmatter-" + ("x" * ask_service.ASK_TOOL_RESULT_CHAR_BUDGET) + "TAIL_MARKER"
-            retained_prefix = long_raw_text[:200]
             oversized_headings = [
                 {
                     "level": 2,
@@ -716,27 +696,7 @@ class AskWorkflowTests(unittest.TestCase):
                         allow_context_reentry=False,
                     ),
                 ):
-                    captured_messages: dict[str, list[dict[str, str]]] = {}
-                    captured_bundle: dict[str, object] = {}
-
-                    def _capture_grounded_answer(
-                        *,
-                        provider_target: object,
-                        query: str,
-                        bundle: object,
-                    ) -> str:
-                        del provider_target
-                        captured_bundle["bundle"] = bundle
-                        captured_messages["messages"] = ask_service._build_grounded_messages(
-                            query=query,
-                            bundle=bundle,
-                        )
-                        return "Roadmap 的结构已确认。[1]"
-
-                    with patch(
-                        "app.services.ask._request_grounded_answer",
-                        side_effect=_capture_grounded_answer,
-                    ):
+                    with patch("app.services.ask._request_grounded_answer") as mocked_answer:
                         result = run_minimal_ask(
                             WorkflowInvokeRequest(
                                 action_type=WorkflowAction.ASK_QA,
@@ -745,19 +705,11 @@ class AskWorkflowTests(unittest.TestCase):
                             settings=settings,
                         )
 
-            self.assertEqual(result.mode, AskResultMode.GENERATED_ANSWER)
-            self.assertIn("messages", captured_messages)
-            self.assertIn("bundle", captured_bundle)
-            grounded_prompt = captured_messages["messages"][1]["content"]
-            trimmed_payload = captured_bundle["bundle"].tool_results[0].data
-            self.assertIn(retained_prefix, grounded_prompt)
-            self.assertNotIn("TAIL_MARKER", grounded_prompt)
-            self.assertNotIn("Heading 39", grounded_prompt)
-            self.assertNotIn("outline-diagnostics", grounded_prompt)
-            self.assertLessEqual(
-                len(json.dumps(trimmed_payload, ensure_ascii=False, sort_keys=True)),
-                ask_service.ASK_TOOL_RESULT_CHAR_BUDGET,
-            )
+            self.assertEqual(result.mode, AskResultMode.RETRIEVAL_ONLY)
+            self.assertTrue(result.tool_call_attempted)
+            self.assertEqual(result.tool_call_used, "get_note_outline")
+            self.assertEqual(result.guardrail_action, GuardrailAction.TOOL_RESULT_INSUFFICIENT)
+            mocked_answer.assert_not_called()
 
     def test_run_minimal_ask_consumes_hybrid_retrieval_candidates(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
