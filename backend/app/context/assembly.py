@@ -17,13 +17,10 @@ from app.contracts.workflow import (
 )
 
 RELEVANCE_SCORE_RATIO = 0.35
-PER_SOURCE_LIMIT = 2
-FULL_TEXT_CHAR_BUDGET = 900
-SUMMARY_CHAR_BUDGET = 280
 
 
-def _normalize_note_title(title: str) -> str:
-    return title.rsplit("/", 1)[-1].removesuffix(".md")
+def _title_from_source_path(source_path: str) -> str:
+    return source_path.rsplit("/", 1)[-1].removesuffix(".md")
 
 
 def _dedupe_candidates(
@@ -90,9 +87,7 @@ def _build_source_notes(
         if source_note is None:
             source_note = ContextSourceNote(
                 source_path=item.source_path,
-                title=_normalize_note_title(
-                    item.source_note_title or item.source_path
-                ),
+                title=item.source_note_title or _title_from_source_path(item.source_path),
                 chunk_count=0,
                 max_score=item.score,
             )
@@ -133,18 +128,24 @@ def build_ask_context_bundle(
     allowed_tool_names: list[str],
 ) -> ContextBundle:
     deduped, deduped_removed = _dedupe_candidates(candidates)
+    shadow_trimmed, _ = _trim_candidates_to_budget(deduped, token_budget)
+    suspicious_trimmed = [
+        item for item in shadow_trimmed if detect_safety_flags(item.text)
+    ]
+    safe_candidates = [
+        item for item in deduped if not detect_safety_flags(item.text)
+    ]
     relevant, relevance_removed, relevance_threshold = _filter_candidates_by_relevance(
-        deduped
+        safe_candidates
     )
     trimmed, trimmed_removed = _trim_candidates_to_budget(relevant, token_budget)
-    visible_candidates = [item for item in trimmed if not detect_safety_flags(item.text)]
-    suspicious_trimmed = [item for item in trimmed if detect_safety_flags(item.text)]
+    visible_candidates = trimmed
 
     evidence_items = [
         ContextEvidenceItem(
             source_path=item.path,
             chunk_id=item.chunk_id,
-            source_note_title=_normalize_note_title(item.title),
+            source_note_title=item.title,
             heading_path=item.heading_path,
             position_hint=f"第 {index} 条 / 共 {len(visible_candidates)} 条",
             text=item.text,
@@ -177,9 +178,9 @@ def build_ask_context_bundle(
             suspicious_filtered_count=len(suspicious_trimmed),
             final_evidence_count=len(evidence_items),
             relevance_threshold=relevance_threshold,
-            per_source_limit=PER_SOURCE_LIMIT,
-            full_text_char_budget=FULL_TEXT_CHAR_BUDGET,
-            summary_char_budget=SUMMARY_CHAR_BUDGET,
+            per_source_limit=0,
+            full_text_char_budget=0,
+            summary_char_budget=0,
         ),
         tool_results=tool_results,
         allowed_tool_names=allowed_tool_names,
