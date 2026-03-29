@@ -845,6 +845,40 @@ class AskWorkflowTests(unittest.TestCase):
                 local_chat_model="",
             )
 
+            prompt_candidate = RetrievedChunkCandidate(
+                retrieval_source="hybrid_rrf",
+                chunk_id="roadmap-main",
+                note_id="note_roadmap",
+                path="/vault/roadmap/Roadmap.md",
+                title="Roadmap",
+                heading_path="Roadmap",
+                note_type="summary_note",
+                template_family="plain",
+                daily_note_date=None,
+                source_mtime_ns=1,
+                start_line=1,
+                end_line=3,
+                score=0.9,
+                snippet="roadmap snippet",
+                text="roadmap snippet",
+            )
+            assembled_bundle = ContextBundle(
+                user_intent="Roadmap",
+                workflow_action=WorkflowAction.ASK_QA,
+                evidence_items=[
+                    ContextEvidenceItem(
+                        source_path=prompt_candidate.path,
+                        chunk_id=prompt_candidate.chunk_id,
+                        source_note_title="Roadmap Master",
+                        heading_path="Roadmap > Ask",
+                        position_hint="3/7",
+                        text="roadmap snippet",
+                        score=prompt_candidate.score,
+                        source_kind="retrieval",
+                    ),
+                ],
+                token_budget=2400,
+            )
             captured_messages: dict[str, list[dict[str, str]]] = {}
 
             def _capture_grounded_answer(
@@ -861,23 +895,34 @@ class AskWorkflowTests(unittest.TestCase):
                 return "Roadmap 已拆成检索与 ask 两段实现。[1]"
 
             with patch(
-                "app.services.ask._request_grounded_answer",
-                side_effect=_capture_grounded_answer,
+                "app.services.ask.search_hybrid_chunks_in_db",
+                return_value=RetrievalSearchResponse(candidates=[prompt_candidate]),
             ):
-                result = run_minimal_ask(
-                    WorkflowInvokeRequest(
-                        action_type=WorkflowAction.ASK_QA,
-                        user_query="Roadmap",
-                    ),
-                    settings=settings,
-                )
+                with patch(
+                    "app.services.ask.build_ask_context_bundle",
+                    return_value=assembled_bundle,
+                ):
+                    with patch(
+                        "app.services.ask._request_tool_call_decision",
+                        return_value=ToolCallDecision(requested=False),
+                    ):
+                        with patch(
+                            "app.services.ask._request_grounded_answer",
+                            side_effect=_capture_grounded_answer,
+                        ):
+                            result = run_minimal_ask(
+                                WorkflowInvokeRequest(
+                                    action_type=WorkflowAction.ASK_QA,
+                                    user_query="Roadmap",
+                                ),
+                                settings=settings,
+                            )
 
             self.assertEqual(result.mode, AskResultMode.GENERATED_ANSWER)
             self.assertIn("messages", captured_messages)
             prompt = captured_messages["messages"][1]["content"]
-            self.assertIn("source_note_title:", prompt)
-            self.assertIn("position_hint:", prompt)
-            self.assertIn("source_note_title: Roadmap", prompt)
+            self.assertIn("source_note_title: Roadmap Master", prompt)
+            self.assertIn("position_hint: 3/7", prompt)
 
     def test_run_minimal_ask_builds_citations_from_post_assembly_visible_evidence(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
