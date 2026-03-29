@@ -518,6 +518,78 @@ class ContextAssemblyTests(unittest.TestCase):
         self.assertEqual(bundle.assembly_metadata.diversity_filtered_count, 1)
         self.assertEqual(bundle.assembly_metadata.budget_filtered_count, 1)
 
+    def test_build_ask_context_bundle_adds_source_titles_and_weighted_budget_metadata(
+        self,
+    ) -> None:
+        bundle = build_ask_context_bundle(
+            user_query="roadmap",
+            candidates=[
+                _make_candidate(
+                    path="vault/Roadmap.md",
+                    chunk_id="c1",
+                    heading_path="Roadmap > Ask",
+                    text="A" * 600,
+                    score=1.0,
+                    title="Roadmap",
+                ),
+                _make_candidate(
+                    path="vault/Roadmap.md",
+                    chunk_id="c2",
+                    heading_path="Roadmap > Scope",
+                    text="B" * 600,
+                    score=0.9,
+                    title="Roadmap",
+                ),
+            ],
+            tool_results=[],
+            token_budget=2400,
+            allowed_tool_names=[],
+        )
+
+        self.assertEqual(bundle.evidence_items[0].source_note_title, "Roadmap")
+        self.assertEqual(bundle.evidence_items[0].position_hint, "第 1 条 / 共 2 条")
+        self.assertEqual(bundle.evidence_items[1].position_hint, "第 2 条 / 共 2 条")
+        self.assertEqual(bundle.assembly_metadata.full_text_char_budget, 900)
+        self.assertEqual(bundle.assembly_metadata.summary_char_budget, 280)
+
+    def test_build_ask_context_bundle_truncates_lower_ranked_candidates_before_dropping_them(
+        self,
+    ) -> None:
+        bundle = build_ask_context_bundle(
+            user_query="roadmap",
+            candidates=[
+                _make_candidate(
+                    path="vault/Roadmap.md",
+                    chunk_id="c1",
+                    heading_path="Roadmap > Ask",
+                    text="A" * 600,
+                    score=1.0,
+                ),
+                _make_candidate(
+                    path="vault/Strategy.md",
+                    chunk_id="c2",
+                    heading_path="Strategy > Scope",
+                    text="B" * 600,
+                    score=0.9,
+                ),
+                _make_candidate(
+                    path="vault/Notes.md",
+                    chunk_id="c3",
+                    heading_path="Notes > Detail",
+                    text="C" * 600,
+                    score=0.8,
+                ),
+            ],
+            tool_results=[],
+            token_budget=1800,
+            allowed_tool_names=[],
+        )
+
+        self.assertEqual(len(bundle.evidence_items), 3)
+        self.assertGreater(len(bundle.evidence_items[0].text), len(bundle.evidence_items[2].text))
+        self.assertEqual(bundle.assembly_metadata.summary_char_budget, 280)
+        self.assertEqual(bundle.assembly_metadata.final_evidence_count, 3)
+
     def test_build_ask_context_bundle_keeps_safe_evidence_when_high_score_chunk_is_suspicious(
         self,
     ) -> None:

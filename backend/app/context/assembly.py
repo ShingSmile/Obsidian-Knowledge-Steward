@@ -18,6 +18,9 @@ from app.contracts.workflow import (
 
 ASK_RELEVANCE_RATIO = 0.35
 ASK_PER_SOURCE_LIMIT = 2
+ASK_FULL_TEXT_CHAR_BUDGET = 900
+ASK_SUMMARY_CHAR_BUDGET = 280
+ASK_FULL_TEXT_EVIDENCE_COUNT = 2
 
 
 def _title_from_source_path(source_path: str) -> str:
@@ -89,6 +92,31 @@ def _trim_candidates_to_budget(
             dropped += 1
             continue
         kept.append(candidate)
+        consumed += candidate_chars
+    return kept, dropped
+
+
+def _apply_weighted_budget(
+    candidates: list[RetrievedChunkCandidate],
+    token_budget: int,
+) -> tuple[list[tuple[RetrievedChunkCandidate, str]], int]:
+    kept: list[tuple[RetrievedChunkCandidate, str]] = []
+    consumed = 0
+    dropped = 0
+    for index, candidate in enumerate(candidates):
+        char_limit = (
+            ASK_FULL_TEXT_CHAR_BUDGET
+            if index < ASK_FULL_TEXT_EVIDENCE_COUNT
+            else ASK_SUMMARY_CHAR_BUDGET
+        )
+        visible_text = candidate.text[:char_limit]
+        candidate_chars = len(candidate.path) + len(candidate.heading_path or "") + len(
+            visible_text
+        )
+        if token_budget > 0 and consumed + candidate_chars > token_budget:
+            dropped += 1
+            continue
+        kept.append((candidate, visible_text))
         consumed += candidate_chars
     return kept, dropped
 
@@ -174,8 +202,10 @@ def build_ask_context_bundle(
         safe_candidates
     )
     diversified, diversity_removed = _limit_candidates_per_source(relevant)
-    trimmed, trimmed_removed = _trim_candidates_to_budget(diversified, token_budget)
-    visible_candidates = trimmed
+    weighted_candidates, weighted_removed = _apply_weighted_budget(
+        diversified,
+        token_budget,
+    )
 
     evidence_items = [
         ContextEvidenceItem(
@@ -183,11 +213,11 @@ def build_ask_context_bundle(
             chunk_id=item.chunk_id,
             source_note_title=item.title,
             heading_path=item.heading_path,
-            text=item.text,
+            text=visible_text,
             score=item.score,
             source_kind="retrieval",
         )
-        for item in visible_candidates
+        for item, visible_text in weighted_candidates
     ]
     _assign_position_hints(evidence_items)
 
@@ -198,8 +228,8 @@ def build_ask_context_bundle(
         assembly_notes.append(f"relevance_filtered:{relevance_removed}")
     if diversity_removed:
         assembly_notes.append(f"diversity_filtered:{diversity_removed}")
-    if trimmed_removed:
-        assembly_notes.append(f"trimmed_for_budget:{trimmed_removed}")
+    if weighted_removed:
+        assembly_notes.append(f"trimmed_for_budget:{weighted_removed}")
     if suspicious_trimmed:
         assembly_notes.append(f"filtered_suspicious:{len(suspicious_trimmed)}")
 
@@ -212,13 +242,13 @@ def build_ask_context_bundle(
             initial_candidate_count=len(candidates),
             relevance_filtered_count=relevance_removed,
             diversity_filtered_count=diversity_removed,
-            budget_filtered_count=trimmed_removed,
+            budget_filtered_count=weighted_removed,
             suspicious_filtered_count=len(suspicious_trimmed),
             final_evidence_count=len(evidence_items),
             relevance_threshold=relevance_threshold,
             per_source_limit=ASK_PER_SOURCE_LIMIT,
-            full_text_char_budget=0,
-            summary_char_budget=0,
+            full_text_char_budget=ASK_FULL_TEXT_CHAR_BUDGET,
+            summary_char_budget=ASK_SUMMARY_CHAR_BUDGET,
         ),
         tool_results=tool_results,
         allowed_tool_names=allowed_tool_names,
