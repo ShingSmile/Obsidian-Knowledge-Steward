@@ -103,24 +103,39 @@ def _apply_weighted_budget(
     if token_budget <= 0:
         return [], len(candidates)
 
+    ranked_candidates = sorted(
+        candidates,
+        key=lambda item: (-item.score, item.path, item.start_line, item.chunk_id),
+    )
+    full_text_chunk_ids = {
+        candidate.chunk_id
+        for candidate in ranked_candidates[:ASK_FULL_TEXT_EVIDENCE_COUNT]
+    }
+
     kept: list[tuple[RetrievedChunkCandidate, str]] = []
+    visible_text_by_chunk_id: dict[str, str] = {}
     consumed = 0
     dropped = 0
-    for index, candidate in enumerate(candidates):
+    for candidate in ranked_candidates:
         char_limit = (
             ASK_FULL_TEXT_CHAR_BUDGET
-            if index < ASK_FULL_TEXT_EVIDENCE_COUNT
+            if candidate.chunk_id in full_text_chunk_ids
             else ASK_SUMMARY_CHAR_BUDGET
         )
         visible_text = candidate.text[:char_limit]
         candidate_chars = len(candidate.path) + len(candidate.heading_path or "") + len(
             visible_text
         )
-        if token_budget > 0 and consumed + candidate_chars > token_budget:
+        if consumed + candidate_chars > token_budget:
             dropped += 1
             continue
-        kept.append((candidate, visible_text))
+        visible_text_by_chunk_id[candidate.chunk_id] = visible_text
         consumed += candidate_chars
+    for candidate in candidates:
+        visible_text = visible_text_by_chunk_id.get(candidate.chunk_id)
+        if visible_text is None:
+            continue
+        kept.append((candidate, visible_text))
     return kept, dropped
 
 
@@ -194,21 +209,27 @@ def build_ask_context_bundle(
     allowed_tool_names: list[str],
 ) -> ContextBundle:
     deduped, deduped_removed = _dedupe_candidates(candidates)
-    shadow_trimmed, _ = _trim_candidates_to_budget(deduped, token_budget)
-    suspicious_trimmed = [
-        item for item in shadow_trimmed if detect_safety_flags(item.text)
-    ]
-    safe_candidates = [
-        item for item in deduped if not detect_safety_flags(item.text)
-    ]
-    relevant, relevance_removed, relevance_threshold = _filter_candidates_by_relevance(
-        safe_candidates
-    )
-    diversified, diversity_removed = _limit_candidates_per_source(relevant)
+    diversified, diversity_removed = _limit_candidates_per_source(deduped)
     weighted_candidates, weighted_removed = _apply_weighted_budget(
         diversified,
         token_budget,
     )
+    visible_candidates: list[tuple[RetrievedChunkCandidate, str]] = []
+    suspicious_filtered_count = 0
+    for item, visible_text in weighted_candidates:
+        if detect_safety_flags(visible_text):
+            suspicious_filtered_count += 1
+            continue
+        visible_candidates.append((item, visible_text))
+    relevant_candidates, relevance_removed, relevance_threshold = (
+        _filter_candidates_by_relevance([item for item, _ in visible_candidates])
+    )
+    relevant_chunk_ids = {item.chunk_id for item in relevant_candidates}
+    visible_candidates = [
+        (item, visible_text)
+        for item, visible_text in visible_candidates
+        if item.chunk_id in relevant_chunk_ids
+    ]
 
     evidence_items = [
         ContextEvidenceItem(
@@ -220,7 +241,7 @@ def build_ask_context_bundle(
             score=item.score,
             source_kind="retrieval",
         )
-        for item, visible_text in weighted_candidates
+        for item, visible_text in visible_candidates
     ]
     _assign_position_hints(evidence_items)
 
@@ -233,8 +254,8 @@ def build_ask_context_bundle(
         assembly_notes.append(f"diversity_filtered:{diversity_removed}")
     if weighted_removed:
         assembly_notes.append(f"trimmed_for_budget:{weighted_removed}")
-    if suspicious_trimmed:
-        assembly_notes.append(f"filtered_suspicious:{len(suspicious_trimmed)}")
+    if suspicious_filtered_count:
+        assembly_notes.append(f"filtered_suspicious:{suspicious_filtered_count}")
 
     return ContextBundle(
         user_intent=user_query,
@@ -246,7 +267,7 @@ def build_ask_context_bundle(
             relevance_filtered_count=relevance_removed,
             diversity_filtered_count=diversity_removed,
             budget_filtered_count=weighted_removed,
-            suspicious_filtered_count=len(suspicious_trimmed),
+            suspicious_filtered_count=suspicious_filtered_count,
             final_evidence_count=len(evidence_items),
             relevance_threshold=relevance_threshold,
             per_source_limit=ASK_PER_SOURCE_LIMIT,
@@ -258,7 +279,7 @@ def build_ask_context_bundle(
         token_budget=token_budget,
         safety_flags=_collect_text_flags(
             [
-                *(item.text for item in suspicious_trimmed),
+                *(visible_text for _, visible_text in weighted_candidates),
                 *(
                     json.dumps(result.data, ensure_ascii=False, sort_keys=True)
                     for result in tool_results
