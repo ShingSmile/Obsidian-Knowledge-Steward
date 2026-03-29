@@ -209,27 +209,40 @@ def build_ask_context_bundle(
     allowed_tool_names: list[str],
 ) -> ContextBundle:
     deduped, deduped_removed = _dedupe_candidates(candidates)
-    diversified, diversity_removed = _limit_candidates_per_source(deduped)
+    shadow_weighted_candidates, _ = _apply_weighted_budget(
+        deduped,
+        token_budget,
+    )
+    suspicious_visible_texts: list[str] = []
+    suspicious_chunk_ids: set[str] = set()
+    for item, visible_text in shadow_weighted_candidates:
+        if detect_safety_flags(visible_text):
+            suspicious_visible_texts.append(visible_text)
+            suspicious_chunk_ids.add(item.chunk_id)
+
+    safe_candidates = [
+        item for item in deduped if item.chunk_id not in suspicious_chunk_ids
+    ]
+
+    relevant_candidates, relevance_removed, relevance_threshold = (
+        _filter_candidates_by_relevance(safe_candidates)
+    )
+    diversified, diversity_removed = _limit_candidates_per_source(relevant_candidates)
     weighted_candidates, weighted_removed = _apply_weighted_budget(
         diversified,
         token_budget,
     )
     visible_candidates: list[tuple[RetrievedChunkCandidate, str]] = []
-    suspicious_filtered_count = 0
+    post_weight_suspicious_texts: list[str] = []
     for item, visible_text in weighted_candidates:
         if detect_safety_flags(visible_text):
-            suspicious_filtered_count += 1
+            post_weight_suspicious_texts.append(visible_text)
             continue
         visible_candidates.append((item, visible_text))
-    relevant_candidates, relevance_removed, relevance_threshold = (
-        _filter_candidates_by_relevance([item for item, _ in visible_candidates])
+
+    suspicious_filtered_count = len(suspicious_visible_texts) + len(
+        post_weight_suspicious_texts
     )
-    relevant_chunk_ids = {item.chunk_id for item in relevant_candidates}
-    visible_candidates = [
-        (item, visible_text)
-        for item, visible_text in visible_candidates
-        if item.chunk_id in relevant_chunk_ids
-    ]
 
     evidence_items = [
         ContextEvidenceItem(
@@ -279,7 +292,8 @@ def build_ask_context_bundle(
         token_budget=token_budget,
         safety_flags=_collect_text_flags(
             [
-                *(visible_text for _, visible_text in weighted_candidates),
+                *suspicious_visible_texts,
+                *post_weight_suspicious_texts,
                 *(
                     json.dumps(result.data, ensure_ascii=False, sort_keys=True)
                     for result in tool_results
