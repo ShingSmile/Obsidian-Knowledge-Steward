@@ -368,6 +368,51 @@ class ContextAssemblyTests(unittest.TestCase):
         self.assertEqual(bundle.assembly_metadata.relevance_filtered_count, 1)
         self.assertEqual(bundle.assembly_metadata.final_evidence_count, 1)
 
+    def test_build_ask_context_bundle_limits_each_source_to_two_chunks(self) -> None:
+        bundle = build_ask_context_bundle(
+            user_query="roadmap",
+            candidates=[
+                _make_candidate(
+                    path="vault/Roadmap.md",
+                    chunk_id="c1",
+                    heading_path="Roadmap > Delivery",
+                    text="top evidence",
+                    score=1.0,
+                ),
+                _make_candidate(
+                    path="vault/Roadmap.md",
+                    chunk_id="c2",
+                    heading_path="Roadmap > Delivery",
+                    text="second evidence",
+                    score=0.9,
+                ),
+                _make_candidate(
+                    path="vault/Roadmap.md",
+                    chunk_id="c3",
+                    heading_path="Roadmap > Delivery",
+                    text="third evidence",
+                    score=0.8,
+                ),
+                _make_candidate(
+                    path="vault/Strategy.md",
+                    chunk_id="c4",
+                    heading_path="Strategy > Overview",
+                    text="strategy evidence",
+                    score=0.7,
+                ),
+            ],
+            tool_results=[],
+            token_budget=2400,
+            allowed_tool_names=[],
+        )
+
+        self.assertEqual(
+            [item.chunk_id for item in bundle.evidence_items],
+            ["c1", "c2", "c4"],
+        )
+        self.assertEqual(bundle.assembly_metadata.diversity_filtered_count, 1)
+        self.assertEqual(bundle.assembly_metadata.per_source_limit, 2)
+
     def test_build_ask_context_bundle_keeps_safe_evidence_when_high_score_chunk_is_suspicious(
         self,
     ) -> None:

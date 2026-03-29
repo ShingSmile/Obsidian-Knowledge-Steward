@@ -16,7 +16,8 @@ from app.contracts.workflow import (
     WorkflowAction,
 )
 
-RELEVANCE_SCORE_RATIO = 0.35
+ASK_RELEVANCE_RATIO = 0.35
+ASK_PER_SOURCE_LIMIT = 2
 
 
 def _title_from_source_path(source_path: str) -> str:
@@ -50,11 +51,27 @@ def _filter_candidates_by_relevance(
         return [], 0, 0.0
 
     top_score = max(candidate.score for candidate in candidates)
-    relevance_threshold = top_score * RELEVANCE_SCORE_RATIO
+    relevance_threshold = top_score * ASK_RELEVANCE_RATIO
     filtered = [candidate for candidate in candidates if candidate.score >= relevance_threshold]
     if not filtered:
         filtered = [max(candidates, key=lambda candidate: candidate.score)]
     return filtered, len(candidates) - len(filtered), relevance_threshold
+
+
+def _limit_candidates_per_source(
+    candidates: list[RetrievedChunkCandidate],
+) -> tuple[list[RetrievedChunkCandidate], int]:
+    kept: list[RetrievedChunkCandidate] = []
+    counts_by_path: dict[str, int] = {}
+    dropped = 0
+    for candidate in sorted(candidates, key=lambda item: (-item.score, item.path, item.start_line)):
+        path_count = counts_by_path.get(candidate.path, 0)
+        if path_count >= ASK_PER_SOURCE_LIMIT:
+            dropped += 1
+            continue
+        counts_by_path[candidate.path] = path_count + 1
+        kept.append(candidate)
+    return kept, dropped
 
 
 def _trim_candidates_to_budget(
@@ -156,7 +173,8 @@ def build_ask_context_bundle(
     relevant, relevance_removed, relevance_threshold = _filter_candidates_by_relevance(
         safe_candidates
     )
-    trimmed, trimmed_removed = _trim_candidates_to_budget(relevant, token_budget)
+    diversified, diversity_removed = _limit_candidates_per_source(relevant)
+    trimmed, trimmed_removed = _trim_candidates_to_budget(diversified, token_budget)
     visible_candidates = trimmed
 
     evidence_items = [
@@ -178,6 +196,8 @@ def build_ask_context_bundle(
         assembly_notes.append(f"deduplicated:{deduped_removed}")
     if relevance_removed:
         assembly_notes.append(f"relevance_filtered:{relevance_removed}")
+    if diversity_removed:
+        assembly_notes.append(f"diversity_filtered:{diversity_removed}")
     if trimmed_removed:
         assembly_notes.append(f"trimmed_for_budget:{trimmed_removed}")
     if suspicious_trimmed:
@@ -191,12 +211,12 @@ def build_ask_context_bundle(
         assembly_metadata=ContextAssemblyMetadata(
             initial_candidate_count=len(candidates),
             relevance_filtered_count=relevance_removed,
-            diversity_filtered_count=0,
+            diversity_filtered_count=diversity_removed,
             budget_filtered_count=trimmed_removed,
             suspicious_filtered_count=len(suspicious_trimmed),
             final_evidence_count=len(evidence_items),
             relevance_threshold=relevance_threshold,
-            per_source_limit=0,
+            per_source_limit=ASK_PER_SOURCE_LIMIT,
             full_text_char_budget=0,
             summary_char_budget=0,
         ),
