@@ -6,6 +6,7 @@ from app.context.assembly import (
     build_ask_context_bundle,
     build_digest_context_bundle,
     build_ingest_context_bundle,
+    _filter_candidates_by_relevance,
 )
 from app.context.render import render_tool_selection_prompt
 from app.contracts.workflow import (
@@ -367,6 +368,30 @@ class ContextAssemblyTests(unittest.TestCase):
         self.assertEqual(bundle.assembly_metadata.initial_candidate_count, 2)
         self.assertEqual(bundle.assembly_metadata.relevance_filtered_count, 1)
         self.assertEqual(bundle.assembly_metadata.final_evidence_count, 1)
+
+    def test_filter_candidates_by_relevance_anchors_to_highest_score(self) -> None:
+        kept, removed_count, threshold = _filter_candidates_by_relevance(
+            [
+                _make_candidate(
+                    path="vault/Noise.md",
+                    chunk_id="c1",
+                    heading_path="Noise > Tail",
+                    text="low evidence",
+                    score=0.2,
+                ),
+                _make_candidate(
+                    path="vault/Roadmap.md",
+                    chunk_id="c2",
+                    heading_path="Roadmap > Delivery",
+                    text="top evidence",
+                    score=1.0,
+                ),
+            ]
+        )
+
+        self.assertEqual([item.chunk_id for item in kept], ["c2"])
+        self.assertEqual(removed_count, 1)
+        self.assertEqual(threshold, 0.35)
 
     def test_build_ask_context_bundle_limits_each_source_to_two_chunks(self) -> None:
         bundle = build_ask_context_bundle(
