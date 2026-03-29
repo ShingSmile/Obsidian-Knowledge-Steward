@@ -26,11 +26,11 @@
 ### TASK-047
 
 - `task_id`: `TASK-047`
-- `session_id`:
+- `session_id`: `SES-20260329-02`
 - `title`: 重构上下文装配层为多阶段质量控制管线
 - `category`: `Retrieval`
 - `priority`: `P1`
-- `status`: `planned`
+- `status`: `completed`
 - `scope`: `medium`
 - `goal`: 将当前上下文装配层从"去重 + 截断"升级为四阶段质量控制管线：相关性过滤（按 RRF 分数丢弃尾部噪声）→ 来源多样性控制（限制单篇笔记贡献上限，防止上下文被单一来源垄断）→ 结构化上下文增强（为每条 chunk 注入来源笔记标题、heading 路径、位置信息，使模型引用时能精确定位来源）→ 相关性加权 Token 预算分配（高分 chunk 保留全文，低分 chunk 截取摘要，替代当前的均匀截断）。装配结果输出 ContextBundle 并附带 assembly_metadata 记录每阶段的决策。
 - `out_of_scope`:
@@ -48,26 +48,27 @@
 - `depends_on`:
   - `TASK-042`
 - `related_files`:
-  - `backend/app/context/assembly.py`
-  - `backend/app/retrieval/hybrid.py`
-  - `backend/app/services/ask.py`
   - `backend/app/contracts/workflow.py`
+  - `backend/app/context/assembly.py`
+  - `backend/app/context/render.py`
+  - `backend/app/services/ask.py`
+  - `backend/tests/test_context_assembly.py`
   - `backend/tests/test_ask_workflow.py`
   - `eval/golden/ask_cases.json`
 - `derived_tasks`:
   - `small: 为 assembly_metadata 增加结构化 trace 写入，便于在 Trace 回放中定位装配层丢弃了哪些 chunk`
   - `small: 评估是否需要对多样性控制中被淘汰的 chunk 做"备选池"保留，供 ReAct 二轮补查时优先召回`
   - `small: 为相关性过滤的阈值比例增加离线 eval case 覆盖，验证阈值变化对 ask 质量的影响`
-- `notes`: 当前 `context/assembly.py` 只做 chunk_id 去重和字符数截断，面试时说"独立的上下文装配层"但追问细节会见底。升级为四阶段管线后，每个阶段都有独立的技术决策和可追问的 why：为什么按 RRF 分数过滤而不用 re-ranker、为什么限制单篇贡献上限、为什么不均匀分配预算。这使"检索与生成之间的解耦层"从概念包装变成有实质深度的架构组件。
+- `notes`: 当前 `context/assembly.py` 原先只做 chunk_id 去重和字符数截断，面试时说"独立的上下文装配层"但追问细节会见底。`SES-20260329-02` 已完成四阶段升级：相关性过滤、来源多样性控制、结构化增强与加权预算分配均已落到 [backend/app/context/assembly.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/app/context/assembly.py)，`ContextBundle` 已补 `source_notes / assembly_metadata`，ask prompt 也已在 [backend/app/context/render.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/app/context/render.py) 中渲染 `source_note_title / position_hint`，citation 与 `retrieved_candidates` 继续只跟随 post-assembly 可见 evidence。验收期内已通过 `tests.test_context_assembly + tests.test_ask_workflow` 共 54 个 backend tests，以及 2 条 ask eval case。上面的 `derived_tasks` 继续保留为不阻塞收口的 `small` 尾项。
 
 ### TASK-045
 
 - `task_id`: `TASK-045`
-- `session_id`: `SES-20260327-02`
+- `session_id`: `SES-20260329-01`
 - `title`: 补齐受限写回的静态校验与工具覆盖，增强 LLM 输出可控性
 - `category`: `Safety`
 - `priority`: `P1`
-- `status`: `in_progress`
+- `status`: `completed`
 - `scope`: `medium`
 - `goal`: 在现有两种原子 patch 类型（merge_frontmatter、insert_under_heading）和五层工具调用防御的基础上，补齐三个维度：(1) 扩展读工具覆盖，增加 `get_note_outline` 和 `find_backlinks`，让模型在提出治理建议前能感知文档结构和引用关系；(2) 扩展写操作类型，增加 `replace_section` 和 `add_wikilink`，覆盖章节重写和知识图谱链接治理场景；(3) 补齐静态校验层，在现有 JSON Schema 校验之上增加内容长度阈值、目标路径白名单和危险模式检测。
 - `out_of_scope`:
@@ -89,14 +90,16 @@
   - `backend/app/tools/registry.py`
   - `backend/app/guardrails/ask.py`
   - `backend/app/services/ingest_proposal.py`
+  - `backend/app/services/proposal_validation.py`
   - `backend/app/contracts/workflow.py`
   - `plugin/src/writeback/applyProposalWriteback.ts`
   - `backend/app/indexing/store.py`
   - `backend/tests/test_tool_registry.py`
+  - `backend/tests/test_proposal_validation.py`
 - `derived_tasks`:
   - `small: 为 replace_section 增加 max_changed_lines 安全检查，防止模型一次替换过大段落`
   - `small: 将静态校验的阈值和白名单抽为配置文件，支持按 vault 自定义`
-- `notes`: 当前系统只有两种 patch 类型和两个读工具，覆盖了最基础的治理场景。但随着 ingest proposal 逐渐成熟，模型缺乏文档结构感知（不知道标题树）和引用关系感知（不知道谁链接了这篇笔记），治理建议的质量会受限。写操作只有"在标题下插入"和"合并 frontmatter"，章节重写和链接管理这两个高频治理场景没有覆盖。静态校验目前只有 JSON Schema 层面的参数合法性检查，没有内容级的安全拦截。这三个维度是让"可控性"从最小可用推向面试可深挖的关键补齐。2026-03-28 已完成第一阶段落地：`get_note_outline`、fail-closed `find_backlinks`、ask verified-only tool reentry、插件侧 `replace_section / add_wikilink`、静态校验接线与相关测试均已合入本地 `main`；但 [backend/app/services/proposal_validation.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/app/services/proposal_validation.py) 仍未把 `replace_section / add_wikilink` 作为正式支持的持久化校验 op 收口，因此本任务继续保持 `in_progress`。
+- `notes`: 当前系统只有两种 patch 类型和两个读工具，覆盖了最基础的治理场景。但随着 ingest proposal 逐渐成熟，模型缺乏文档结构感知（不知道标题树）和引用关系感知（不知道谁链接了这篇笔记），治理建议的质量会受限。写操作只有"在标题下插入"和"合并 frontmatter"，章节重写和链接管理这两个高频治理场景没有覆盖。静态校验目前只有 JSON Schema 层面的参数合法性检查，没有内容级的安全拦截。这三个维度是让"可控性"从最小可用推向面试可深挖的关键补齐。2026-03-28 已完成第一阶段落地：`get_note_outline`、fail-closed `find_backlinks`、ask verified-only tool reentry、插件侧 `replace_section / add_wikilink`、静态校验接线与相关测试均已合入本地 `main`。2026-03-29 已由 `SES-20260329-01` 收口最后缺口：[backend/app/services/proposal_validation.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/app/services/proposal_validation.py) 已把 `replace_section / add_wikilink` 纳入正式支持 op，并补齐 payload-specific validation、危险模式拦截与 `add_wikilink` 的“仅允许 vault 内已存在笔记”约束，因此本任务验收已满足。上面的 `derived_tasks` 继续保留为不阻塞收口的 `small` 尾项。
 
 ### TASK-046
 

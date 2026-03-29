@@ -12,6 +12,8 @@
 
 | 会话 ID | 日期 | 主题 | 类型 | 状态 | 对应任务 |
 | --- | --- | --- | --- | --- | --- |
+| `SES-20260329-02` | 2026-03-29 | 完成 ask 上下文装配四阶段质量控制管线并接通 prompt / citation | `Retrieval` | `已完成` | `TASK-047` |
+| `SES-20260329-01` | 2026-03-29 | 收口 proposal validator 对新 patch op 的正式支持并关闭 `TASK-045` | `Safety` | `已完成` | `TASK-045` |
 | `SES-20260327-02` | 2026-03-28 | 补齐受限写回的静态校验与工具覆盖，并完成本地 main 合并 | `Safety` | `部分完成` | `TASK-045` |
 | `SES-20260327-01` | 2026-03-27 | 将 checkpoint 持久化迁移到 LangGraph SqliteSaver 并完成主分支合并 | `Graph` | `已完成` | `TASK-044` |
 | `SES-20260323-02` | 2026-03-23 | 执行文档控制面分层与归档治理 | `Docs` | `已完成` | `TASK-043` |
@@ -24,6 +26,219 @@
 - 当前 2026-03 历史快照位于：
   [docs/archive/session_logs/SESSION_LOG_2026-03.md](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/docs/archive/session_logs/SESSION_LOG_2026-03.md)
 - 更早历史会话、旧索引与旧任务阶段记录，请优先查 archive，再按 `task_id` 回溯。
+
+## [SES-20260329-02] 完成 ask 上下文装配四阶段质量控制管线并接通 prompt / citation
+
+- 日期：2026-03-29
+- task_id：`TASK-047`
+- 类型：`Retrieval`
+- 状态：`已完成`
+- 验收结论：`完全满足`
+- 对应任务：`TASK-047`
+- 本会话唯一目标：把 ask 上下文装配层从“去重 + 截断”升级为四阶段质量控制管线，并让 prompt / citation 只消费 post-assembly 可见 evidence，再按治理规则同步控制面文档。
+
+### 1. 本次目标
+
+- 为 `ContextBundle` 补齐 `source_notes / assembly_metadata` 与更丰富的 retrieval evidence 字段。
+- 在装配层落地相关性过滤、来源多样性控制、结构化增强与加权预算分配四个阶段。
+- 让 ask prompt 直接消费 `source_note_title / position_hint`，并确保 citation / `retrieved_candidates` 继续只跟随 post-assembly 可见 evidence。
+- 跑通针对装配层和 ask 集成路径的回归与离线 eval。
+- 在确认验收成立后，以 Level 3 路由同步 `TASK_QUEUE / CURRENT_STATE / SESSION_LOG / PROJECT_MASTER_PLAN / CHANGELOG`。
+
+### 2. 本次完成内容
+
+- 在 [backend/app/contracts/workflow.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/app/contracts/workflow.py) 中扩展 `ContextBundle` 与 evidence contract，新增 `source_notes / assembly_metadata / source_note_title / position_hint` 等结构化字段。
+- 在 [backend/app/context/assembly.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/app/context/assembly.py) 中落地四阶段管线：先做相关性过滤，再做来源多样性控制，再补来源标题 / 位置信息与 `source_notes`，最后按得分分配全文 / 摘要预算；同时保留 suspicious 文本的 fail-closed 语义和稳定顺序。
+- 在 [backend/app/context/render.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/app/context/render.py) 与 [backend/app/services/ask.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/app/services/ask.py) 中接通结构化 evidence 消费：prompt 现可见 `source_note_title / heading_path / position_hint`，citation 与 `retrieved_candidates` 继续严格跟随装配后可见 chunk。
+- 在 [backend/tests/test_context_assembly.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/tests/test_context_assembly.py) 与 [backend/tests/test_ask_workflow.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/tests/test_ask_workflow.py) 中补齐四阶段装配、prompt 渲染、post-assembly citation 对齐与 review 回归加固测试。
+- 已把 [docs/TASK_QUEUE.md](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/docs/TASK_QUEUE.md)、[docs/CURRENT_STATE.md](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/docs/CURRENT_STATE.md)、[docs/SESSION_LOG.md](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/docs/SESSION_LOG.md)、[docs/PROJECT_MASTER_PLAN.md](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/docs/PROJECT_MASTER_PLAN.md) 与 [docs/CHANGELOG.md](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/docs/CHANGELOG.md) 同步到 `TASK-047` 完成态。
+
+### 3. 本次未完成内容
+
+- 没有为 `assembly_metadata` 追加结构化 trace 写入；它继续保留为 `TASK-047` 的 `small` 派生项。
+- 没有为来源多样性淘汰的 chunk 建“备选池”；若后续做 `TASK-046` 的 ReAct 二轮补查，再决定是否需要。
+- 没有新增相关性阈值比例的独立离线 eval case；当前只补到 ask 集成与两条现有 eval case。
+- 没有推进 `TASK-046`、`TASK-031`、`TASK-032` 或 `TASK-033`，避免把本会话扩成第二个 `medium`。
+
+### 4. 关键决策
+
+- 没有把过滤 / 多样性逻辑前推到 hybrid retrieval，而是继续把它保留在 `context/assembly.py`；原因是这层职责是“回答上下文质量控制”，不是“召回算法本身”。
+- 没有引入 re-ranker 或模型摘要，相关性与预算都继续基于现有 RRF 分数和字符截取完成，保持 deterministic 边界。
+- `AskWorkflowResult` 外层 contract 保持不变；citation 编号继续只跟随 `bundle.evidence_items` 中可见的 retrieval evidence，避免 prompt 与引用编号漂移。
+- `TASK-047` 在本会话结束时记为 `completed`，即便仍有三个 `small` 尾项；原因是它们不再构成 acceptance gap。
+
+### 5. 修改过的文件
+
+- [backend/app/contracts/workflow.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/app/contracts/workflow.py)
+- [backend/app/context/assembly.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/app/context/assembly.py)
+- [backend/app/context/render.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/app/context/render.py)
+- [backend/app/services/ask.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/app/services/ask.py)
+- [backend/tests/test_context_assembly.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/tests/test_context_assembly.py)
+- [backend/tests/test_ask_workflow.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/tests/test_ask_workflow.py)
+- [docs/TASK_QUEUE.md](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/docs/TASK_QUEUE.md)
+- [docs/CURRENT_STATE.md](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/docs/CURRENT_STATE.md)
+- [docs/SESSION_LOG.md](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/docs/SESSION_LOG.md)
+- [docs/PROJECT_MASTER_PLAN.md](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/docs/PROJECT_MASTER_PLAN.md)
+- [docs/CHANGELOG.md](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/docs/CHANGELOG.md)
+
+### 6. 验证与测试
+
+- 跑了什么命令
+  - `/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/.conda/knowledge-steward/bin/python -m unittest tests.test_context_assembly tests.test_ask_workflow -v`
+  - `/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/.conda/knowledge-steward/bin/python eval/run_eval.py --case-id ask_fixture_hybrid_retrieval_only --case-id ask_fixture_generated_answer_citation_valid --output /tmp/task047-ask-eval.json`
+- 结果如何
+  - backend 54 tests 通过。
+  - ask eval 2 passed, 0 failed。
+- 哪些没法验证
+  - 没有在真实 Obsidian 宿主里重跑 ask 端到端交互；当前仍以 backend 自动化回归与离线 eval 为主。
+- 哪些只是静态修改
+  - 本次对 `TASK_QUEUE`、`CURRENT_STATE`、`SESSION_LOG`、`PROJECT_MASTER_PLAN` 与 `CHANGELOG` 的更新都属于治理文档同步。
+
+### 7. 范围偏移与原因
+
+- 没有新增第二个 `medium`。
+- 唯一伴随动作是完成后按治理规则做 Level 3 文档同步，因为 `TASK-047` 状态、默认下一任务和稳定主文档里的 global next-action 口径都发生了变化。
+
+### 8. 未解决问题
+
+- `assembly_metadata` 还没有进入结构化 trace，回放时只能看到结果，不能直接看到每阶段丢弃了哪些 chunk。
+- 多样性淘汰的 chunk 还没有备选池；若后续引入 ReAct 二轮工具调用，可能需要重新评估这部分保留策略。
+- 本地工作区仍然脏：`stash@{0}` 仍在，根目录也仍有与本任务无关的已修改 / 未跟踪文件。
+
+### 9. 新增风险 / 技术债 / 假设
+
+- 技术债：`TASK-047` 已完成，但装配层的三个 `small` 尾项都还没落 trace / eval / 二轮补查辅助能力。
+- 风险：ask 的 semantic groundedness 仍未进入 runtime 保守 gate；即便装配层已更强，`TASK-033` 之前仍不能把“离线发现 unsupported_claim”自动转成线上拦截。
+- 假设：下一会话默认进入 `TASK-046`，而不是继续重新打开已完成的 `TASK-047`。
+
+### 10. 下一步最优先任务
+
+- 默认进入 `TASK-046`，在 ask 链路内部引入 ReAct 多轮工具调用循环。
+- 之后继续回到 `TASK-031`、`TASK-032`、`TASK-033` 的 P2 backlog。
+- `TASK-047` 的三个 `small` 尾项与 `TASK-045` 的两个 `small` 尾项都不应再单独开一个 `medium`。
+
+### 11. 下一次新会话应该先读哪些文件
+
+- [docs/TASK_QUEUE.md](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/docs/TASK_QUEUE.md)
+- [docs/CURRENT_STATE.md](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/docs/CURRENT_STATE.md)
+- [docs/SESSION_LOG.md](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/docs/SESSION_LOG.md)
+- 若继续 `TASK-046`：
+  - [backend/app/services/ask.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/app/services/ask.py)
+  - [backend/app/tools/registry.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/app/tools/registry.py)
+  - [backend/app/graphs/ask_graph.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/app/graphs/ask_graph.py)
+  - [backend/app/observability/runtime_trace.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/app/observability/runtime_trace.py)
+- 若回溯 `TASK-047`：
+  - [backend/app/context/assembly.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/app/context/assembly.py)
+  - [backend/app/context/render.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/app/context/render.py)
+  - [backend/tests/test_context_assembly.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/tests/test_context_assembly.py)
+  - [backend/tests/test_ask_workflow.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/tests/test_ask_workflow.py)
+
+### 12. 当前最容易被追问的点
+
+- 为什么四阶段质量控制放在 `context/assembly.py`，而不是直接并进 hybrid retrieval？正确回答必须落到“召回负责尽量找全候选，装配负责把可回答、可引用、可追踪的上下文组织出来；把两者绑死会让检索算法和 prompt 质量控制耦合在一起，后续无论做 ReAct 还是换 rerank 都更难演进”。
+
+## [SES-20260329-01] 收口 proposal validator 对新 patch op 的正式支持并关闭 `TASK-045`
+
+- 日期：2026-03-29
+- task_id：`TASK-045`
+- 类型：`Safety`
+- 状态：`已完成`
+- 验收结论：`完全满足`
+- 对应任务：`TASK-045`
+- 本会话唯一目标：补齐后端 proposal persistence validator 对 `replace_section / add_wikilink` 的正式支持，完成验证，并把治理文档同步到真实代码边界。
+
+### 1. 本次目标
+
+- 让 [backend/app/services/proposal_validation.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/app/services/proposal_validation.py) 不再把 `replace_section / add_wikilink` 视为“不支持的 op”。
+- 为这两个新 op 补齐 payload-specific validation，而不是仅做宽松 allowlist 放行。
+- 重新跑完 `TASK-045` 完成态所需的 backend / plugin 验证。
+- 在确认验收成立后，以 Level 3 路由同步 `TASK_QUEUE / CURRENT_STATE / SESSION_LOG / PROJECT_MASTER_PLAN / CHANGELOG`。
+
+### 2. 本次完成内容
+
+- 在 [backend/tests/test_proposal_validation.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/tests/test_proposal_validation.py) 中新增针对 `replace_section / add_wikilink` 的 validator 回归：覆盖合法 proposal 放行、`replace_section` 缺内容拒绝、`add_wikilink` 缺 `linked_note_path` 拒绝，以及 `add_wikilink` 指向不存在笔记拒绝。
+- 在 [backend/app/services/proposal_validation.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/app/services/proposal_validation.py) 中把 `replace_section / add_wikilink` 纳入正式支持 op，并拆成按 op 分支的静态校验：
+  - `replace_section` 复用 heading/content 校验与内容长度阈值；
+  - `add_wikilink` 强制要求 `heading|heading_path + linked_note_path`，且目标路径必须位于 vault 内并指向已存在笔记；
+  - 危险模式与超长内容错误信息保留 op 名，避免上层调用链只看到泛化的 `payload` 报错。
+- 已重跑 `TASK-045` 相关 backend suite、plugin tests 与 plugin build，确认 ask / ingest / digest / resume / writeback 的既有行为没有回退。
+- 已把 [docs/TASK_QUEUE.md](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/docs/TASK_QUEUE.md)、[docs/CURRENT_STATE.md](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/docs/CURRENT_STATE.md)、[docs/SESSION_LOG.md](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/docs/SESSION_LOG.md)、[docs/PROJECT_MASTER_PLAN.md](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/docs/PROJECT_MASTER_PLAN.md) 与 [docs/CHANGELOG.md](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/docs/CHANGELOG.md) 同步到完成态。
+
+### 3. 本次未完成内容
+
+- `replace_section` 的 `max_changed_lines` 安全检查仍未落地；它继续保留为 `TASK-045` 的 `small` 派生尾项，不阻塞当前收口。
+- proposal validator 的阈值 / 白名单还没有抽到配置层；同样继续保留为 `small` 尾项。
+- 没有推进 `TASK-031`、`TASK-032`、`TASK-033` 或 `TASK-046` / `TASK-047`，避免把本会话扩成第二个 `medium`。
+
+### 4. 关键决策
+
+- 没有采用“只把 allowlist 放开”的宽松方案，而是对 `replace_section / add_wikilink` 都补 payload-specific validation，保持后端 fail-closed 语义。
+- `add_wikilink` 在后端也要求目标笔记必须已存在于 vault 内，避免出现“插件执行器会拒绝、但持久化层先接受”的边界错位。
+- 错误信息保留 op 名称，而不是继续使用泛化 `payload` 文案；这样 ingest / digest 上层回归在失败时仍能明确知道是哪类 patch op 被拦截。
+- `TASK-045` 在本会话结束时记为 `completed`，即便仍有两个 `small` 尾项；原因是它们已降级为非阻塞的派生改动，不再构成 acceptance gap。
+
+### 5. 修改过的文件
+
+- [backend/app/services/proposal_validation.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/app/services/proposal_validation.py)
+- [backend/tests/test_proposal_validation.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/tests/test_proposal_validation.py)
+- [docs/TASK_QUEUE.md](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/docs/TASK_QUEUE.md)
+- [docs/CURRENT_STATE.md](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/docs/CURRENT_STATE.md)
+- [docs/SESSION_LOG.md](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/docs/SESSION_LOG.md)
+- [docs/PROJECT_MASTER_PLAN.md](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/docs/PROJECT_MASTER_PLAN.md)
+- [docs/CHANGELOG.md](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/docs/CHANGELOG.md)
+
+### 6. 验证与测试
+
+- 跑了什么命令
+  - `/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/.conda/knowledge-steward/bin/python -m unittest tests.test_tool_registry tests.test_ask_workflow tests.test_proposal_validation tests.test_resume_workflow tests.test_ingest_workflow tests.test_digest_workflow -v`
+  - `npm test`
+  - `npm run build`
+- 结果如何
+  - backend 86 tests 通过。
+  - plugin 11 tests 通过。
+  - plugin build 通过。
+- 哪些没法验证
+  - 没有在真实 Obsidian 宿主里重跑一次完整 approve -> local writeback -> `/workflows/resume` 端到端交互；当前仍以 backend / plugin 自动化回归为主。
+- 哪些只是静态修改
+  - 本次对 `TASK_QUEUE`、`CURRENT_STATE`、`SESSION_LOG`、`PROJECT_MASTER_PLAN` 与 `CHANGELOG` 的更新都属于治理文档同步。
+
+### 7. 范围偏移与原因
+
+- 没有新增第二个 `medium`。
+- 唯一伴随动作是完成后按治理规则做 Level 3 文档同步，因为 `TASK-045` 状态、默认下一任务和稳定主文档事实都发生了变化。
+
+### 8. 未解决问题
+
+- `replace_section.max_changed_lines` 仍未进入写回执行或 validator 边界。
+- 静态校验的阈值 / 白名单还没有配置化。
+- 本地 `main` 仍保留 `stash@{0}`，且根工作区仍有与当前任务无关的脏改动和未跟踪环境产物。
+
+### 9. 新增风险 / 技术债 / 假设
+
+- 技术债：`TASK-045` 虽已完成，但 proposal validator 的阈值与白名单仍硬编码在服务层，后续若要适配多 vault，需要再抽配置。
+- 风险：当前根工作区仍然脏，后续若直接在此基础上继续推进 `TASK-047` / `TASK-046`，需要先辨清哪些是业务改动、哪些只是历史或环境产物。
+- 假设：下一会话默认回到 backlog 中的 `TASK-047`，而不是重新打开已经完成的 `TASK-045`。
+
+### 10. 下一步最优先任务
+
+- 默认进入 `TASK-047`，把上下文装配层升级为四阶段质量控制管线。
+- 若优先追求 ask 架构强项，则进入 `TASK-046`，在 `execute_ask` 节点内部引入 ReAct 多轮工具调用循环。
+- `TASK-031`、`TASK-032`、`TASK-033` 继续保持在后续 backlog；`TASK-045` 的两个 `small` 尾项不应再单独开一个 `medium`。
+
+### 11. 下一次新会话应该先读哪些文件
+
+- [docs/TASK_QUEUE.md](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/docs/TASK_QUEUE.md)
+- [docs/CURRENT_STATE.md](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/docs/CURRENT_STATE.md)
+- [docs/SESSION_LOG.md](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/docs/SESSION_LOG.md)
+- 若继续 `TASK-047`：
+  - [backend/app/context/assembly.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/app/context/assembly.py)
+  - [backend/app/retrieval/hybrid.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/app/retrieval/hybrid.py)
+  - [backend/app/services/ask.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/app/services/ask.py)
+  - [backend/app/contracts/workflow.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/app/contracts/workflow.py)
+
+### 12. 当前最容易被追问的点
+
+- 为什么插件执行器已经支持 `replace_section / add_wikilink`，还要再补后端 proposal validator？正确回答必须落到“插件执行器负责副作用落盘，proposal validator 负责持久化前和 resume 前的边界闭合；如果后端静态校验不正式支持新 op，就会出现 proposal 已落库、但真正执行时才被宿主拒绝的职责错位和审计语义空洞”。
 
 ## [SES-20260327-02] 补齐受限写回的静态校验与工具覆盖，并完成本地 main 合并
 
