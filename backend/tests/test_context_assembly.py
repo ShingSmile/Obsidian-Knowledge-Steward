@@ -590,6 +590,25 @@ class ContextAssemblyTests(unittest.TestCase):
         self.assertEqual(bundle.assembly_metadata.summary_char_budget, 280)
         self.assertEqual(bundle.assembly_metadata.final_evidence_count, 3)
 
+    def test_build_ask_context_bundle_returns_no_evidence_for_zero_budget(self) -> None:
+        bundle = build_ask_context_bundle(
+            user_query="roadmap",
+            candidates=[
+                _make_candidate(
+                    path="vault/Roadmap.md",
+                    chunk_id="c1",
+                    heading_path="Roadmap > Ask",
+                    text="A" * 600,
+                    score=1.0,
+                )
+            ],
+            tool_results=[],
+            token_budget=0,
+            allowed_tool_names=[],
+        )
+
+        self.assertEqual(bundle.evidence_items, [])
+
     def test_build_ask_context_bundle_keeps_safe_evidence_when_high_score_chunk_is_suspicious(
         self,
     ) -> None:

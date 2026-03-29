@@ -100,6 +100,9 @@ def _apply_weighted_budget(
     candidates: list[RetrievedChunkCandidate],
     token_budget: int,
 ) -> tuple[list[tuple[RetrievedChunkCandidate, str]], int]:
+    if token_budget <= 0:
+        return [], len(candidates)
+
     kept: list[tuple[RetrievedChunkCandidate, str]] = []
     consumed = 0
     dropped = 0
