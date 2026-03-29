@@ -9,6 +9,7 @@ from app.context.assembly import (
 )
 from app.context.render import render_tool_selection_prompt
 from app.contracts.workflow import (
+    ContextAssemblyMetadata,
     ContextBundle,
     ContextEvidenceItem,
     DigestSourceNote,
@@ -71,6 +72,11 @@ class ContextContractTests(unittest.TestCase):
         self.assertEqual(payload["workflow_action"], "ask_qa")
         self.assertEqual(payload["evidence_items"][0]["source_kind"], "retrieval")
         self.assertEqual(payload["safety_flags"], ["suspicious_instruction"])
+        self.assertEqual(payload["source_notes"], [])
+        self.assertEqual(
+            payload["assembly_metadata"],
+            ContextAssemblyMetadata().model_dump(mode="json"),
+        )
 
 
 class ContextAssemblyTests(unittest.TestCase):
@@ -116,6 +122,8 @@ class ContextAssemblyTests(unittest.TestCase):
         self.assertGreaterEqual(len(bundle.evidence_items), 2)
         self.assertEqual(bundle.evidence_items[0].source_path, "Recent-A.md")
         self.assertEqual(bundle.evidence_items[1].source_path, "Recent-B.md")
+        self.assertEqual(bundle.source_notes, [])
+        self.assertEqual(bundle.assembly_metadata, ContextAssemblyMetadata())
 
     def test_build_ingest_context_bundle_orders_findings_before_related_candidates(
         self,
@@ -157,6 +165,48 @@ class ContextAssemblyTests(unittest.TestCase):
             ],
         )
         self.assertTrue(bundle.assembly_notes)
+        self.assertEqual(bundle.source_notes, [])
+        self.assertEqual(bundle.assembly_metadata, ContextAssemblyMetadata())
+
+    def test_build_ask_context_bundle_uses_per_note_position_hints(self) -> None:
+        bundle = build_ask_context_bundle(
+            user_query="roadmap",
+            candidates=[
+                _make_candidate(
+                    path="vault/Roadmap.md",
+                    chunk_id="c1",
+                    heading_path="Roadmap > Delivery",
+                    text="top evidence",
+                    score=1.0,
+                ),
+                _make_candidate(
+                    path="vault/Other.md",
+                    chunk_id="c2",
+                    heading_path="Other > Notes",
+                    text="other note evidence",
+                    score=0.9,
+                ),
+                _make_candidate(
+                    path="vault/Roadmap.md",
+                    chunk_id="c3",
+                    heading_path="Roadmap > Delivery",
+                    text="second evidence",
+                    score=0.8,
+                ),
+            ],
+            tool_results=[],
+            token_budget=2400,
+            allowed_tool_names=[],
+        )
+
+        self.assertEqual(
+            [item.position_hint for item in bundle.evidence_items],
+            [
+                "第 1 条 / 共 2 条",
+                "第 1 条 / 共 1 条",
+                "第 2 条 / 共 2 条",
+            ],
+        )
 
     def test_build_ask_context_bundle_deduplicates_candidates_and_marks_suspicious_evidence(
         self,
@@ -369,6 +419,7 @@ class ContextAssemblyTests(unittest.TestCase):
         self.assertEqual(bundle.source_notes[0].chunk_count, 1)
         self.assertEqual(bundle.evidence_items[0].source_note_title, "Roadmap / Delivery")
         self.assertEqual(bundle.source_notes[0].title, "Roadmap / Delivery")
+        self.assertEqual(bundle.source_notes, [bundle.source_notes[0]])
 
 
 if __name__ == "__main__":

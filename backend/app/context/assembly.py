@@ -103,6 +103,24 @@ def _build_source_notes(
     return source_notes
 
 
+def _assign_position_hints(evidence_items: list[ContextEvidenceItem]) -> None:
+    total_by_source_path: dict[str, int] = {}
+    for item in evidence_items:
+        total_by_source_path[item.source_path] = (
+            total_by_source_path.get(item.source_path, 0) + 1
+        )
+
+    seen_by_source_path: dict[str, int] = {}
+    for item in evidence_items:
+        seen_by_source_path[item.source_path] = (
+            seen_by_source_path.get(item.source_path, 0) + 1
+        )
+        item.position_hint = (
+            f"第 {seen_by_source_path[item.source_path]} 条 / "
+            f"共 {total_by_source_path[item.source_path]} 条"
+        )
+
+
 def _collect_flags(candidates: list[RetrievedChunkCandidate]) -> list[str]:
     return _collect_text_flags(candidate.text for candidate in candidates)
 
@@ -147,13 +165,13 @@ def build_ask_context_bundle(
             chunk_id=item.chunk_id,
             source_note_title=item.title,
             heading_path=item.heading_path,
-            position_hint=f"第 {index} 条 / 共 {len(visible_candidates)} 条",
             text=item.text,
             score=item.score,
             source_kind="retrieval",
         )
-        for index, item in enumerate(visible_candidates, start=1)
+        for item in visible_candidates
     ]
+    _assign_position_hints(evidence_items)
 
     assembly_notes: list[str] = []
     if deduped_removed:
