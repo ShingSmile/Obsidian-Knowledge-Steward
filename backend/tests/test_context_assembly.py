@@ -7,6 +7,7 @@ from app.context.assembly import (
     build_digest_context_bundle,
     build_ingest_context_bundle,
     _filter_candidates_by_relevance,
+    _limit_candidates_per_source,
 )
 from app.context.render import render_tool_selection_prompt
 from app.contracts.workflow import (
@@ -437,6 +438,85 @@ class ContextAssemblyTests(unittest.TestCase):
         )
         self.assertEqual(bundle.assembly_metadata.diversity_filtered_count, 1)
         self.assertEqual(bundle.assembly_metadata.per_source_limit, 2)
+
+    def test_limit_candidates_per_source_preserves_original_survivor_order(self) -> None:
+        kept, dropped = _limit_candidates_per_source(
+            [
+                _make_candidate(
+                    path="vault/Roadmap.md",
+                    chunk_id="c2",
+                    heading_path="Roadmap > Delivery",
+                    text="second evidence",
+                    score=0.9,
+                ),
+                _make_candidate(
+                    path="vault/Roadmap.md",
+                    chunk_id="c1",
+                    heading_path="Roadmap > Delivery",
+                    text="top evidence",
+                    score=1.0,
+                ),
+                _make_candidate(
+                    path="vault/Roadmap.md",
+                    chunk_id="c3",
+                    heading_path="Roadmap > Delivery",
+                    text="third evidence",
+                    score=0.8,
+                ),
+                _make_candidate(
+                    path="vault/Strategy.md",
+                    chunk_id="c4",
+                    heading_path="Strategy > Overview",
+                    text="strategy evidence",
+                    score=0.7,
+                ),
+            ]
+        )
+
+        self.assertEqual([item.chunk_id for item in kept], ["c2", "c1", "c4"])
+        self.assertEqual(dropped, 1)
+
+    def test_build_ask_context_bundle_applies_diversity_before_budget_trim(self) -> None:
+        bundle = build_ask_context_bundle(
+            user_query="roadmap",
+            candidates=[
+                _make_candidate(
+                    path="A.md",
+                    chunk_id="c1",
+                    heading_path="A",
+                    text="A" * 10,
+                    score=1.0,
+                ),
+                _make_candidate(
+                    path="B.md",
+                    chunk_id="c2",
+                    heading_path="B",
+                    text="B" * 10,
+                    score=0.8,
+                ),
+                _make_candidate(
+                    path="A.md",
+                    chunk_id="c3",
+                    heading_path="A",
+                    text="C" * 10,
+                    score=0.9,
+                ),
+                _make_candidate(
+                    path="A.md",
+                    chunk_id="c4",
+                    heading_path="A",
+                    text="D" * 10,
+                    score=0.7,
+                ),
+            ],
+            tool_results=[],
+            token_budget=30,
+            allowed_tool_names=[],
+        )
+
+        self.assertEqual([item.chunk_id for item in bundle.evidence_items], ["c1", "c2"])
+        self.assertEqual(bundle.assembly_metadata.diversity_filtered_count, 1)
+        self.assertEqual(bundle.assembly_metadata.budget_filtered_count, 1)
 
     def test_build_ask_context_bundle_keeps_safe_evidence_when_high_score_chunk_is_suspicious(
         self,

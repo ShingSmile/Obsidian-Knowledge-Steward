@@ -61,17 +61,17 @@ def _filter_candidates_by_relevance(
 def _limit_candidates_per_source(
     candidates: list[RetrievedChunkCandidate],
 ) -> tuple[list[RetrievedChunkCandidate], int]:
-    kept: list[RetrievedChunkCandidate] = []
+    kept_chunk_ids: set[str] = set()
     counts_by_path: dict[str, int] = {}
-    dropped = 0
     for candidate in sorted(candidates, key=lambda item: (-item.score, item.path, item.start_line)):
         path_count = counts_by_path.get(candidate.path, 0)
         if path_count >= ASK_PER_SOURCE_LIMIT:
-            dropped += 1
             continue
         counts_by_path[candidate.path] = path_count + 1
-        kept.append(candidate)
-    return kept, dropped
+        kept_chunk_ids.add(candidate.chunk_id)
+
+    kept = [candidate for candidate in candidates if candidate.chunk_id in kept_chunk_ids]
+    return kept, len(candidates) - len(kept)
 
 
 def _trim_candidates_to_budget(
