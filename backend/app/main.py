@@ -5,6 +5,7 @@ from typing import Callable
 from uuid import uuid4
 
 from fastapi import FastAPI, HTTPException, Response
+from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 
 from app.config import get_settings
@@ -43,6 +44,16 @@ app = FastAPI(
     title="Knowledge Steward Backend",
     version=settings.version,
     summary="Backend baseline for Obsidian Knowledge Steward",
+)
+app.add_middleware(
+    CORSMiddleware,
+    # Obsidian desktop plugins run in an Electron/webview origin and may issue
+    # browser-style preflight requests to the local backend. This backend does
+    # not rely on browser cookies, so permissive local cross-origin access keeps
+    # the plugin transport usable without coupling it to a single origin shape.
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 
