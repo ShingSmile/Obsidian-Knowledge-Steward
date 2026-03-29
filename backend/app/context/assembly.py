@@ -5,14 +5,25 @@ import json
 
 from app.context.safety import detect_safety_flags
 from app.contracts.workflow import (
+    ContextAssemblyMetadata,
     ContextBundle,
     ContextEvidenceItem,
+    ContextSourceNote,
     DigestSourceNote,
     ProposalEvidence,
     RetrievedChunkCandidate,
     ToolExecutionResult,
     WorkflowAction,
 )
+
+RELEVANCE_SCORE_RATIO = 0.35
+PER_SOURCE_LIMIT = 2
+FULL_TEXT_CHAR_BUDGET = 900
+SUMMARY_CHAR_BUDGET = 280
+
+
+def _normalize_note_title(title: str) -> str:
+    return title.rsplit("/", 1)[-1].removesuffix(".md")
 
 
 def _dedupe_candidates(
@@ -35,6 +46,20 @@ def _estimate_candidate_chars(candidate: RetrievedChunkCandidate) -> int:
     return len(candidate.path) + len(heading) + len(candidate.text)
 
 
+def _filter_candidates_by_relevance(
+    candidates: list[RetrievedChunkCandidate],
+) -> tuple[list[RetrievedChunkCandidate], int, float]:
+    if not candidates:
+        return [], 0, 0.0
+
+    top_score = max(candidate.score for candidate in candidates)
+    relevance_threshold = top_score * RELEVANCE_SCORE_RATIO
+    filtered = [candidate for candidate in candidates if candidate.score >= relevance_threshold]
+    if not filtered:
+        filtered = [max(candidates, key=lambda candidate: candidate.score)]
+    return filtered, len(candidates) - len(filtered), relevance_threshold
+
+
 def _trim_candidates_to_budget(
     candidates: list[RetrievedChunkCandidate],
     token_budget: int,
@@ -52,6 +77,35 @@ def _trim_candidates_to_budget(
         kept.append(candidate)
         consumed += candidate_chars
     return kept, dropped
+
+
+def _build_source_notes(
+    evidence_items: list[ContextEvidenceItem],
+) -> list[ContextSourceNote]:
+    source_notes_by_path: dict[str, ContextSourceNote] = {}
+    source_notes: list[ContextSourceNote] = []
+
+    for item in evidence_items:
+        source_note = source_notes_by_path.get(item.source_path)
+        if source_note is None:
+            source_note = ContextSourceNote(
+                source_path=item.source_path,
+                title=_normalize_note_title(
+                    item.source_note_title or item.source_path
+                ),
+                chunk_count=0,
+                max_score=item.score,
+            )
+            source_notes_by_path[item.source_path] = source_note
+            source_notes.append(source_note)
+
+        source_note.chunk_count += 1
+        if item.score is not None and (
+            source_note.max_score is None or item.score > source_note.max_score
+        ):
+            source_note.max_score = item.score
+
+    return source_notes
 
 
 def _collect_flags(candidates: list[RetrievedChunkCandidate]) -> list[str]:
@@ -79,27 +133,32 @@ def build_ask_context_bundle(
     allowed_tool_names: list[str],
 ) -> ContextBundle:
     deduped, deduped_removed = _dedupe_candidates(candidates)
-    trimmed, trimmed_removed = _trim_candidates_to_budget(deduped, token_budget)
-    suspicious_trimmed = [
-        item for item in trimmed if detect_safety_flags(item.text)
-    ]
+    relevant, relevance_removed, relevance_threshold = _filter_candidates_by_relevance(
+        deduped
+    )
+    trimmed, trimmed_removed = _trim_candidates_to_budget(relevant, token_budget)
+    visible_candidates = [item for item in trimmed if not detect_safety_flags(item.text)]
+    suspicious_trimmed = [item for item in trimmed if detect_safety_flags(item.text)]
 
     evidence_items = [
         ContextEvidenceItem(
             source_path=item.path,
             chunk_id=item.chunk_id,
+            source_note_title=_normalize_note_title(item.title),
             heading_path=item.heading_path,
+            position_hint=f"第 {index} 条 / 共 {len(visible_candidates)} 条",
             text=item.text,
             score=item.score,
             source_kind="retrieval",
         )
-        for item in trimmed
-        if not detect_safety_flags(item.text)
+        for index, item in enumerate(visible_candidates, start=1)
     ]
 
     assembly_notes: list[str] = []
     if deduped_removed:
         assembly_notes.append(f"deduplicated:{deduped_removed}")
+    if relevance_removed:
+        assembly_notes.append(f"relevance_filtered:{relevance_removed}")
     if trimmed_removed:
         assembly_notes.append(f"trimmed_for_budget:{trimmed_removed}")
     if suspicious_trimmed:
@@ -109,6 +168,19 @@ def build_ask_context_bundle(
         user_intent=user_query,
         workflow_action=WorkflowAction.ASK_QA,
         evidence_items=evidence_items,
+        source_notes=_build_source_notes(evidence_items),
+        assembly_metadata=ContextAssemblyMetadata(
+            initial_candidate_count=len(candidates),
+            relevance_filtered_count=relevance_removed,
+            diversity_filtered_count=0,
+            budget_filtered_count=trimmed_removed,
+            suspicious_filtered_count=len(suspicious_trimmed),
+            final_evidence_count=len(evidence_items),
+            relevance_threshold=relevance_threshold,
+            per_source_limit=PER_SOURCE_LIMIT,
+            full_text_char_budget=FULL_TEXT_CHAR_BUDGET,
+            summary_char_budget=SUMMARY_CHAR_BUDGET,
+        ),
         tool_results=tool_results,
         allowed_tool_names=allowed_tool_names,
         token_budget=token_budget,
@@ -176,6 +248,8 @@ def build_ingest_context_bundle(
         user_intent=f"Review governance signals for {target_note_path}",
         workflow_action=WorkflowAction.INGEST_STEWARD,
         evidence_items=[*proposal_items, *retrieval_items],
+        source_notes=[],
+        assembly_metadata=ContextAssemblyMetadata(),
         tool_results=[],
         allowed_tool_names=[],
         token_budget=token_budget,
@@ -233,6 +307,8 @@ def build_digest_context_bundle(
         user_intent="Assemble digest context from selected source notes",
         workflow_action=WorkflowAction.DAILY_DIGEST,
         evidence_items=evidence_items,
+        source_notes=[],
+        assembly_metadata=ContextAssemblyMetadata(),
         tool_results=[],
         allowed_tool_names=[],
         token_budget=token_budget,

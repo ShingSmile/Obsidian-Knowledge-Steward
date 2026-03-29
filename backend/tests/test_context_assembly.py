@@ -288,6 +288,55 @@ class ContextAssemblyTests(unittest.TestCase):
         )
         self.assertEqual([item.chunk_id for item in bundle.evidence_items], ["c2"])
 
+    def test_build_ask_context_bundle_filters_low_score_tail_candidates(self) -> None:
+        bundle = build_ask_context_bundle(
+            user_query="roadmap",
+            candidates=[
+                _make_candidate(
+                    path="vault/Roadmap.md",
+                    chunk_id="c1",
+                    heading_path="Roadmap > Delivery",
+                    text="top evidence",
+                    score=1.0,
+                ),
+                _make_candidate(
+                    path="vault/Noise.md",
+                    chunk_id="c2",
+                    heading_path="Noise > Tail",
+                    text="tail evidence",
+                    score=0.1,
+                ),
+            ],
+            tool_results=[],
+            token_budget=2400,
+            allowed_tool_names=[],
+        )
+
+        self.assertEqual([item.chunk_id for item in bundle.evidence_items], ["c1"])
+        self.assertEqual(bundle.assembly_metadata.initial_candidate_count, 2)
+        self.assertEqual(bundle.assembly_metadata.relevance_filtered_count, 1)
+        self.assertEqual(bundle.assembly_metadata.final_evidence_count, 1)
+
+    def test_build_ask_context_bundle_exposes_source_note_summary_defaults(self) -> None:
+        bundle = build_ask_context_bundle(
+            user_query="roadmap",
+            candidates=[
+                _make_candidate(
+                    path="vault/Roadmap.md",
+                    chunk_id="c1",
+                    heading_path="Roadmap > Delivery",
+                    text="top evidence",
+                    score=1.0,
+                )
+            ],
+            tool_results=[],
+            token_budget=2400,
+            allowed_tool_names=[],
+        )
+
+        self.assertEqual(bundle.source_notes[0].title, "Roadmap")
+        self.assertEqual(bundle.source_notes[0].chunk_count, 1)
+
 
 if __name__ == "__main__":
     unittest.main()

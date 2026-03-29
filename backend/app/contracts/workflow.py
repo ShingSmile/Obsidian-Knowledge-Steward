@@ -17,16 +17,42 @@ class WorkflowAction(str, Enum):
 class ContextEvidenceItem(BaseModel):
     source_path: str
     chunk_id: str | None = None
+    source_note_title: str | None = None
     heading_path: str | None = None
+    position_hint: str | None = None
     text: str
     score: float | None = None
     source_kind: Literal["retrieval", "tool", "proposal", "digest"]
+
+
+class ContextSourceNote(BaseModel):
+    source_path: str
+    title: str
+    chunk_count: int = 0
+    max_score: float | None = None
+
+
+class ContextAssemblyMetadata(BaseModel):
+    initial_candidate_count: int = 0
+    relevance_filtered_count: int = 0
+    diversity_filtered_count: int = 0
+    budget_filtered_count: int = 0
+    suspicious_filtered_count: int = 0
+    final_evidence_count: int = 0
+    relevance_threshold: float = 0.0
+    per_source_limit: int = 0
+    full_text_char_budget: int = 0
+    summary_char_budget: int = 0
 
 
 class ContextBundle(BaseModel):
     user_intent: str
     workflow_action: WorkflowAction
     evidence_items: list[ContextEvidenceItem] = Field(default_factory=list)
+    source_notes: list[ContextSourceNote] = Field(default_factory=list)
+    assembly_metadata: ContextAssemblyMetadata = Field(
+        default_factory=ContextAssemblyMetadata
+    )
     tool_results: list["ToolExecutionResult"] = Field(default_factory=list)
     allowed_tool_names: list[str] = Field(default_factory=list)
     token_budget: int
