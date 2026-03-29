@@ -92,7 +92,7 @@ def run_minimal_ask(
         token_budget=ASK_CONTEXT_TOKEN_BUDGET,
         allowed_tool_names=allowed_tool_names,
     )
-    prompt_candidates = _select_prompt_candidates(candidates, bundle)
+    prompt_candidates = _select_prompt_candidates(candidates=candidates, bundle=bundle)
     citations = _build_citations(prompt_candidates)
     if bundle.safety_flags and not prompt_candidates:
         return _build_retrieval_only_result(
@@ -189,7 +189,7 @@ def run_minimal_ask(
             token_budget=ASK_CONTEXT_TOKEN_BUDGET,
             allowed_tool_names=allowed_tool_names,
         )
-        prompt_candidates = _select_prompt_candidates(candidates, bundle)
+        prompt_candidates = _select_prompt_candidates(candidates=candidates, bundle=bundle)
         citations = _build_citations(prompt_candidates)
 
     generated_answer, provider_target, model_fallback_reason = _try_generate_grounded_answer(
@@ -282,6 +282,9 @@ def _select_prompt_candidates(
     candidates: list[RetrievedChunkCandidate],
     bundle: ContextBundle,
 ) -> list[RetrievedChunkCandidate]:
+    # Prompt-visible citations always follow the assembled bundle order, not the raw
+    # retrieval order. That keeps citation numbering aligned with what the user can
+    # actually see in the rendered prompt.
     retrieval_chunk_ids = [
         item.chunk_id
         for item in bundle.evidence_items

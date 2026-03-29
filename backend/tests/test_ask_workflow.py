@@ -13,6 +13,8 @@ from fastapi import HTTPException, Response
 from app.config import get_settings
 from app.contracts.workflow import (
     AskResultMode,
+    ContextBundle,
+    ContextEvidenceItem,
     GuardrailAction,
     RetrievalMetadataFilter,
     RetrievalSearchResponse,
@@ -831,6 +833,172 @@ class AskWorkflowTests(unittest.TestCase):
             self.assertEqual(Path(result.retrieved_candidates[0].path).name, "Roadmap.md")
             self.assertEqual(Path(result.retrieved_candidates[1].path).name, "Strategy.md")
             self.assertEqual(result.citations[0].retrieval_source, "hybrid_rrf")
+
+    def test_run_minimal_ask_includes_source_title_and_position_hint_in_prompt(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            db_path = self._build_index_fixture(Path(temp_dir))
+            settings = replace(
+                get_settings(),
+                index_db_path=db_path,
+                cloud_base_url="https://example.com",
+                cloud_chat_model="gpt-test",
+                local_chat_model="",
+            )
+
+            captured_messages: dict[str, list[dict[str, str]]] = {}
+
+            def _capture_grounded_answer(
+                *,
+                provider_target: object,
+                query: str,
+                bundle: object,
+            ) -> str:
+                del provider_target
+                captured_messages["messages"] = ask_service._build_grounded_messages(
+                    query=query,
+                    bundle=bundle,
+                )
+                return "Roadmap 已拆成检索与 ask 两段实现。[1]"
+
+            with patch(
+                "app.services.ask._request_grounded_answer",
+                side_effect=_capture_grounded_answer,
+            ):
+                result = run_minimal_ask(
+                    WorkflowInvokeRequest(
+                        action_type=WorkflowAction.ASK_QA,
+                        user_query="Roadmap",
+                    ),
+                    settings=settings,
+                )
+
+            self.assertEqual(result.mode, AskResultMode.GENERATED_ANSWER)
+            self.assertIn("messages", captured_messages)
+            prompt = captured_messages["messages"][1]["content"]
+            self.assertIn("source_note_title:", prompt)
+            self.assertIn("position_hint:", prompt)
+            self.assertIn("source_note_title: Roadmap", prompt)
+
+    def test_run_minimal_ask_builds_citations_from_post_assembly_visible_evidence(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            db_path = self._build_index_fixture(Path(temp_dir))
+            settings = replace(
+                get_settings(),
+                index_db_path=db_path,
+                cloud_base_url="https://example.com",
+                cloud_chat_model="gpt-test",
+                local_chat_model="",
+            )
+
+            raw_candidates = [
+                RetrievedChunkCandidate(
+                    retrieval_source="hybrid_rrf",
+                    chunk_id="raw-first",
+                    note_id="note_first",
+                    path="/vault/first/First.md",
+                    title="First",
+                    heading_path="First",
+                    note_type="summary_note",
+                    template_family="plain",
+                    daily_note_date=None,
+                    source_mtime_ns=1,
+                    start_line=1,
+                    end_line=2,
+                    score=0.4,
+                    snippet="first raw snippet",
+                    text="first raw snippet",
+                ),
+                RetrievedChunkCandidate(
+                    retrieval_source="hybrid_rrf",
+                    chunk_id="raw-second",
+                    note_id="note_second",
+                    path="/vault/second/Second.md",
+                    title="Second",
+                    heading_path="Second",
+                    note_type="summary_note",
+                    template_family="plain",
+                    daily_note_date=None,
+                    source_mtime_ns=1,
+                    start_line=3,
+                    end_line=4,
+                    score=0.9,
+                    snippet="second raw snippet",
+                    text="second raw snippet",
+                ),
+                RetrievedChunkCandidate(
+                    retrieval_source="hybrid_rrf",
+                    chunk_id="raw-filtered",
+                    note_id="note_filtered",
+                    path="/vault/filtered/Filtered.md",
+                    title="Filtered",
+                    heading_path="Filtered",
+                    note_type="summary_note",
+                    template_family="plain",
+                    daily_note_date=None,
+                    source_mtime_ns=1,
+                    start_line=5,
+                    end_line=6,
+                    score=0.8,
+                    snippet="filtered raw snippet",
+                    text="filtered raw snippet",
+                ),
+            ]
+            visible_bundle = ContextBundle(
+                user_intent="Roadmap",
+                workflow_action=WorkflowAction.ASK_QA,
+                evidence_items=[
+                    ContextEvidenceItem(
+                        source_path="/vault/second/Second.md",
+                        chunk_id="raw-second",
+                        source_note_title="Second",
+                        heading_path="Second",
+                        position_hint="2/3",
+                        text="second visible snippet",
+                        score=0.9,
+                        source_kind="retrieval",
+                    ),
+                    ContextEvidenceItem(
+                        source_path="/vault/first/First.md",
+                        chunk_id="raw-first",
+                        source_note_title="First",
+                        heading_path="First",
+                        position_hint="1/3",
+                        text="first visible snippet",
+                        score=0.4,
+                        source_kind="retrieval",
+                    ),
+                ],
+                token_budget=2400,
+            )
+
+            with patch(
+                "app.services.ask.search_hybrid_chunks_in_db",
+                return_value=RetrievalSearchResponse(candidates=raw_candidates),
+            ):
+                with patch(
+                    "app.services.ask.build_ask_context_bundle",
+                    return_value=visible_bundle,
+                ):
+                    with patch(
+                        "app.services.ask._request_tool_call_decision",
+                        return_value=ToolCallDecision(requested=False),
+                    ):
+                        with patch(
+                            "app.services.ask._request_grounded_answer",
+                            return_value="Roadmap 已拆成检索与 ask 两段实现。[1][2]",
+                        ):
+                            result = run_minimal_ask(
+                                WorkflowInvokeRequest(
+                                    action_type=WorkflowAction.ASK_QA,
+                                    user_query="Roadmap",
+                                ),
+                                settings=settings,
+                            )
+
+            self.assertEqual(result.mode, AskResultMode.GENERATED_ANSWER)
+            self.assertEqual([candidate.chunk_id for candidate in result.retrieved_candidates], ["raw-second", "raw-first"])
+            self.assertEqual([citation.chunk_id for citation in result.citations], ["raw-second", "raw-first"])
+            self.assertNotIn("raw-filtered", [citation.chunk_id for citation in result.citations])
 
     def test_run_minimal_ask_downgrades_when_generated_answer_has_no_citation(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

@@ -31,11 +31,12 @@ def render_grounded_answer_prompt(bundle: ContextBundle) -> str:
     lines = [f"用户问题：{bundle.user_intent}", "", "可用检索证据如下："]
     if retrieval_items:
         for index, item in enumerate(retrieval_items, start=1):
-            heading_path = item.heading_path or item.source_path
             lines.extend(
                 [
                     f"[{index}] path: {item.source_path}",
-                    f"heading_path: {heading_path}",
+                    f"source_note_title: {item.source_note_title or item.source_path}",
+                    f"heading_path: {item.heading_path or item.source_path}",
+                    f"position_hint: {item.position_hint or '1/1'}",
                     "content:",
                     item.text,
                     "",
