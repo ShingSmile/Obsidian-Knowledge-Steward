@@ -1,1 +1,0 @@
-{"channel_sources": "conda-forge", "channel_targets": "conda-forge main", "fastapi_core": "0.135.1 pyhcf101f3_0", "python_min": "3.10", "target_platform": "noarch"}

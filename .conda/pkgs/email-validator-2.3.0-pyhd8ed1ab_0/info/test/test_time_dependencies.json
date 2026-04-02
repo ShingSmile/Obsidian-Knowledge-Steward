@@ -1,1 +1,0 @@
-["flake8", "docutils", "python 3.10.*", "pytest", "pytest-cov", "coverage"]

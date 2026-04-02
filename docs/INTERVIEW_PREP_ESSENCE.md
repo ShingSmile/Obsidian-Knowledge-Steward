@@ -2,6 +2,47 @@
 
 > 用途：只保留后续面试复习最有用的结论。当前版本先沉淀 Step 1，后续继续增量维护。
 
+## 2026-03-29 简历版高阶项目叙事
+
+### 1. 项目一句话主线
+
+- 不要讲成“Obsidian 问答助手”
+- 要讲成“面向个人知识库的受控治理 Agent 系统”
+- 核心复杂性不是检索本身，而是：
+  - 海量非结构化 Markdown 的跨文档理解
+  - 多步推理与人工审批带来的跨会话状态衔接
+  - LLM 生成建议到真实写回之间的风险收敛
+  - 生成质量、引用一致性与审计可追溯
+
+### 2. 推荐的四层架构切法
+
+- 数据治理与索引层
+  - 解析 Markdown、frontmatter、heading、wikilink 和任务结构
+  - 建本地 SQLite + FTS + embedding 索引
+  - 让知识库从“不可控原文集合”变成“可检索、可治理、可追踪的数据底座”
+- 多路检索与上下文装配层
+  - 不是命中候选后直接喂模型
+  - 先做双路召回、RRF 融合、上下文装配、来源多样性控制、预算分配和可疑内容过滤
+  - 解决“召回后上下文太脏、太偏、太长、不可引用”的问题
+- 状态机编排与跨会话恢复层
+  - ask 走图级 ReAct，ingest / digest 走静态编排
+  - 用 checkpoint + thread_id + resume 协议接住工具循环、人工审批和异常恢复
+  - 解决“流程跨天中断后无法衔接、重复执行副作用”的问题
+- 受控写回、风险拦截与评测观测层
+  - 写回收敛为有限原子 patch，经 Proposal -> Approval -> Writeback -> Audit
+  - runtime 做保守 faithfulness gate，offline 做 claim/NLI 多维评测
+  - 解决“模型看起来能答、能改，但系统其实不可控、不可证伪”的问题
+
+### 3. 简历表述时最该突出的 senior 关键词
+
+- `workflow-first`
+- `graph-level ReAct`
+- `hybrid retrieval + context assembly`
+- `checkpoint / resume / idempotency`
+- `proposal-driven controlled writeback`
+- `runtime gate + offline eval`
+- `auditability / observability / fail-closed`
+
 ## Step 1：项目宏观认知与术语对齐
 
 ### 1. 项目一句话定位

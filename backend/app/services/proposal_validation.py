@@ -17,6 +17,8 @@ ALLOWED_PATCH_OPS = {
     "frontmatter_merge",
     "insert_under_heading",
     "merge_frontmatter",
+    "replace_section",
+    "add_wikilink",
 }
 
 
@@ -73,40 +75,77 @@ def _validate_patch_op(
             f"patch_ops[{ordinal}].payload must be a mapping."
         )
 
-    if patch_op.op in {"insert_under_heading"}:
-        _validate_insert_under_heading_payload(
+    if patch_op.op in {"insert_under_heading", "replace_section"}:
+        _validate_heading_content_payload(
             patch_op.payload,
             content_limit=content_limit,
+            ordinal=ordinal,
+            op_name=patch_op.op,
+        )
+    elif patch_op.op == "add_wikilink":
+        _validate_add_wikilink_payload(
+            patch_op.payload,
+            vault_root=vault_root,
             ordinal=ordinal,
         )
 
     _validate_payload_strings(
         patch_op.payload,
         content_limit=content_limit,
-        field_name=f"patch_ops[{ordinal}].payload",
+        field_name=f"patch_ops[{ordinal}].{patch_op.op} payload",
     )
 
 
-def _validate_insert_under_heading_payload(
+def _validate_heading_content_payload(
     payload: dict[str, object],
     *,
     content_limit: int,
     ordinal: int,
+    op_name: str,
 ) -> None:
     heading = _first_string_value(payload, ("heading", "heading_path"))
     if heading is None or not heading.strip():
         raise ProposalValidationError(
-            f"patch_ops[{ordinal}].payload must include heading or heading_path."
+            f"patch_ops[{ordinal}].{op_name} payload must include heading or heading_path."
         )
 
     content = _first_string_value(payload, ("content", "text"))
     if content is None or not content.strip():
         raise ProposalValidationError(
-            f"patch_ops[{ordinal}].payload must include content or text."
+            f"patch_ops[{ordinal}].{op_name} payload must include content or text."
         )
     if len(content) > content_limit:
         raise ProposalValidationError(
-            f"patch_ops[{ordinal}].payload text exceeds the {content_limit} character limit."
+            f"patch_ops[{ordinal}].{op_name} payload text exceeds the {content_limit} character limit."
+        )
+
+
+def _validate_add_wikilink_payload(
+    payload: dict[str, object],
+    *,
+    vault_root: Path,
+    ordinal: int,
+) -> None:
+    heading = _first_string_value(payload, ("heading", "heading_path"))
+    if heading is None or not heading.strip():
+        raise ProposalValidationError(
+            f"patch_ops[{ordinal}].add_wikilink payload must include heading or heading_path."
+        )
+
+    linked_note_path = _first_string_value(payload, ("linked_note_path",))
+    if linked_note_path is None or not linked_note_path.strip():
+        raise ProposalValidationError(
+            f"patch_ops[{ordinal}].add_wikilink payload must include linked_note_path."
+        )
+
+    normalized_linked_note_path = _normalize_candidate_path(
+        linked_note_path,
+        vault_root=vault_root,
+        field_name=f"patch_ops[{ordinal}].payload.linked_note_path",
+    )
+    if not normalized_linked_note_path.is_file():
+        raise ProposalValidationError(
+            f"patch_ops[{ordinal}].add_wikilink linked_note_path must reference an existing note within the configured vault."
         )
 
 
@@ -133,6 +172,19 @@ def _validate_path_within_vault(
     vault_root: Path,
     field_name: str,
 ) -> None:
+    _normalize_candidate_path(
+        raw_path,
+        vault_root=vault_root,
+        field_name=field_name,
+    )
+
+
+def _normalize_candidate_path(
+    raw_path: str,
+    *,
+    vault_root: Path,
+    field_name: str,
+) -> Path:
     if not isinstance(raw_path, str) or not raw_path.strip():
         raise ProposalValidationError(f"{field_name} must be a non-empty string.")
 
@@ -147,6 +199,7 @@ def _validate_path_within_vault(
         raise ProposalValidationError(
             f"{field_name} must stay within the configured vault."
         ) from exc
+    return normalized_candidate_path
 
 
 def _iter_strings(value: object) -> Iterable[str]:

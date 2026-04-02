@@ -2,6 +2,49 @@
 
 > 用途：为跨会话继续“项目面试辅导”提供最小但完整的接力信息。只写当前进度、下一步断点和用户薄弱点，不写冗余过程。
 
+## 2026-03-29 最新断点（新会话先看这里）
+
+- 当前最新状态：
+  - 已完成一次“架构师视角的项目重构”，目标是把项目从“模块清单”升级为“围绕核心系统问题的高阶故事”
+  - 本轮重构明确采用的主线不是“问答助手”，而是“面向 Obsidian 个人知识库的受控治理系统”
+  - 本轮输出已按“技术栈 -> 核心系统痛点 -> 架构层级贡献 -> 面试钩子”重组
+- 本轮用于重构的证据来源：
+  - 文档：`docs/PROJECT_MASTER_PLAN.md`、`docs/TASK_QUEUE.md`、`docs/SESSION_LOG.md`
+  - 代码：`backend/app/main.py`、`backend/app/graphs/*.py`、`backend/app/services/ask.py`
+  - 代码：`backend/app/context/*.py`、`backend/app/retrieval/hybrid.py`
+  - 代码：`backend/app/services/resume_workflow.py`、`backend/app/services/proposal_validation.py`
+  - 代码：`backend/app/observability/runtime_trace.py`、`eval/run_eval.py`
+  - 插件：`plugin/src/writeback/applyProposalWriteback.ts`、`plugin/src/backend/runtime.ts`
+- 本轮重构后的核心叙事：
+  - 系统核心问题不是“回答问题”，而是“如何让 LLM 在海量非结构化笔记上做跨文档理解、生成治理建议并安全写回，同时保持可恢复、可审计、可降级”
+  - 架构层被收敛为四层：
+    - 数据治理与索引层
+    - 多路检索与上下文装配层
+    - 状态机编排与跨会话恢复层
+    - 受控写回、风控与评测观测层
+  - 面试时要突出“静态编排 + 图级 ReAct”“受限 patch + HITL 审批”“runtime gate + offline eval 闭环”这三条 senior 叙事
+- 本轮表达策略：
+  - 代码里已落地的能力直接按事实表述
+  - `TASK_QUEUE` 中用户明确要求“视为已实现”的能力，可以纳入最终项目叙事：
+    - ask 图级 ReAct 循环
+    - Runtime Faithfulness Gate
+    - claim 级 NLI / 多维度离线评测
+    - 跨会话恢复控制面补齐
+- 用户当前最需要强化的点：
+  - 不要把项目讲成“RAG + LangGraph + SQLite 的技术堆砌”
+  - 要先抛核心复杂性，再讲为什么需要分层架构
+  - 要能解释为什么 ask 用图级 ReAct，而 ingest / digest 保持静态编排
+  - 要能解释为什么写回必须收敛到原子 patch，而不是让模型直接改 Markdown
+  - 要能解释 runtime gate 和 offline eval 为什么必须拆成两层
+- 下一步推荐顺序：
+  1. 先背本轮产出的“简历版项目描述”
+  2. 再针对 4 到 5 个架构钩子做深问演练
+  3. 最后把每个钩子的回答收敛成“场景 -> 风险 -> 设计 -> trade-off -> 落地”
+- 为了续聊必须知道的上下文摘要：
+  - 用户本轮不是要继续扫代码，而是要拿到一版能直接用于简历和大厂面试的高阶表达
+  - 后续如果继续辅导，最自然的动作不是再讲模块，而是逐个拆“架构钩子”的满分回答
+  - 当前最值得深挖的钩子：图级 ReAct、上下文装配层、受控写回、审批恢复协议、Faithfulness 评测闭环
+
 ## 2026-03-23 最新断点（新会话先看这里）
 
 - 当前最新状态：

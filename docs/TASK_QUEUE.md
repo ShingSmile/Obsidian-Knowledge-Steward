@@ -104,35 +104,40 @@
 ### TASK-046
 
 - `task_id`: `TASK-046`
-- `session_id`:
-- `title`: ask 链路执行节点内部引入 ReAct 多轮工具调用循环
+- `session_id`: `SES-20260401-01`
+- `title`: 用 LangGraph 原生 conditional edges 重构 ask 链路为图级 ReAct 循环
 - `category`: `Graph`
 - `priority`: `P1`
-- `status`: `planned`
+- `status`: `completed`
 - `scope`: `medium`
-- `goal`: 将 ask 链路的 `execute_ask` 节点从当前的单轮工具调用（模型最多调一次工具就必须回答）改为 ReAct 循环（模型可以多轮 think → tool call → observe，直到判断信息充分或达到最大轮次上限），同时保持 ingest / digest 链路的静态编排不变。
+- `goal`: 将 ask 链路从当前的线性三节点图（prepare_ask → execute_ask → finalize_ask）重构为带条件边的图级 ReAct 循环：prepare_ask → llm_call → should_continue（条件边）→ tool_node / finalize_ask，其中 llm_call 与 tool_node 之间形成循环直到模型不再调用工具或达到最大轮次。ReAct 的每一步都是图上的独立节点，经过 SqliteSaver checkpoint，支持中途恢复。ingest / digest 链路保持静态线性编排不变。
 - `out_of_scope`:
   - 不改变 ingest / digest 链路的编排范式
   - 不引入新的工具类型（工具扩展由 `TASK-045` 负责）
-  - 不改变外层 LangGraph StateGraph 的图结构（ReAct 循环在 execute_ask 节点内部运行）
-  - 不引入 LangGraph 条件边（`add_conditional_edges`），ReAct 循环用代码控制
-  - 不改变 `AskWorkflowResult` 外层 contract
+  - 不改变 `AskWorkflowResult` 外层 contract（除新增 `tool_call_rounds` 字段）
+  - 不引入 LangGraph `create_react_agent` 预构建组件（保留自定义图结构的控制力）
 - `acceptance_criteria`:
-  - `execute_ask` 节点内部实现 ReAct 循环：模型每轮可选择调用一个只读工具或输出最终答案
-  - 最大轮次上限可配置（默认 3 轮），超过上限后强制用已有上下文生成回答
+  - ask 图结构改为 `prepare_ask → llm_call → should_continue(conditional_edge) → tool_node | finalize_ask`，`llm_call ↔ tool_node` 形成图级循环
+  - `should_continue` 条件边根据 LLM 输出是否包含 tool_calls 路由到 `tool_node`（继续循环）或 `finalize_ask`（结束）
+  - `tool_node` 执行工具调用后返回 `llm_call`，形成完整 ReAct 循环
+  - 最大轮次上限可配置（默认 3 轮），超过上限后条件边强制路由到 `finalize_ask`
+  - 每轮 llm_call / tool_node 都经过 SqliteSaver checkpoint，循环中途中断可从上一轮恢复
   - 每轮工具调用经过现有五层防御体系校验，不绕过 guardrail
-  - 每轮 think / tool_call / observe 事件写入 trace，支持按 thread_id 回放完整 ReAct 链路
+  - 每轮 llm_call / tool_call / tool_result 作为独立 trace 事件写入，支持按 thread_id 回放完整 ReAct 链路
   - `AskWorkflowResult` 新增 `tool_call_rounds: int` 字段记录实际工具调用轮次
-  - 模型第一轮判断信息充分时（不调用工具），行为与当前单轮模式一致，不引入额外延迟
+  - 模型第一轮判断信息充分时（不调用工具），条件边直接路由到 finalize_ask，行为与当前单轮模式一致
   - 现有 ask 相关测试和 eval golden case 全部通过或等价迁移
 - `depends_on`:
   - `TASK-042`
   - `TASK-044`
 - `related_files`:
+  - `backend/app/graphs/ask_graph.py`
+  - `backend/app/graphs/runtime.py`
+  - `backend/app/graphs/state.py`
+  - `backend/app/contracts/workflow.py`
   - `backend/app/services/ask.py`
   - `backend/app/tools/registry.py`
   - `backend/app/guardrails/ask.py`
-  - `backend/app/graphs/ask_graph.py`
   - `backend/app/context/assembly.py`
   - `backend/app/observability/runtime_trace.py`
   - `backend/tests/test_ask_workflow.py`
@@ -141,7 +146,264 @@
   - `small: 为 ReAct 循环增加 token 消耗累计统计，写入 trace 便于成本分析`
   - `small: 为多轮工具调用场景补充 eval golden case，覆盖"首轮不够、二轮补查后回答"的典型路径`
   - `small: 评估是否需要对 ReAct 循环中的中间 context 做增量去重，避免多轮查询结果重复`
-- `notes`: 当前 ask 的 `run_minimal_ask` 是单轮模式：混合检索 → 模型拿到上下文 → 最多调一次工具 → 直接回答。这在简单问题上够用，但面对需要跨笔记追踪的复杂问题（例如"A 笔记提到的方案和 B 笔记的结论有什么矛盾"），单轮检索命中率不足，模型被迫用不完整的上下文硬答。ReAct 循环让模型可以多轮定向补查，显著提升复杂问答质量。外层工作流仍为 LangGraph 静态图，ReAct 只在 execute_ask 节点内部运行，不影响 ingest / digest 的确定性编排——这个"静态编排 + 局部 ReAct"的架构区分本身也是面试强项。
+- `notes`: 原设计是在 `execute_ask` 节点内部用 while 循环手写 ReAct——LangGraph 只看到一个黑盒函数，循环内部不经过 checkpoint，trace 也只记录一个事件。`SES-20260401-01` 已将 ask 收敛为 graph-only 执行模型：[backend/app/graphs/ask_graph.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/app/graphs/ask_graph.py) 现使用 `prepare_ask -> llm_call -> tool_node -> finalize_ask` 的 conditional-edge 循环，[backend/app/services/ask.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/app/services/ask.py) 被拆为初始装配、工具判定、工具执行与最终回答 helper，不再保留 `run_minimal_ask` 这条完整 ask 主入口，[backend/app/contracts/workflow.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/app/contracts/workflow.py) 也已新增 `tool_call_rounds`。验收期内已通过 `tests.test_ask_workflow` 共 32 个 backend tests，以及 2 条 ask eval case。上面的 `derived_tasks` 继续保留为不阻塞收口的 `small` 尾项。
+
+### TASK-048
+
+- `task_id`: `TASK-048`
+- `session_id`:
+- `title`: 跨链路内容质量评估与 Runtime Faithfulness 治理 Umbrella
+- `category`: `Eval`
+- `priority`: `P1`
+- `status`: `split_into_TASK-050_to_TASK-054`
+- `scope`: `large`
+- `goal`: 将原本单个 `medium` 里过于拥挤的“跨链路质量评估 + runtime gate”工作重新定义为 umbrella：保留统一目标与验收边界，但把执行切分为多个可独立推进、可单会话收口的 `medium`。整体目标仍是为 ask / ingest / digest 三条链路建立共享 faithfulness 底座、场景特定离线指标，以及可保守降级的 runtime 质量闸门。
+- `out_of_scope`:
+  - 不再把 umbrella 本身作为单个 `medium` 直接执行
+  - 不在一个会话里同时完成共享底座、runtime gate、ask 四维度和 ingest / digest 全部评估
+  - 不改变插件侧 UI
+  - 不做 re-ranking（cross-encoder 精排为独立优化方向，不在本任务范围内）
+- `acceptance_criteria`:
+  - `TASK-050` 到 `TASK-054` 组合后，完整覆盖原任务的共享底座、runtime gate、ask 四维度评估、ingest / digest 场景指标与 golden 扩充
+  - 每个拆分出的 `medium` 都能独立绑定 session、独立验证、独立收口
+  - `TASK-033` 的 runtime groundedness 目标由新的拆分任务显式吸收，不再悬空
+- `depends_on`:
+  - `TASK-042`
+  - `TASK-047`
+- `related_files`:
+  - `backend/app/services/ask.py`
+  - `backend/app/services/ingest_proposal.py`
+  - `backend/app/guardrails/ask.py`
+  - `backend/app/context/assembly.py`
+  - `backend/tests/test_ask_workflow.py`
+  - `eval/run_eval.py`
+  - `eval/golden/ask_cases.json`
+  - `backend/tests/test_eval_runner.py`
+- `derived_tasks`:
+  - `medium: TASK-050 抽取共享 ask faithfulness 判定层并接通 ask runtime 启发式 gate（已完成）`
+  - `medium: TASK-051 建立共享 claim 拆解 + NLI faithfulness core（已完成）`
+  - `medium: TASK-052 用 embedding 相似度接通 ask / digest runtime faithfulness gate`
+  - `medium: TASK-053 完成 ask 离线四维度评估与 faithfulness golden 扩充`
+  - `medium: TASK-054 完成 ingest / digest 场景评估指标与 golden 基线`
+- `notes`: `SES-20260401-02` 实际实现后已经证明，这块工作把“共享语义底座、runtime 安全闸门、ask 四维度离线指标、ingest / digest 场景指标、golden 扩充”全部塞进一个 `medium` 会导致执行边界失真。因此从本次起保留 `TASK-048` 作为 umbrella，只负责定义总目标与拆分关系；真实执行改由 `TASK-050` 到 `TASK-054` 承担。`TASK-033` 也随之改为被 `TASK-050` / `TASK-052` 吸收。
+
+### TASK-050
+
+- `task_id`: `TASK-050`
+- `session_id`: `SES-20260401-02`
+- `title`: 抽取共享 ask faithfulness 判定层并接通 ask runtime 启发式 gate
+- `category`: `Eval`
+- `priority`: `P1`
+- `status`: `completed`
+- `scope`: `medium`
+- `goal`: 把 ask 的 groundedness / faithfulness 启发式判断从离线 eval 脚本中抽成共享模块，在 ask runtime 主链路接入最保守的一层 `unsupported_claim -> retrieval_only` 降级，并让离线 eval 复用同一套判定逻辑，先消除“实现一份、评估一份”的分叉。
+- `out_of_scope`:
+  - 不引入 claim-NLI 或外部 LLM judge
+  - 不把 runtime gate 升级为 embedding 相似度
+  - 不扩展到 digest runtime gate
+  - 不完成 ask 四维度或 ingest / digest 场景指标
+- `acceptance_criteria`:
+  - 新增共享 ask faithfulness snapshot 模块，runtime 与 offline eval 复用同一套判定逻辑
+  - ask 对明显 `unsupported_claim` 的 generated answer 会稳定降级为 `retrieval_only`
+  - 降级结果沿用现有 `AskWorkflowResult` contract，并写入 guardrail action
+  - 受影响的 tests 与 eval golden case 全部通过
+- `depends_on`:
+  - `TASK-042`
+  - `TASK-046`
+  - `TASK-047`
+- `related_files`:
+  - `backend/app/quality/faithfulness.py`
+  - `backend/app/guardrails/ask.py`
+  - `backend/app/services/ask.py`
+  - `eval/run_eval.py`
+  - `backend/tests/test_ask_guardrails.py`
+  - `backend/tests/test_ask_workflow.py`
+  - `backend/tests/test_eval_runner.py`
+  - `eval/golden/ask_cases.json`
+- `derived_tasks`:
+  - `small: 将 runtime faithfulness outcome 写入更结构化的 trace 字段，减少后续 gate 接线时的重复 glue code`
+  - `small: 评估是否需要把 shared snapshot 拆成 ask 专属层与更通用的 claim-level helper`
+- `notes`: 本任务对应 `TASK-048` 的第一刀，已在 `SES-20260401-02` 完成。当前实现仍是 term-overlap 风格的启发式快照，不是最终的 claim-NLI / embedding 方案；它的价值在于先把 ask runtime 安全降级与 offline eval 判定层收敛到同一个代码入口，为后续 `TASK-051` / `TASK-052` / `TASK-053` 铺底。
+
+### TASK-051
+
+- `task_id`: `TASK-051`
+- `session_id`: `SES-20260401-03`
+- `title`: 建立共享 claim 拆解 + NLI faithfulness core
+- `category`: `Eval`
+- `priority`: `P1`
+- `status`: `completed`
+- `scope`: `medium`
+- `goal`: 把当前 ask 专属、启发式的 faithfulness snapshot 演进为可复用的 claim-level 语义底座：统一 claim 拆解、evidence 配对与 NLI 判定接口，让 ask / ingest / digest 在离线评估路径上能够共享一套 semantic faithfulness core。
+- `out_of_scope`:
+  - 不把外部 LLM judge 接入 runtime 主链路
+  - 不在本任务内完成 ask / digest runtime gate 接线
+  - 不在本任务内完成所有场景指标与 golden 扩充
+- `acceptance_criteria`:
+  - 提供共享 claim 拆解接口，能把中文回答 / rationale / digest 文本拆成原子声明列表
+  - 提供统一 NLI 判定接口，对 `(claim, evidence)` 输出至少 `entailed / contradicted / neutral`
+  - ask / ingest / digest 的离线评估都能调用同一套 core，而不是各自维护局部逻辑
+  - 补齐最小测试，覆盖 entailed / contradicted / neutral 与中文短句边界
+- `depends_on`:
+  - `TASK-050`
+- `related_files`:
+  - `backend/app/quality/faithfulness.py`
+  - `backend/app/quality/__init__.py`
+  - `eval/run_eval.py`
+  - `backend/tests/test_faithfulness.py`
+  - `backend/tests/test_ask_guardrails.py`
+  - `backend/tests/test_eval_runner.py`
+  - `eval/golden/ask_cases.json`
+  - `eval/golden/governance_cases.json`
+  - `eval/golden/digest_cases.json`
+- `derived_tasks`:
+  - `small: 为 claim 拆解增加中文停用词 / allowlist，减少短句误拆`
+  - `small: 为 NLI 判断增加 confidence threshold 与低置信度 trace`
+- `notes`: `SES-20260401-03` 已完成本任务：[backend/app/quality/faithfulness.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/app/quality/faithfulness.py) 现已新增共享 claim-level faithfulness core，可把中文回答 / rationale / digest / proposal summary 拆成原子声明，并对 `(claim, evidence)` 输出 `entailed / contradicted / neutral` verdict；当 embedding provider 可用时，会复用现有 provider abstraction 走更强的 semantic backend，不可用时则保留 lexical / structured fallback。与此同时，[eval/run_eval.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/eval/run_eval.py) 已让 ask / governance / digest 共用同一套 core，governance / digest 的 faithfulness 不再直接退回 `context_recall` 充当替代指标。验收期内已通过 `tests.test_ask_guardrails + tests.test_faithfulness + tests.test_eval_runner` 共 15 个 backend tests，以及 4 条 targeted eval case。外部 LLM judge 与 runtime gate 接线继续保持 out-of-scope，留给 `TASK-052` / `TASK-053` / `TASK-054`。
+
+### TASK-052
+
+- `task_id`: `TASK-052`
+- `session_id`:
+- `title`: 用 embedding 相似度接通 ask / digest runtime faithfulness gate
+- `category`: `Eval`
+- `priority`: `P1`
+- `status`: `planned`
+- `scope`: `medium`
+- `goal`: 把当前 ask runtime 的启发式降级逻辑升级为更稳定的 embedding/cosine 近似 gate，并把同类 runtime 质量闸门扩展到 digest 链路，形成“低延迟、可配置阈值、保守降级”的统一运行时策略。
+- `out_of_scope`:
+  - 不引入外部 LLM judge 作为 runtime 依赖
+  - 不完成完整 ask 四维度离线评估
+  - 不处理 ingest runtime gate
+- `acceptance_criteria`:
+  - ask generated answer 在生成后执行 embedding 相似度 gate，unsupported 比例超阈值时保守降级为 `retrieval_only`
+  - digest 生成结果具备等价的 runtime quality outcome（如 `low_confidence` 或等价 contract / trace 字段）
+  - 阈值、score 与 guardrail action 会写入结构化 trace 或等价运行时元数据
+  - 已验证的 grounded case 不被大面积误伤
+- `depends_on`:
+  - `TASK-051`
+- `related_files`:
+  - `backend/app/quality/faithfulness.py`
+  - `backend/app/services/ask.py`
+  - `backend/app/guardrails/ask.py`
+  - `backend/app/services/digest.py`
+  - `backend/app/graphs/digest_graph.py`
+  - `backend/app/contracts/workflow.py`
+  - `backend/tests/test_faithfulness.py`
+  - `backend/tests/test_ask_workflow.py`
+  - `backend/tests/test_digest_workflow.py`
+- `derived_tasks`:
+  - `small: 评估是否将 runtime faithfulness score 作为可选质量元数据暴露给插件侧`
+  - `small: 为 digest 的低置信度文案增加更细粒度 reason code`
+- `notes`: 本任务承接 `TASK-033` 的 runtime safety 目标，但不再停留在 term-overlap 启发式上。`TASK-051` 已经把共享 claim-level semantic core 与 embedding-backed offline backend 落到 [backend/app/quality/faithfulness.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/app/quality/faithfulness.py)；这里需要把同一套语义底座真正接进 ask / digest runtime，并把 score、threshold 与 guardrail outcome 落到结构化 trace。
+
+### TASK-053
+
+- `task_id`: `TASK-053`
+- `session_id`:
+- `title`: 完成 ask 离线四维度评估与 faithfulness golden 扩充
+- `category`: `Eval`
+- `priority`: `P1`
+- `status`: `planned`
+- `scope`: `medium`
+- `goal`: 在共享 faithfulness core 之上，把 ask 离线评估补齐为可回归的四维度基线：Faithfulness、Answer Relevancy、Context Precision、Context Recall，并补足最小可持续维护的 ask golden 标注。
+- `out_of_scope`:
+  - 不处理 digest / ingest 场景指标
+  - 不接 runtime gate
+  - 不改变 ask 主链路 contract
+- `acceptance_criteria`:
+  - ask eval 输出 Faithfulness / Answer Relevancy / Context Precision / Context Recall 四个 0-1 分数
+  - `eval/run_eval.py` 的 ask scenario overview 能稳定汇总四维度结果
+  - ask 新增至少 5 条 faithfulness / evidence 标注 case，覆盖 grounded / unsupported / partial support 等路径
+  - 现有 ask tests 与 golden case 不回退
+- `depends_on`:
+  - `TASK-051`
+- `related_files`:
+  - `backend/app/quality/faithfulness.py`
+  - `eval/run_eval.py`
+  - `eval/golden/ask_cases.json`
+  - `backend/tests/test_eval_runner.py`
+  - `backend/tests/test_ask_workflow.py`
+- `derived_tasks`:
+  - `small: 为 Context Recall 的 golden evidence 标注建立轻量标注规范`
+  - `small: 评估是否需要为 answer relevancy 保留 deterministic fallback 算法`
+- `notes`: `TASK-050` 只让 ask 拥有了共享的启发式 snapshot 与 runtime downgrade，还没有把 ask 离线质量评估做成真正的四维度回归面板。本任务负责把 ask 这一条链路先补完整。
+
+### TASK-054
+
+- `task_id`: `TASK-054`
+- `session_id`:
+- `title`: 完成 ingest / digest 场景评估指标与 golden 基线
+- `category`: `Eval`
+- `priority`: `P1`
+- `status`: `planned`
+- `scope`: `medium`
+- `goal`: 在共享 faithfulness core 之上，为 ingest 与 digest 补齐各自的场景评估：ingest 关注 rationale 是否忠实且 patch 是否安全，digest 关注摘要是否忠实且覆盖关键事实，从而让跨链路 eval 不再只剩 ask 一条线。
+- `out_of_scope`:
+  - 不完成 ask 四维度评估
+  - 不把 ingest / digest 的全部评估逻辑塞回 runtime
+  - 不扩展新的插件交互
+- `acceptance_criteria`:
+  - ingest eval 输出 Rationale Faithfulness 与 Patch Safety
+  - digest eval 输出 Faithfulness 与 Coverage
+  - ingest / digest 至少各新增 3 条 golden case，覆盖成功、偏离与保守失败路径
+  - governance / digest 场景 overview 能汇总新增指标
+- `depends_on`:
+  - `TASK-051`
+- `related_files`:
+  - `backend/app/services/ingest_proposal.py`
+  - `backend/app/services/digest.py`
+  - `eval/run_eval.py`
+  - `eval/golden/governance_cases.json`
+  - `eval/golden/digest_cases.json`
+  - `eval/golden/resume_cases.json`
+  - `backend/tests/test_eval_runner.py`
+  - `backend/tests/test_digest_workflow.py`
+- `derived_tasks`:
+  - `small: 为 Patch Safety 的违规项输出整理更稳定的分类标签`
+  - `small: 为 digest coverage 的关键事实抽取建立最小标注规范`
+- `notes`: ask 之外的两条链路当前还没有真正的内容质量基线。本任务把 ingest / digest 的评估补齐，避免 `TASK-048` 拆分后只剩 ask 质量在进步、其他链路继续停留在合约级断言。
+
+### TASK-049
+
+- `task_id`: `TASK-049`
+- `session_id`:
+- `title`: 将工具调用从 prompt-based JSON 约定迁移到 Structured Tool Calling
+- `category`: `Graph`
+- `priority`: `P1`
+- `status`: `planned`
+- `scope`: `medium`
+- `goal`: 将当前 ask 链路中 LLM 与工具的交互方式从"system prompt 文本描述 + 模型返回裸 JSON + 手动 json.loads 解析"迁移为 OpenAI Function Calling 协议：LLM 调用时通过 API `tools` 参数传入结构化工具定义，模型返回结构化 `tool_calls` 字段，由框架保证调用格式合法性。现有 ToolSpec 中的 `input_schema` 可直接映射为 `tools[].function.parameters`，迁移后移除 prompt 中的工具描述文本和手动 JSON 解析逻辑。
+- `out_of_scope`:
+  - 不改变工具注册表的 ToolSpec 数据结构（schema 定义复用）
+  - 不改变五层工具调用防御体系（白名单、scope 隔离、只读强制、参数校验、guardrail 拦截）
+  - 不引入新的工具类型（工具扩展由 `TASK-045` 负责）
+  - 不改变 `AskWorkflowResult` 外层 contract
+  - 不迁移 ingest / digest 链路（当前只有 ask 链路涉及工具调用）
+- `acceptance_criteria`:
+  - LLM 调用时通过 `tools` 参数传入工具定义，格式符合 OpenAI Function Calling 协议（`type: "function"`, `function.name`, `function.parameters`）
+  - ToolSpec 的 `name`、`purpose`、`input_schema` 自动映射为 `tools` 参数，不需要手动维护两份 schema
+  - 模型返回的 `tool_calls` 字段由响应解析逻辑提取，替代当前的 `json.loads(raw_text)` 手动解析
+  - 移除 system prompt 中的工具描述文本和 JSON 格式约定
+  - 移除 `_parse_tool_call_decision` 中的手动 JSON 解析和类型检查逻辑
+  - ReAct 循环中的 tool_node 仍经过现有五层防御体系校验，工具执行路径不变
+  - 对不支持 Function Calling 的 provider 保留 fallback（降级为当前 prompt-based 方式）
+  - 现有 ask 测试和 eval golden case 全部通过
+- `depends_on`:
+  - `TASK-046`
+- `related_files`:
+  - `backend/app/services/ask.py`
+  - `backend/app/tools/registry.py`
+  - `backend/app/context/render.py`
+  - `backend/app/graphs/ask_graph.py`
+  - `backend/app/contracts/workflow.py`
+  - `backend/tests/test_ask_workflow.py`
+  - `backend/tests/test_tool_registry.py`
+- `derived_tasks`:
+  - `small: 评估是否为 ToolSpec 增加 description 字段，映射为 tools[].function.description 提升模型选择准确率`
+  - `small: 为 Function Calling 的 token 消耗（tools 参数占用）增加 trace 记录，便于成本分析`
+  - `small: 评估是否引入 parallel tool calls（模型一次返回多个 tool_calls），当前 ReAct 循环为单工具串行`
+- `notes`: 当前 ask 链路的工具调用完全靠 prompt 约定——system prompt 用纯文本描述可用工具和 JSON 格式要求，模型返回纯文本 JSON，代码侧手动 `json.loads` 解析并做类型检查。这种方式有三个问题：(1) 模型可能返回格式不合法的 JSON，解析失败只能静默降级；(2) 工具描述在 prompt 中占用 token 但不受 API 级别的结构化保证；(3) 面试时说"Tool Calling"但实际没用 Function Calling 协议，追问会暴露。迁移后工具定义通过 API `tools` 参数传入，模型返回结构化 `tool_calls`，格式合法性由 API 层保证，prompt 更干净、解析更可靠。ToolSpec 中已有完整的 `input_schema`（JSON Schema 格式），可直接映射为 `tools[].function.parameters`，迁移成本低。需要注意的是部分 provider（如本地模型）可能不支持 Function Calling，因此保留 prompt-based fallback 作为降级路径。
 
 ### TASK-031
 
@@ -216,7 +478,7 @@
 - `title`: 在 ask 主链路接入保守 groundedness gate 与安全降级
 - `category`: `Retrieval`
 - `priority`: `P2`
-- `status`: `planned`
+- `status`: `absorbed_by_TASK-050_and_TASK-052`
 - `scope`: `medium`
 - `goal`: 在 `TASK-028` 已有最小 groundedness 离线评估的基础上，把最保守的一层 answer-citation semantic consistency 检查接入 ask runtime，对明显 `unsupported_claim` 的 generated answer 做安全降级。
 - `out_of_scope`:
@@ -239,7 +501,7 @@
 - `derived_tasks`:
   - `small: 为 groundedness term extractor 增加停用词 / allowlist，减少中文短窗误报`
   - `small: 评估是否需要把 LLM judge 只作为人工抽样辅助，而不是主链路依赖`
-- `notes`: `TASK-028` 已经证明当前 ask 还存在“引用编号合法，但答案语义越界”的 bad case。只要这个风险仍停留在离线结果文件里，ask 主链路的可信度边界就还是断裂的。下一步不需要一步到位做复杂 judge，而是先把最保守、最可回归的一层 gate 接进 runtime，并保持失败即降级的安全策略。2026-03-17 在 `TASK-034` 中对齐《初步实现指南》后，本任务被明确后移：它不在当前“剩余 P0 + 只做前三个 P1”的收口范围内，因此优先级降到 `P2`。
+- `notes`: `TASK-028` 已经证明 ask 存在“引用编号合法，但答案语义越界”的 bad case。该问题在 `SES-20260401-02` 中先由 `TASK-050` 以共享启发式 snapshot + `retrieval_only` 安全降级的方式落下第一刀；后续更稳定的 embedding runtime gate 继续由 `TASK-052` 承接。因此本任务不再单独执行，拆分吸收到 `TASK-050` / `TASK-052`。
 
 ## Recent Completed
 

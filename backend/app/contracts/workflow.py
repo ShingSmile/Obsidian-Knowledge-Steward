@@ -292,6 +292,7 @@ class AskWorkflowResult(BaseModel):
     provider_name: str | None = None
     model_name: str | None = None
     tool_call_attempted: bool = False
+    tool_call_rounds: int = 0
     tool_call_used: str | None = None
     guardrail_action: GuardrailAction | None = None
 

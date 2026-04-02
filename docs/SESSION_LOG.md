@@ -12,6 +12,9 @@
 
 | 会话 ID | 日期 | 主题 | 类型 | 状态 | 对应任务 |
 | --- | --- | --- | --- | --- | --- |
+| `SES-20260401-03` | 2026-04-02 | 完成共享 claim-level faithfulness core 并收口 `TASK-051` | `Eval` | `已完成` | `TASK-051` |
+| `SES-20260401-02` | 2026-04-01 | 完成 ask runtime faithfulness 首刀并拆分 `TASK-048` umbrella | `Eval` | `已完成` | `TASK-050` |
+| `SES-20260401-01` | 2026-04-01 | 完成 ask 图级 ReAct 循环并收口 `TASK-046` | `Graph` | `已完成` | `TASK-046` |
 | `SES-20260329-02` | 2026-03-29 | 完成 ask 上下文装配四阶段质量控制管线并接通 prompt / citation | `Retrieval` | `已完成` | `TASK-047` |
 | `SES-20260329-01` | 2026-03-29 | 收口 proposal validator 对新 patch op 的正式支持并关闭 `TASK-045` | `Safety` | `已完成` | `TASK-045` |
 | `SES-20260327-02` | 2026-03-28 | 补齐受限写回的静态校验与工具覆盖，并完成本地 main 合并 | `Safety` | `部分完成` | `TASK-045` |
@@ -26,6 +29,348 @@
 - 当前 2026-03 历史快照位于：
   [docs/archive/session_logs/SESSION_LOG_2026-03.md](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/docs/archive/session_logs/SESSION_LOG_2026-03.md)
 - 更早历史会话、旧索引与旧任务阶段记录，请优先查 archive，再按 `task_id` 回溯。
+
+## [SES-20260401-03] 完成共享 claim-level faithfulness core 并收口 `TASK-051`
+
+- 日期：2026-04-02
+- task_id：`TASK-051`
+- 类型：`Eval`
+- 状态：`已完成`
+- 验收结论：`完全满足`
+- 对应任务：`TASK-051`
+- 本会话唯一目标：把 `TASK-050` 留下的 ask 专属启发式 faithfulness helper 升级成 ask / ingest / digest 共用的 claim-level semantic core，并在不引入新模型子系统的前提下，尽量把首版更强 backend 一并收口在当前 `medium` 内。
+
+### 1. 本次目标
+
+- 提供共享 claim 拆解接口，能把中文回答 / rationale / digest / proposal summary 拆成原子声明列表。
+- 提供统一 semantic verdict 接口，对 `(claim, evidence)` 输出至少 `entailed / contradicted / neutral`。
+- 让 ask / governance / digest 的离线评估共用同一套 faithfulness core，而不是继续让 governance / digest 退回 `context_recall` 顶替。
+- 在不引入 `transformers` / 外部 LLM judge 子系统的前提下，尽量把“更强 backend”直接做进本次任务；若超出边界，再退回 follow-up。
+
+### 2. 本次完成内容
+
+- 在 [backend/app/quality/faithfulness.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/app/quality/faithfulness.py) 中新增共享 claim-level faithfulness core，补齐原子 claim 拆解、结构化 evidence 收集、`entailed / contradicted / neutral` verdict 与统一 report 聚合。
+- 在 [backend/app/quality/faithfulness.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/app/quality/faithfulness.py) 中把首版 stronger backend 直接落到当前任务：当 embedding provider 可用时，复用现有 provider abstraction 做 embedding-backed semantic verdict；provider 不可用时，保留 lexical / structured fallback，而不是把功能降级成空接口。
+- 在 [backend/app/quality/__init__.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/app/quality/__init__.py) 中导出共享 quality API，明确 `faithfulness.py` 已不再只是 ask 专属 helper。
+- 在 [eval/run_eval.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/eval/run_eval.py) 中把 governance / digest 的 faithfulness 从“`context_recall` 代打”升级为共享 semantic claim report，并补 structured evidence composer，让 proposal summary / digest markdown / fallback message 的结构化事实也能进入 evidence。
+- 在 [backend/tests/test_faithfulness.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/tests/test_faithfulness.py) 中新增 claim-level 单测，覆盖中文短句拆解、`contradicted`、`neutral` 与 embedding backend 命中。
+- 在 [backend/tests/test_eval_runner.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/tests/test_eval_runner.py) 中补充回归，显式断言 governance / digest 的 faithfulness reason 走 `semantic_claim_report`，而不是继续停留在 `supporting_context_path_coverage`。
+- 在 [docs/TASK_QUEUE.md](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/docs/TASK_QUEUE.md)、[docs/CURRENT_STATE.md](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/docs/CURRENT_STATE.md)、[docs/SESSION_LOG.md](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/docs/SESSION_LOG.md)、[docs/PROJECT_MASTER_PLAN.md](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/docs/PROJECT_MASTER_PLAN.md) 与 [docs/CHANGELOG.md](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/docs/CHANGELOG.md) 中同步 `TASK-051` 完成态，并把默认下一任务前移到 `TASK-052`。
+
+### 3. 本次未完成内容
+
+- 没有把共享 semantic core 接进 ask / digest runtime gate；这继续留给 `TASK-052`。
+- 没有引入外部 LLM judge、专门 NLI 模型下载链路或新的推理子系统；本次 stronger backend 仍刻意复用现有 embedding provider abstraction。
+- 没有完成 ask 四维度离线评估与 golden 扩充；这继续留给 `TASK-053`。
+- 没有完成 ingest / digest 的场景指标与 golden 基线；这继续留给 `TASK-054`。
+- 没有推进 `TASK-049`、`TASK-031`、`TASK-032`，避免把本会话扩成第二个 `medium`。
+
+### 4. 关键决策
+
+- 不把“更强 NLI backend”解释为“必须立刻引入新模型依赖或外部 judge 子系统”；原因是当前仓库已具备现成 embedding provider abstraction，可先落一个可验证、可替换的 semantic backend，而不必把 `TASK-051` 扩成环境 / 模型管理 `medium`。
+- 把 stronger backend 直接收口在 `TASK-051`，而不是再拆一条 follow-up；原因是最终实现仍控制在共享 quality 层 + eval 接线范围内，没有侵入 runtime gate、provider 路由或部署路径。
+- governance / digest 的 faithfulness 不再继续让 `context_recall` 代打；原因是这会把“是否取回支持上下文”和“输出文本是否忠实”混成同一个指标，失去语义层辨别力。
+- 本会话不借机改 ask runtime gate；原因是一旦把 runtime contract、阈值、trace 与 digest runtime 一并纳入，就会直接跨进 `TASK-052`。
+
+### 5. 修改过的文件
+
+- [backend/app/quality/faithfulness.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/app/quality/faithfulness.py)
+- [backend/app/quality/__init__.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/app/quality/__init__.py)
+- [eval/run_eval.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/eval/run_eval.py)
+- [backend/tests/test_faithfulness.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/tests/test_faithfulness.py)
+- [backend/tests/test_eval_runner.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/tests/test_eval_runner.py)
+- [docs/TASK_QUEUE.md](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/docs/TASK_QUEUE.md)
+- [docs/CURRENT_STATE.md](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/docs/CURRENT_STATE.md)
+- [docs/SESSION_LOG.md](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/docs/SESSION_LOG.md)
+- [docs/PROJECT_MASTER_PLAN.md](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/docs/PROJECT_MASTER_PLAN.md)
+- [docs/CHANGELOG.md](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/docs/CHANGELOG.md)
+
+### 6. 验证与测试
+
+- 跑了什么命令
+  - `cd backend && ../.conda/knowledge-steward/bin/python -m unittest tests.test_ask_guardrails tests.test_faithfulness tests.test_eval_runner -v`
+  - `./.conda/knowledge-steward/bin/python eval/run_eval.py --case-id ask_fixture_semantic_overclaim_writeback --case-id ask_fixture_semantic_overclaim_governance --case-id governance_fixture_waiting_proposal_hybrid --case-id digest_fixture_structured_result_metrics --output /private/tmp/task051-verification.json`
+- 结果如何
+  - backend 共 15 tests 通过。
+  - targeted eval 4 passed, 0 failed。
+- 哪些没法验证
+  - 没有在真实 Obsidian 宿主里重跑 governance / digest 端到端交互。
+  - 没有验证新的 semantic core 在真实云 / 本地 embedding provider 下的非 mock 表现；当前仍以 deterministic fixture 与 embedding mock 为主。
+- 哪些只是静态修改
+  - 对 [docs/TASK_QUEUE.md](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/docs/TASK_QUEUE.md)、[docs/CURRENT_STATE.md](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/docs/CURRENT_STATE.md)、[docs/SESSION_LOG.md](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/docs/SESSION_LOG.md)、[docs/PROJECT_MASTER_PLAN.md](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/docs/PROJECT_MASTER_PLAN.md) 与 [docs/CHANGELOG.md](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/docs/CHANGELOG.md) 的修改都属于治理同步。
+
+### 7. 范围偏移与原因
+
+- 会话中途用户明确追问“更强 NLI backend 能不能这次做完”；因此本会话实际范围从“共享接口 + 可能新增 follow-up”收敛为“共享接口 + 首版 stronger backend 一并完成”。
+- 这个偏移没有扩成第二个 `medium`；原因是最终实现仍然严格停在 quality core 与离线 eval 层，没有把 runtime gate、外部 judge 子系统或新依赖安装一起拉进来。
+
+### 8. 未解决问题
+
+- ask runtime 与 digest runtime 仍未消费这套 shared semantic core。
+- claim 拆解的中文停用词 / allowlist 与 low-confidence trace 仍未落地。
+- ask 四维度离线评估、ingest / digest 场景指标与更多 golden 仍未完成。
+- 根工作区仍然是脏的，除本会话改动外还存在其他已修改 / 未跟踪文件。
+
+### 9. 新增风险 / 技术债 / 假设
+
+- 技术债：当前 stronger backend 仍优先依赖现有 embedding provider abstraction，没有引入专门 NLI 模型或外部 judge 子系统。
+- 风险：如果 `TASK-052` 迟迟不做，shared semantic core 会继续停留在 offline eval / quality 层，runtime 仍只能依赖 ask 专属启发式降级。
+- 假设：下一步最合理的顺序是先把 `TASK-052` 做成 runtime 接线，再进入 `TASK-053` 与 `TASK-054` 的评估扩面。
+
+### 10. 下一步最优先任务
+
+- 默认进入 `TASK-052`，把 ask / digest runtime gate 接到共享 semantic core 与 embedding 相似度判定层。
+- 之后进入 `TASK-053`，完成 ask 四维度离线评估与 golden 扩充。
+- 再进入 `TASK-054`，为 ingest / digest 补齐场景评估指标与 golden 基线。
+- `TASK-051` 已完成，不应再作为新的 `medium` 直接执行。
+
+### 11. 下一次新会话应该先读哪些文件
+
+- [docs/TASK_QUEUE.md](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/docs/TASK_QUEUE.md)
+- [docs/CURRENT_STATE.md](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/docs/CURRENT_STATE.md)
+- [docs/SESSION_LOG.md](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/docs/SESSION_LOG.md)
+- 若继续 `TASK-052`：
+  - [backend/app/quality/faithfulness.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/app/quality/faithfulness.py)
+  - [backend/app/services/ask.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/app/services/ask.py)
+  - [backend/app/guardrails/ask.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/app/guardrails/ask.py)
+  - [backend/app/services/digest.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/app/services/digest.py)
+  - [backend/app/graphs/digest_graph.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/app/graphs/digest_graph.py)
+  - [backend/tests/test_faithfulness.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/tests/test_faithfulness.py)
+  - [backend/tests/test_ask_workflow.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/tests/test_ask_workflow.py)
+  - [backend/tests/test_digest_workflow.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/tests/test_digest_workflow.py)
+
+### 12. 当前最容易被追问的点
+
+- 为什么 `TASK-051` 可以记为完成，但没有引入外部 NLI 模型或 LLM judge？正确回答必须落到“本任务验收要求是共享 claim-level semantic core，而不是新推理子系统；当前已把 stronger backend 收口到现有 embedding/provider abstraction 上，外部 judge 与 runtime 接线刻意留给后续任务”。
+- 为什么 governance / digest 不能继续让 `context_recall` 充当 faithfulness？正确回答必须落到“上下文覆盖率只能回答‘证据有没有取回来’，不能回答‘最终输出是不是忠实’，所以必须引入 claim-level semantic report”。
+
+## [SES-20260401-02] 完成 ask runtime faithfulness 首刀并拆分 `TASK-048` umbrella
+
+- 日期：2026-04-01
+- task_id：`TASK-050`
+- 类型：`Eval`
+- 状态：`已完成`
+- 验收结论：`完全满足（按拆分后的 TASK-050 口径）`
+- 对应任务：`TASK-050`
+- 本会话唯一目标：先为 ask 主链路落下 runtime faithfulness 的第一刀，并在执行过程中如果确认原 `TASK-048` 超出单个 `medium` 边界，就把它拆成可独立推进的后续任务，再按治理规则同步控制面。
+
+### 1. 本次目标
+
+- 把 ask 的 groundedness / faithfulness 启发式判定从离线 eval 脚本抽成共享模块，避免 runtime 与 offline 各维护一套逻辑。
+- 在 ask runtime 主链路接入最保守的一层 `unsupported_claim -> retrieval_only` 安全降级。
+- 让离线 eval 复用同一套 ask faithfulness 判定层，收敛“代码一份、评估一份”的分叉。
+- 如果执行过程中确认 `TASK-048` 的真实工作量已经超出单个 `medium`，就把它重新定义为 umbrella，并拆出后续独立 `medium`。
+
+### 2. 本次完成内容
+
+- 在 [backend/app/quality/faithfulness.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/app/quality/faithfulness.py) 中新增共享 ask faithfulness snapshot / groundedness helper，把原先散落在 eval 里的启发式逻辑抽到 runtime 与 offline 可共用的位置。
+- 在 [backend/app/guardrails/ask.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/app/guardrails/ask.py) 中新增 runtime ask faithfulness guardrail，对明显 `unsupported_claim` 返回 `REFUSE_STRONG_CLAIM`。
+- 在 [backend/app/services/ask.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/app/services/ask.py) 中把 guardrail 接到 ask 生成路径：当模型答案命中 semantic overclaim 时，结果会保守降级为 `retrieval_only`，并沿用现有 `AskWorkflowResult` contract。
+- 在 [eval/run_eval.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/eval/run_eval.py) 中移除 ask 专属的本地实现，改为复用共享 snapshot，并补强 failed case 的 metric 汇总健壮性。
+- 在 [backend/tests/test_ask_guardrails.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/tests/test_ask_guardrails.py)、[backend/tests/test_ask_workflow.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/tests/test_ask_workflow.py)、[backend/tests/test_eval_runner.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/tests/test_eval_runner.py) 中补齐 runtime downgrade、grounded answer 保留与 eval 回归。
+- 在 [eval/golden/ask_cases.json](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/eval/golden/ask_cases.json) 与 [eval/golden/resume_cases.json](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/eval/golden/resume_cases.json) 中对齐受影响 fixture / golden，并新增本次切片的设计与计划文档：[docs/superpowers/specs/2026-04-01-task-048-runtime-faithfulness-gate-design.md](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/docs/superpowers/specs/2026-04-01-task-048-runtime-faithfulness-gate-design.md)、[docs/superpowers/plans/2026-04-01-task-048-runtime-faithfulness-gate.md](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/docs/superpowers/plans/2026-04-01-task-048-runtime-faithfulness-gate.md)。
+- 在 [docs/TASK_QUEUE.md](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/docs/TASK_QUEUE.md) 与 [docs/CURRENT_STATE.md](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/docs/CURRENT_STATE.md) 中把原 `TASK-048` 重定义为 umbrella，拆出 `TASK-050` 到 `TASK-054`，并把默认下一任务改到 `TASK-051`。
+- 在 [docs/SESSION_LOG.md](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/docs/SESSION_LOG.md)、[docs/PROJECT_MASTER_PLAN.md](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/docs/PROJECT_MASTER_PLAN.md) 与 [docs/CHANGELOG.md](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/docs/CHANGELOG.md) 中完成 governed closeout，同步 `TASK-050` 完成态、`TASK-048` umbrella 拆分事实与新的默认推进顺序。
+
+### 3. 本次未完成内容
+
+- 没有实现共享 claim 拆解 + NLI 语义底座；当前 [backend/app/quality/faithfulness.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/app/quality/faithfulness.py) 仍是 ask 专属、term-overlap 风格的启发式快照。
+- 没有把 runtime gate 升级为 embedding 相似度，也没有把同类 gate 扩展到 digest；这些留给 `TASK-052`。
+- 没有完成 ask 的 Faithfulness / Answer Relevancy / Context Precision / Context Recall 四维度离线评估；这些留给 `TASK-053`。
+- 没有完成 ingest / digest 的场景指标与 golden 基线；这些留给 `TASK-054`。
+- 没有推进 `TASK-049`、`TASK-031`、`TASK-032`，避免把本会话扩成第二个 `medium`。
+
+### 4. 关键决策
+
+- 不把 `TASK-048` 继续强行维持为单个 `medium`，而是把它改成 umbrella；原因是它同时包含共享语义底座、runtime gate、ask 四维度和 ingest / digest 场景评估，已经超过单会话可稳定收口的边界。
+- 这次会话按拆分后的 `TASK-050` 记为完成，而不是把整个 `TASK-048` 记为部分实现；原因是“ask runtime faithfulness 第一刀 + shared snapshot 抽取”本身已经构成一个自洽的 `medium` 闭环。
+- 当前 runtime gate 仍保留启发式路线，不在本会话里直接跳到 embedding / LLM judge；原因是需要先把 runtime 与 offline 共享入口收敛，再升级语义能力，减少后续替换成本。
+- `TASK-033` 不再单独执行，改为由 `TASK-050` 和 `TASK-052` 吸收；原因是它的 runtime safety 目标已经被新的拆分结构更精确地覆盖。
+
+### 5. 修改过的文件
+
+- [backend/app/quality/faithfulness.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/app/quality/faithfulness.py)
+- [backend/app/guardrails/ask.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/app/guardrails/ask.py)
+- [backend/app/services/ask.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/app/services/ask.py)
+- [eval/run_eval.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/eval/run_eval.py)
+- [backend/tests/test_ask_guardrails.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/tests/test_ask_guardrails.py)
+- [backend/tests/test_ask_workflow.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/tests/test_ask_workflow.py)
+- [backend/tests/test_eval_runner.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/tests/test_eval_runner.py)
+- [eval/golden/ask_cases.json](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/eval/golden/ask_cases.json)
+- [eval/golden/resume_cases.json](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/eval/golden/resume_cases.json)
+- [docs/superpowers/specs/2026-04-01-task-048-runtime-faithfulness-gate-design.md](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/docs/superpowers/specs/2026-04-01-task-048-runtime-faithfulness-gate-design.md)
+- [docs/superpowers/plans/2026-04-01-task-048-runtime-faithfulness-gate.md](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/docs/superpowers/plans/2026-04-01-task-048-runtime-faithfulness-gate.md)
+- [docs/TASK_QUEUE.md](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/docs/TASK_QUEUE.md)
+- [docs/CURRENT_STATE.md](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/docs/CURRENT_STATE.md)
+- [docs/SESSION_LOG.md](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/docs/SESSION_LOG.md)
+- [docs/PROJECT_MASTER_PLAN.md](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/docs/PROJECT_MASTER_PLAN.md)
+- [docs/CHANGELOG.md](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/docs/CHANGELOG.md)
+
+### 6. 验证与测试
+
+- 跑了什么命令
+  - `cd backend && ../.conda/knowledge-steward/bin/python -m unittest tests.test_ask_guardrails tests.test_ask_workflow tests.test_eval_runner -v`
+  - `./.conda/knowledge-steward/bin/python eval/run_eval.py --case-id ask_fixture_semantic_overclaim_writeback --case-id ask_fixture_semantic_overclaim_governance --case-id ask_fixture_generated_answer_citation_valid --case-id ask_fixture_tool_call_load_excerpt_success --case-id resume_fixture_reject_waiting_proposal --case-id resume_fixture_writeback_success --case-id resume_fixture_writeback_failure --output /tmp/task048-runtime-faithfulness-final.json`
+- 结果如何
+  - backend 共 45 tests 通过。
+  - targeted eval 7 passed, 0 failed。
+- 哪些没法验证
+  - 没有在真实 Obsidian 宿主里重跑 ask / digest 端到端交互。
+  - 没有为本次纯治理文档同步单独追加自动化验证。
+- 哪些只是静态修改
+  - 对 [docs/TASK_QUEUE.md](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/docs/TASK_QUEUE.md)、[docs/CURRENT_STATE.md](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/docs/CURRENT_STATE.md)、[docs/SESSION_LOG.md](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/docs/SESSION_LOG.md) 与 [docs/PROJECT_MASTER_PLAN.md](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/docs/PROJECT_MASTER_PLAN.md) 的修改都属于治理同步。
+
+### 7. 范围偏移与原因
+
+- 会话启动时绑定的是原 `TASK-048`，但执行后确认该任务已经超出单个 `medium` 边界。
+- 偏移不是再开第二个 `medium`，而是把原目标收敛为 `TASK-050` 这一刀，并把剩余工作拆成 `TASK-051` 到 `TASK-054`；这样本会话仍然只完成了一个 `medium`。
+
+### 8. 未解决问题
+
+- ask runtime gate 目前仍是启发式快照，不是 claim-NLI 或 embedding 级语义判断。
+- digest runtime 还没有等价的 faithfulness quality outcome。
+- ask / ingest / digest 的跨链路质量评估仍未真正统一到 claim-level core。
+- 根工作区仍然是脏的，除了本会话改动外还存在其他已修改 / 未跟踪文件。
+
+### 9. 新增风险 / 技术债 / 假设
+
+- 技术债：`TASK-050` 已完成，但它只解决了 ask runtime 和 offline eval 共用一套启发式判定层，没有完成最终的共享语义底座。
+- 风险：如果后续不尽快推进 `TASK-051` / `TASK-052`，当前 ask runtime 的保守降级仍会受启发式误判边界影响。
+- 假设：后续最合理的推进顺序是先做 `TASK-051`，再做 `TASK-052`，然后分别补 `TASK-053` 与 `TASK-054`。
+
+### 10. 下一步最优先任务
+
+- 默认进入 `TASK-051`，建立共享 claim 拆解 + NLI faithfulness core。
+- 之后进入 `TASK-052`，把 ask / digest runtime gate 升级到 embedding 相似度近似。
+- 再分别完成 `TASK-053` 与 `TASK-054`。
+- `TASK-048` 不再作为单个 `medium` 直接执行。
+
+### 11. 下一次新会话应该先读哪些文件
+
+- [docs/TASK_QUEUE.md](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/docs/TASK_QUEUE.md)
+- [docs/CURRENT_STATE.md](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/docs/CURRENT_STATE.md)
+- [docs/SESSION_LOG.md](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/docs/SESSION_LOG.md)
+- 若继续 `TASK-051`：
+  - [backend/app/quality/faithfulness.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/app/quality/faithfulness.py)
+  - [eval/run_eval.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/eval/run_eval.py)
+  - [backend/tests/test_ask_guardrails.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/tests/test_ask_guardrails.py)
+  - [backend/tests/test_eval_runner.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/tests/test_eval_runner.py)
+  - [eval/golden/ask_cases.json](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/eval/golden/ask_cases.json)
+  - [eval/golden/governance_cases.json](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/eval/golden/governance_cases.json)
+  - [eval/golden/digest_cases.json](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/eval/golden/digest_cases.json)
+
+### 12. 当前最容易被追问的点
+
+- 为什么 `TASK-048` 必须拆分，而不是继续按单个 `medium` 往下做？正确回答必须落到“共享语义底座、runtime gate、ask 四维度、ingest / digest 场景指标不是一个会话能稳定收口的同级工作，强行塞在一起会让任务边界失真”。
+- 为什么当前 runtime faithfulness gate 还是启发式？正确回答必须落到“先把 runtime 与 offline 的代码入口收敛，再升级到 claim-NLI / embedding，避免替换时同时拆两层结构”。
+
+## [SES-20260401-01] 完成 ask 图级 ReAct 循环并收口 `TASK-046`
+
+- 日期：2026-04-01
+- task_id：`TASK-046`
+- 类型：`Graph`
+- 状态：`已完成`
+- 验收结论：`完全满足`
+- 对应任务：`TASK-046`
+- 本会话唯一目标：把 ask 从线性三节点与单轮黑盒工具调用重构为 LangGraph 原生 conditional-edge 图级 ReAct 循环，在验证通过后同步控制面与稳定文档。
+
+### 1. 本次目标
+
+- 让 ask 执行模型收敛为 graph-only 入口，不再保留 `run_minimal_ask` 这条完整 ask 主路径。
+- 在 ask graph 内引入 `prepare_ask -> llm_call -> tool_node -> finalize_ask` 的条件边循环，并显式记录工具调用轮次。
+- 让每轮 LLM / tool 调用都进入 LangGraph checkpoint 与 runtime trace，而不是停留在 service 黑盒内部。
+- 把测试统一迁移到 graph 入口，覆盖无工具路径、单轮工具循环、resume 与 trace 语义。
+- 以 Level 3 路由同步 `TASK_QUEUE / CURRENT_STATE / SESSION_LOG / PROJECT_MASTER_PLAN / CHANGELOG`。
+
+### 2. 本次完成内容
+
+- 在 [backend/app/contracts/workflow.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/app/contracts/workflow.py) 中为 `AskWorkflowResult` 新增 `tool_call_rounds`，让 ask 结果显式暴露工具循环轮次。
+- 在 [backend/app/graphs/state.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/app/graphs/state.py) 中补齐 ask 循环所需的显式 graph state，包括 query、候选 evidence、tool decision、tool results、citation、round counter 与 fallback 标记。
+- 在 [backend/app/services/ask.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/app/services/ask.py) 中拆出 `build_initial_ask_turn()`、`decide_ask_tool_call()`、`apply_ask_tool_turn()`、`generate_ask_result()` 与 `build_retrieval_only_ask_result()` 等节点级 helper，并移除 `run_minimal_ask` 作为生产 ask 主入口。
+- 在 [backend/app/graphs/ask_graph.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/app/graphs/ask_graph.py) 中完成 graph-only 编排：`prepare_ask -> llm_call -> tool_node -> llm_call -> finalize_ask`，其中 `llm_call` 通过条件边决定进入工具节点还是直接收尾，`tool_node` 再回到 `llm_call`。
+- 在 [backend/tests/test_ask_workflow.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/tests/test_ask_workflow.py) 中把 ask 回归统一迁到 graph 入口，并覆盖无工具直达 finalize、单轮工具循环、resume 恢复与 `tool_call_rounds` 断言。
+- 已把 [docs/TASK_QUEUE.md](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/docs/TASK_QUEUE.md)、[docs/CURRENT_STATE.md](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/docs/CURRENT_STATE.md)、[docs/SESSION_LOG.md](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/docs/SESSION_LOG.md)、[docs/PROJECT_MASTER_PLAN.md](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/docs/PROJECT_MASTER_PLAN.md) 与 [docs/CHANGELOG.md](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/docs/CHANGELOG.md) 同步到 `TASK-046` 完成态。
+
+### 3. 本次未完成内容
+
+- 没有为 ReAct 循环补 token 消耗累计统计；这继续作为 `TASK-046` 的 `small` 尾项存在。
+- 没有新增多轮工具调用场景的独立 eval golden case；当前 ask eval 仍只覆盖 retrieval-only 与 citation valid 两条回归。
+- 没有实现循环中间 context 的增量去重；多轮工具结果目前仍依赖现有 helper 的保守装配。
+- 没有启动 `TASK-048`、`TASK-031` 或 `TASK-032`，避免把本会话扩成第二个 `medium`。
+
+### 4. 关键决策
+
+- 不保留 `run_minimal_ask` 兼容包装层，而是把 ask 收敛为 graph-only 入口；原因是 ReAct 循环、checkpoint、resume 与 trace 现在都应该以 graph state 为唯一真实来源。
+- 工具判定、工具执行、回答生成仍保留在 service helper 中，而不是全部塞进 graph 文件；原因是 graph 负责编排，service 负责节点级业务逻辑，边界更清晰。
+- 保留现有 citation、guardrail 与 retrieval fallback 语义，把它们迁移到循环内复用，而不是借 `TASK-046` 顺手重写回答 contract。
+- `TASK-046` 在本会话结束时记为 `completed`，即便仍有三个 `small` 尾项；原因是它们已降级为非阻塞优化，不再构成 acceptance gap。
+
+### 5. 修改过的文件
+
+- [backend/app/contracts/workflow.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/app/contracts/workflow.py)
+- [backend/app/graphs/state.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/app/graphs/state.py)
+- [backend/app/services/ask.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/app/services/ask.py)
+- [backend/app/graphs/ask_graph.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/app/graphs/ask_graph.py)
+- [backend/tests/test_ask_workflow.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/tests/test_ask_workflow.py)
+- [docs/superpowers/plans/2026-04-01-task-046-ask-graph-react-loop.md](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/docs/superpowers/plans/2026-04-01-task-046-ask-graph-react-loop.md)
+- [docs/TASK_QUEUE.md](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/docs/TASK_QUEUE.md)
+- [docs/CURRENT_STATE.md](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/docs/CURRENT_STATE.md)
+- [docs/SESSION_LOG.md](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/docs/SESSION_LOG.md)
+- [docs/PROJECT_MASTER_PLAN.md](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/docs/PROJECT_MASTER_PLAN.md)
+- [docs/CHANGELOG.md](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/docs/CHANGELOG.md)
+
+### 6. 验证与测试
+
+- 跑了什么命令
+  - `/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/.conda/knowledge-steward/bin/python -m unittest tests.test_ask_workflow -v`
+  - `/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/.conda/knowledge-steward/bin/python eval/run_eval.py --case-id ask_fixture_hybrid_retrieval_only --case-id ask_fixture_generated_answer_citation_valid --output /tmp/task046-ask-eval.json`
+- 结果如何
+  - backend `tests.test_ask_workflow` 共 32 tests 通过。
+  - ask eval 2 passed, 0 failed。
+- 哪些没法验证
+  - 没有在真实 Obsidian 宿主里重跑 ask 端到端交互；当前仍以 backend 回归与离线 eval 为主。
+- 哪些只是静态修改
+  - 本次对 `TASK_QUEUE`、`CURRENT_STATE`、`SESSION_LOG`、`PROJECT_MASTER_PLAN` 与 `CHANGELOG` 的更新都属于治理文档同步。
+
+### 7. 范围偏移与原因
+
+- 没有新增第二个 `medium`。
+- 唯一伴随动作是按治理规则完成 Level 3 文档同步，因为 `TASK-046` 状态、默认下一任务和稳定主文档里的 ask 执行模型事实都发生了变化。
+
+### 8. 未解决问题
+
+- ReAct 循环的 token 统计仍然缺席，当前 trace 只能看到节点级事件，不能直接读到累计 token 成本。
+- 多轮工具调用还没有独立 eval golden case，后续若扩到真实多轮回归，需要在 `eval/` 中补 fixture。
+- 循环中间 context 还没有增量去重，未来若工具结果变长，可能需要再收敛 prompt 体积。
+- 根工作区仍有与本任务无关的脏改动，但 `git stash list` 当前为空；先前控制面里关于 `stash@{0}` 的表述已在本次收尾时修正。
+
+### 9. 新增风险 / 技术债 / 假设
+
+- 技术债：`TASK-046` 虽已完成，但 token 统计、多轮 eval 与 context 去重三个 `small` 尾项仍未落地。
+- 风险：graph-native ReAct 已接通，但没有累计 token trace 与多轮 eval 时，成本波动和复杂问题回归仍不够透明。
+- 假设：下一会话默认进入 `TASK-048`，把 runtime faithfulness gate 与多维度 RAG eval 作为新的 medium 主线。
+
+### 10. 下一步最优先任务
+
+- 默认进入 `TASK-048`，建立跨链路多维度 RAG 评估框架，并把 runtime faithfulness gate 接到 ask 主链路。
+- 之后回到 `TASK-031`、`TASK-032`。
+- `TASK-046` 的三个 `small` 尾项不应单独再开一个新的 `medium`。
+
+### 11. 下一次新会话应该先读哪些文件
+
+- [docs/TASK_QUEUE.md](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/docs/TASK_QUEUE.md)
+- [docs/CURRENT_STATE.md](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/docs/CURRENT_STATE.md)
+- [docs/SESSION_LOG.md](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/docs/SESSION_LOG.md)
+- 若继续 `TASK-048`：
+  - [backend/app/graphs/ask_graph.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/app/graphs/ask_graph.py)
+  - [backend/app/services/ask.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/app/services/ask.py)
+  - [backend/app/guardrails/ask.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/app/guardrails/ask.py)
+  - [backend/app/contracts/workflow.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/app/contracts/workflow.py)
+  - [eval/run_eval.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/eval/run_eval.py)
+
+### 12. 当前最容易被追问的点
+
+- 为什么直接移除 `run_minimal_ask`，而不是保留兼容包装层？正确回答必须落到“多轮工具调用已经成为 ask 的真实执行模型；只保留 graph 这一个编排真相，checkpoint / resume / trace / state 才不会再出现两套语义”。
 
 ## [SES-20260329-02] 完成 ask 上下文装配四阶段质量控制管线并接通 prompt / citation
 

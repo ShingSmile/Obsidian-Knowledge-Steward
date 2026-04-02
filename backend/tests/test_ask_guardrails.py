@@ -4,14 +4,18 @@ import unittest
 
 from app.contracts.workflow import (
     AskCitation,
+    AskResultMode,
+    AskWorkflowResult,
     ContextBundle,
     GuardrailAction,
     GuardrailOutcome,
+    RetrievedChunkCandidate,
     ToolCallDecision,
     ToolExecutionResult,
     WorkflowAction,
 )
 from app.guardrails.ask import evaluate_final_ask_response, evaluate_tool_call_outcome
+from app.quality.faithfulness import build_ask_faithfulness_snapshot
 
 
 class GuardrailContractTests(unittest.TestCase):
@@ -28,6 +32,49 @@ class GuardrailContractTests(unittest.TestCase):
 
 
 class AskGuardrailTests(unittest.TestCase):
+    def test_build_ask_faithfulness_snapshot_marks_semantic_overclaim_as_unsupported(self) -> None:
+        snapshot = build_ask_faithfulness_snapshot(
+            AskWorkflowResult(
+                mode=AskResultMode.GENERATED_ANSWER,
+                query="Roadmap",
+                answer="Roadmap 会自动写回知识库。[1]",
+                citations=[
+                    AskCitation(
+                        chunk_id="c1",
+                        path="Roadmap.md",
+                        title="Roadmap",
+                        heading_path="Roadmap",
+                        start_line=1,
+                        end_line=3,
+                        score=0.9,
+                        snippet="Roadmap 已拆成检索与 ask 两段实现。",
+                    )
+                ],
+                retrieved_candidates=[
+                    RetrievedChunkCandidate(
+                        chunk_id="c1",
+                        note_id="note-roadmap",
+                        path="Roadmap.md",
+                        title="Roadmap",
+                        heading_path="Roadmap",
+                        note_type="summary_note",
+                        template_family="general",
+                        daily_note_date=None,
+                        source_mtime_ns=1,
+                        start_line=1,
+                        end_line=3,
+                        score=0.9,
+                        snippet="Roadmap 已拆成检索与 ask 两段实现。",
+                        text="Roadmap 已拆成检索与 ask 两段实现。",
+                    )
+                ],
+            )
+        )
+
+        self.assertEqual(snapshot["bucket"], "unsupported_claim")
+        self.assertFalse(snapshot["consistent"])
+        self.assertIn("自动", "\n".join(snapshot["unsupported_terms"]))
+
     def test_guardrail_rejects_invalid_tool_request(self) -> None:
         outcome = evaluate_tool_call_outcome(
             ToolCallDecision(requested=True, tool_name="delete_note", arguments={}),

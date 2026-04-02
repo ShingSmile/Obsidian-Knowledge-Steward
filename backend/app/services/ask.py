@@ -13,17 +13,22 @@ from app.context.safety import detect_safety_flags
 from app.context.render import render_grounded_answer_prompt, render_tool_selection_prompt
 from app.contracts.workflow import (
     AskCitation,
-    ContextBundle,
     AskResultMode,
     AskWorkflowResult,
+    ContextBundle,
     GuardrailAction,
     GuardrailOutcome,
     RetrievedChunkCandidate,
     ToolCallDecision,
     ToolExecutionResult,
+    WorkflowAction,
     WorkflowInvokeRequest,
 )
-from app.guardrails.ask import evaluate_final_ask_response, evaluate_tool_call_outcome
+from app.guardrails.ask import (
+    evaluate_final_ask_response,
+    evaluate_runtime_ask_faithfulness,
+    evaluate_tool_call_outcome,
+)
 from app.retrieval.hybrid import search_hybrid_chunks_in_db
 from app.tools.registry import execute_tool_call, get_allowed_tools_for_workflow
 
@@ -52,14 +57,27 @@ class ChatProviderError(RuntimeError):
     """Raised when a configured chat provider cannot return a usable answer."""
 
 
-def run_minimal_ask(
+@dataclass(frozen=True)
+class AskTurnContext:
+    query: str
+    candidates: list[RetrievedChunkCandidate]
+    bundle: ContextBundle
+    prompt_candidates: list[RetrievedChunkCandidate]
+    citations: list[AskCitation]
+    retrieval_fallback_used: bool
+    retrieval_fallback_reason: str | None
+    allowed_tool_names: list[str]
+    raw_tool_results: list[ToolExecutionResult]
+    prompt_tool_results: list[ToolExecutionResult]
+
+
+def build_initial_ask_turn(
     request: WorkflowInvokeRequest,
     *,
     settings: Settings,
-) -> AskWorkflowResult:
-    query = (request.user_query or "").strip()
-    if not query:
-        raise ValueError("ask_qa requests must include a non-empty user_query.")
+) -> AskTurnContext | AskWorkflowResult:
+    query = _normalize_ask_query(request.user_query)
+    allowed_tool_names = _get_allowed_tool_names(request.action_type)
 
     retrieval_response = search_hybrid_chunks_in_db(
         settings.index_db_path,
@@ -70,9 +88,6 @@ def run_minimal_ask(
         provider_preference=request.provider_preference,
     )
     candidates = retrieval_response.candidates
-    allowed_tool_names = [
-        spec.name for spec in get_allowed_tools_for_workflow(request.action_type)
-    ]
 
     if not candidates:
         return AskWorkflowResult(
@@ -83,12 +98,249 @@ def run_minimal_ask(
             retrieved_candidates=[],
             retrieval_fallback_used=retrieval_response.fallback_used,
             retrieval_fallback_reason=retrieval_response.fallback_reason,
+            tool_call_rounds=0,
         )
 
+    return _build_ask_turn_context(
+        query=query,
+        workflow_action=request.action_type,
+        candidates=candidates,
+        raw_tool_results=[],
+        prompt_tool_results=[],
+        retrieval_fallback_used=retrieval_response.fallback_used,
+        retrieval_fallback_reason=retrieval_response.fallback_reason,
+        allowed_tool_names=allowed_tool_names,
+    )
+
+
+def decide_ask_tool_call(
+    turn: AskTurnContext,
+    *,
+    settings: Settings,
+    provider_preference: str | None,
+    workflow_action: WorkflowAction,
+) -> tuple[ToolCallDecision, GuardrailOutcome]:
+    tool_decision = _request_tool_call_decision(
+        query=turn.query,
+        bundle=turn.bundle,
+        settings=settings,
+        provider_preference=provider_preference,
+    )
+    return tool_decision, evaluate_tool_call_outcome(
+        tool_decision,
+        workflow_action=workflow_action,
+    )
+
+
+def apply_ask_tool_turn(
+    turn: AskTurnContext,
+    *,
+    decision: ToolCallDecision,
+    workflow_action: WorkflowAction,
+    settings: Settings,
+) -> AskTurnContext | AskWorkflowResult:
+    if not decision.requested:
+        return turn
+
+    tool_result = execute_tool_call(
+        decision,
+        workflow_action=workflow_action,
+        settings=settings,
+    )
+    next_raw_tool_results = [*turn.raw_tool_results, tool_result]
+    if not tool_result.ok:
+        return _build_retrieval_only_result(
+            query=turn.query,
+            citations=turn.citations,
+            candidates=turn.prompt_candidates,
+            retrieval_fallback_used=turn.retrieval_fallback_used,
+            retrieval_fallback_reason=turn.retrieval_fallback_reason,
+            tool_call_attempted=True,
+            tool_call_rounds=len(next_raw_tool_results),
+            tool_call_used=decision.tool_name,
+            guardrail_outcome=GuardrailOutcome(
+                action=GuardrailAction.TOOL_RESULT_INSUFFICIENT,
+                applied=True,
+                reasons=[tool_result.error or "tool_failed"],
+            ),
+        )
+
+    if _tool_results_have_safety_flags([tool_result]):
+        return _build_retrieval_only_result(
+            query=turn.query,
+            citations=turn.citations,
+            candidates=turn.prompt_candidates,
+            retrieval_fallback_used=turn.retrieval_fallback_used,
+            retrieval_fallback_reason=turn.retrieval_fallback_reason,
+            tool_call_attempted=True,
+            tool_call_rounds=len(next_raw_tool_results),
+            tool_call_used=decision.tool_name,
+            guardrail_outcome=GuardrailOutcome(
+                action=GuardrailAction.POSSIBLE_INJECTION_DETECTED,
+                applied=True,
+                reasons=["tool_result_flagged"],
+            ),
+        )
+
+    next_prompt_tool_results = [
+        *turn.prompt_tool_results,
+        *_select_prompt_tool_results(
+            [tool_result],
+            prompt_candidates=turn.prompt_candidates,
+        ),
+    ]
+    if not tool_result.allow_context_reentry and len(next_prompt_tool_results) == len(turn.prompt_tool_results):
+        return _build_retrieval_only_result(
+            query=turn.query,
+            citations=turn.citations,
+            candidates=turn.prompt_candidates,
+            retrieval_fallback_used=turn.retrieval_fallback_used,
+            retrieval_fallback_reason=turn.retrieval_fallback_reason,
+            tool_call_attempted=True,
+            tool_call_rounds=len(next_raw_tool_results),
+            tool_call_used=decision.tool_name,
+            guardrail_outcome=GuardrailOutcome(
+                action=GuardrailAction.TOOL_RESULT_INSUFFICIENT,
+                applied=True,
+                reasons=["tool_result_not_prompt_safe"],
+            ),
+        )
+
+    return _build_ask_turn_context(
+        query=turn.query,
+        workflow_action=workflow_action,
+        candidates=turn.candidates,
+        raw_tool_results=next_raw_tool_results,
+        prompt_tool_results=next_prompt_tool_results,
+        retrieval_fallback_used=turn.retrieval_fallback_used,
+        retrieval_fallback_reason=turn.retrieval_fallback_reason,
+        allowed_tool_names=turn.allowed_tool_names,
+    )
+
+
+def generate_ask_result(
+    turn: AskTurnContext,
+    *,
+    settings: Settings,
+    provider_preference: str | None,
+    tool_call_attempted: bool,
+    tool_call_used: str | None,
+    tool_call_rounds: int,
+) -> AskWorkflowResult:
+    generated_answer, provider_target, model_fallback_reason = _try_generate_grounded_answer(
+        query=turn.query,
+        bundle=turn.bundle,
+        settings=settings,
+        provider_preference=provider_preference,
+    )
+    if generated_answer is None or provider_target is None:
+        return _build_retrieval_only_result(
+            query=turn.query,
+            citations=turn.citations,
+            candidates=turn.prompt_candidates,
+            retrieval_fallback_used=turn.retrieval_fallback_used,
+            retrieval_fallback_reason=turn.retrieval_fallback_reason,
+            model_fallback_used=True,
+            model_fallback_reason=model_fallback_reason,
+            tool_call_attempted=tool_call_attempted,
+            tool_call_rounds=tool_call_rounds,
+            tool_call_used=tool_call_used,
+        )
+
+    citation_alignment_error = _validate_generated_answer_citations(
+        answer=generated_answer,
+        candidate_count=len(turn.citations),
+    )
+    if citation_alignment_error is not None:
+        return _build_retrieval_only_result(
+            query=turn.query,
+            citations=turn.citations,
+            candidates=turn.prompt_candidates,
+            retrieval_fallback_used=turn.retrieval_fallback_used,
+            retrieval_fallback_reason=turn.retrieval_fallback_reason,
+            model_fallback_used=True,
+            model_fallback_reason=citation_alignment_error,
+            tool_call_attempted=tool_call_attempted,
+            tool_call_rounds=tool_call_rounds,
+            tool_call_used=tool_call_used,
+        )
+
+    final_guardrail = evaluate_final_ask_response(
+        answer_text=generated_answer,
+        citations=turn.citations,
+        bundle=turn.bundle,
+        tool_results=turn.raw_tool_results,
+    )
+    if final_guardrail.applied:
+        return _build_retrieval_only_result(
+            query=turn.query,
+            citations=turn.citations,
+            candidates=turn.prompt_candidates,
+            retrieval_fallback_used=turn.retrieval_fallback_used,
+            retrieval_fallback_reason=turn.retrieval_fallback_reason,
+            tool_call_attempted=tool_call_attempted,
+            tool_call_rounds=tool_call_rounds,
+            tool_call_used=tool_call_used,
+            guardrail_outcome=final_guardrail,
+        )
+
+    generated_result = AskWorkflowResult(
+        mode=AskResultMode.GENERATED_ANSWER,
+        query=turn.query,
+        answer=generated_answer,
+        citations=turn.citations,
+        retrieved_candidates=turn.prompt_candidates,
+        retrieval_fallback_used=turn.retrieval_fallback_used,
+        retrieval_fallback_reason=turn.retrieval_fallback_reason,
+        provider_name=provider_target.provider_name,
+        model_name=provider_target.model_name,
+        tool_call_attempted=tool_call_attempted,
+        tool_call_rounds=tool_call_rounds,
+        tool_call_used=tool_call_used,
+        guardrail_action=final_guardrail.action,
+    )
+    faithfulness_guardrail = evaluate_runtime_ask_faithfulness(generated_result)
+    if faithfulness_guardrail.applied:
+        return _build_retrieval_only_result(
+            query=turn.query,
+            citations=turn.citations,
+            candidates=turn.prompt_candidates,
+            retrieval_fallback_used=turn.retrieval_fallback_used,
+            retrieval_fallback_reason=turn.retrieval_fallback_reason,
+            tool_call_attempted=tool_call_attempted,
+            tool_call_rounds=tool_call_rounds,
+            tool_call_used=tool_call_used,
+            guardrail_outcome=faithfulness_guardrail,
+        )
+    return generated_result
+
+
+def _normalize_ask_query(user_query: str | None) -> str:
+    query = (user_query or "").strip()
+    if not query:
+        raise ValueError("ask_qa requests must include a non-empty user_query.")
+    return query
+
+
+def _get_allowed_tool_names(workflow_action: WorkflowAction) -> list[str]:
+    return [spec.name for spec in get_allowed_tools_for_workflow(workflow_action)]
+
+
+def _build_ask_turn_context(
+    *,
+    query: str,
+    workflow_action: WorkflowAction,
+    candidates: list[RetrievedChunkCandidate],
+    raw_tool_results: list[ToolExecutionResult],
+    prompt_tool_results: list[ToolExecutionResult],
+    retrieval_fallback_used: bool,
+    retrieval_fallback_reason: str | None,
+    allowed_tool_names: list[str],
+) -> AskTurnContext | AskWorkflowResult:
     bundle = build_ask_context_bundle(
         user_query=query,
         candidates=candidates,
-        tool_results=[],
+        tool_results=prompt_tool_results,
         token_budget=ASK_CONTEXT_TOKEN_BUDGET,
         allowed_tool_names=allowed_tool_names,
     )
@@ -99,165 +351,28 @@ def run_minimal_ask(
             query=query,
             citations=[],
             candidates=[],
-            retrieval_fallback_used=retrieval_response.fallback_used,
-            retrieval_fallback_reason=retrieval_response.fallback_reason,
+            retrieval_fallback_used=retrieval_fallback_used,
+            retrieval_fallback_reason=retrieval_fallback_reason,
+            tool_call_attempted=bool(raw_tool_results),
+            tool_call_rounds=len(raw_tool_results),
+            tool_call_used=raw_tool_results[-1].tool_name if raw_tool_results else None,
             guardrail_outcome=GuardrailOutcome(
                 action=GuardrailAction.POSSIBLE_INJECTION_DETECTED,
                 applied=True,
                 reasons=["all_visible_context_flagged"],
             ),
         )
-    tool_decision = _request_tool_call_decision(
+    return AskTurnContext(
         query=query,
+        candidates=candidates,
         bundle=bundle,
-        settings=settings,
-        provider_preference=request.provider_preference,
-    )
-    tool_guardrail = evaluate_tool_call_outcome(
-        tool_decision,
-        workflow_action=request.action_type,
-    )
-    tool_results: list[ToolExecutionResult] = []
-    if tool_guardrail.applied:
-        return _build_retrieval_only_result(
-            query=query,
-            citations=citations,
-            candidates=prompt_candidates,
-            retrieval_fallback_used=retrieval_response.fallback_used,
-            retrieval_fallback_reason=retrieval_response.fallback_reason,
-            tool_decision=tool_decision,
-            guardrail_outcome=tool_guardrail,
-        )
-
-    if tool_decision.requested:
-        tool_result = execute_tool_call(
-            tool_decision,
-            workflow_action=request.action_type,
-            settings=settings,
-        )
-        if not tool_result.ok:
-            return _build_retrieval_only_result(
-                query=query,
-                citations=citations,
-                candidates=prompt_candidates,
-                retrieval_fallback_used=retrieval_response.fallback_used,
-                retrieval_fallback_reason=retrieval_response.fallback_reason,
-                tool_decision=tool_decision,
-                guardrail_outcome=GuardrailOutcome(
-                    action=GuardrailAction.TOOL_RESULT_INSUFFICIENT,
-                    applied=True,
-                    reasons=[tool_result.error or "tool_failed"],
-                ),
-            )
-        tool_results.append(tool_result)
-        if _tool_results_have_safety_flags(tool_results):
-            return _build_retrieval_only_result(
-                query=query,
-                citations=citations,
-                candidates=prompt_candidates,
-                retrieval_fallback_used=retrieval_response.fallback_used,
-                retrieval_fallback_reason=retrieval_response.fallback_reason,
-                tool_decision=tool_decision,
-                guardrail_outcome=GuardrailOutcome(
-                    action=GuardrailAction.POSSIBLE_INJECTION_DETECTED,
-                    applied=True,
-                    reasons=["tool_result_flagged"],
-                ),
-            )
-        prompt_tool_results = _select_prompt_tool_results(
-            tool_results,
-            prompt_candidates=prompt_candidates,
-        )
-        if any(not result.allow_context_reentry for result in tool_results) and not prompt_tool_results:
-            return _build_retrieval_only_result(
-                query=query,
-                citations=citations,
-                candidates=prompt_candidates,
-                retrieval_fallback_used=retrieval_response.fallback_used,
-                retrieval_fallback_reason=retrieval_response.fallback_reason,
-                tool_decision=tool_decision,
-                guardrail_outcome=GuardrailOutcome(
-                    action=GuardrailAction.TOOL_RESULT_INSUFFICIENT,
-                    applied=True,
-                    reasons=["tool_result_not_prompt_safe"],
-                ),
-            )
-        bundle = build_ask_context_bundle(
-            user_query=query,
-            candidates=candidates,
-            tool_results=prompt_tool_results,
-            token_budget=ASK_CONTEXT_TOKEN_BUDGET,
-            allowed_tool_names=allowed_tool_names,
-        )
-        prompt_candidates = _select_prompt_candidates(candidates=candidates, bundle=bundle)
-        citations = _build_citations(prompt_candidates)
-
-    generated_answer, provider_target, model_fallback_reason = _try_generate_grounded_answer(
-        query=query,
-        bundle=bundle,
-        settings=settings,
-        provider_preference=request.provider_preference,
-    )
-    if generated_answer is None or provider_target is None:
-        return _build_retrieval_only_result(
-            query=query,
-            citations=citations,
-            candidates=prompt_candidates,
-            retrieval_fallback_used=retrieval_response.fallback_used,
-            retrieval_fallback_reason=retrieval_response.fallback_reason,
-            model_fallback_used=True,
-            model_fallback_reason=model_fallback_reason,
-            tool_decision=tool_decision,
-        )
-
-    citation_alignment_error = _validate_generated_answer_citations(
-        answer=generated_answer,
-        candidate_count=len(citations),
-    )
-    # 这里在 service 层做程序级编号校验，是为了把“模型返回了文本、但引用已经缺失或漂移”
-    # 的 bad case 截停在响应落地之前。当前任务只做编号对齐，不假装已经完成语义级 groundedness。
-    if citation_alignment_error is not None:
-        return _build_retrieval_only_result(
-            query=query,
-            citations=citations,
-            candidates=prompt_candidates,
-            retrieval_fallback_used=retrieval_response.fallback_used,
-            retrieval_fallback_reason=retrieval_response.fallback_reason,
-            model_fallback_used=True,
-            model_fallback_reason=citation_alignment_error,
-            tool_decision=tool_decision,
-        )
-
-    final_guardrail = evaluate_final_ask_response(
-        answer_text=generated_answer,
+        prompt_candidates=prompt_candidates,
         citations=citations,
-        bundle=bundle,
-        tool_results=tool_results,
-    )
-    if final_guardrail.applied:
-        return _build_retrieval_only_result(
-            query=query,
-            citations=citations,
-            candidates=prompt_candidates,
-            retrieval_fallback_used=retrieval_response.fallback_used,
-            retrieval_fallback_reason=retrieval_response.fallback_reason,
-            tool_decision=tool_decision,
-            guardrail_outcome=final_guardrail,
-        )
-
-    return AskWorkflowResult(
-        mode=AskResultMode.GENERATED_ANSWER,
-        query=query,
-        answer=generated_answer,
-        citations=citations,
-        retrieved_candidates=prompt_candidates,
-        retrieval_fallback_used=retrieval_response.fallback_used,
-        retrieval_fallback_reason=retrieval_response.fallback_reason,
-        provider_name=provider_target.provider_name,
-        model_name=provider_target.model_name,
-        tool_call_attempted=tool_decision.requested,
-        tool_call_used=tool_decision.tool_name,
-        guardrail_action=final_guardrail.action,
+        retrieval_fallback_used=retrieval_fallback_used,
+        retrieval_fallback_reason=retrieval_fallback_reason,
+        allowed_tool_names=allowed_tool_names,
+        raw_tool_results=raw_tool_results,
+        prompt_tool_results=prompt_tool_results,
     )
 
 
@@ -403,7 +518,9 @@ def _build_retrieval_only_result(
     retrieval_fallback_reason: str | None,
     model_fallback_used: bool = False,
     model_fallback_reason: str | None = None,
-    tool_decision: ToolCallDecision | None = None,
+    tool_call_attempted: bool = False,
+    tool_call_rounds: int = 0,
+    tool_call_used: str | None = None,
     guardrail_outcome: GuardrailOutcome | None = None,
 ) -> AskWorkflowResult:
     return AskWorkflowResult(
@@ -420,10 +537,15 @@ def _build_retrieval_only_result(
         retrieval_fallback_reason=retrieval_fallback_reason,
         model_fallback_used=model_fallback_used,
         model_fallback_reason=model_fallback_reason,
-        tool_call_attempted=tool_decision.requested if tool_decision is not None else False,
-        tool_call_used=tool_decision.tool_name if tool_decision is not None else None,
+        tool_call_attempted=tool_call_attempted,
+        tool_call_rounds=tool_call_rounds,
+        tool_call_used=tool_call_used,
         guardrail_action=guardrail_outcome.action if guardrail_outcome is not None else None,
     )
+
+
+def build_retrieval_only_ask_result(**kwargs: object) -> AskWorkflowResult:
+    return _build_retrieval_only_result(**kwargs)
 
 
 def _request_tool_call_decision(

@@ -2,6 +2,8 @@
 .env
 .env.*
 .idea/
+.claude/
+.conda/
 __pycache__/
 *.pyc
 *.pyo
@@ -19,4 +21,6 @@ plugin/main.js.map
 
 logs/
 data/runtime/
+data/*.sqlite3
+data/traces/
 .worktrees/

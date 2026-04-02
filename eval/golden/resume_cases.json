@@ -66,20 +66,20 @@
         },
         "writeback_result": {
           "applied": true,
-          "target_note_path": "/vault/Digest/2026-03-14.md",
+          "target_note_path": "Digest/2026-03-14.md",
           "before_hash": "sha256:resume_before",
           "after_hash": "sha256:after_success",
           "applied_patch_ops": [
             {
               "op": "frontmatter_merge",
-              "target_path": "/vault/Digest/2026-03-14.md",
+              "target_path": "Digest/2026-03-14.md",
               "payload": {
                 "reviewed": false
               }
             },
             {
               "op": "insert_under_heading",
-              "target_path": "/vault/Digest/2026-03-14.md",
+              "target_path": "Digest/2026-03-14.md",
               "payload": {
                 "heading_path": "## Digest",
                 "content": "- Review retrieval fallback cases"
@@ -146,7 +146,7 @@
         },
         "writeback_result": {
           "applied": false,
-          "target_note_path": "/vault/Digest/2026-03-14.md",
+          "target_note_path": "Digest/2026-03-14.md",
           "before_hash": "sha256:current_hash",
           "applied_patch_ops": [],
           "error": "before_hash mismatch: current file changed"

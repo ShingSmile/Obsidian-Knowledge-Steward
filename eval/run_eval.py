@@ -48,16 +48,16 @@ from app.graphs.checkpoint import (  # noqa: E402
 from app.indexing.ingest import ingest_vault  # noqa: E402
 from app.indexing.store import connect_sqlite, initialize_index_db, save_proposal  # noqa: E402
 from app.main import invoke_workflow, resume_workflow_endpoint  # noqa: E402
+from app.quality.faithfulness import (  # noqa: E402
+    build_ask_groundedness_snapshot,
+    build_claim_faithfulness_report,
+)
 from app.retrieval.embeddings import EmbeddingBatchResult  # noqa: E402
 
 
 GOLDEN_DIR = Path(__file__).resolve().parent / "golden"
 RESULTS_DIR = Path(__file__).resolve().parent / "results"
 RESULT_SCHEMA_VERSION = "1.3"
-CITATION_PATTERN = re.compile(r"\[(\d+)\]")
-LATIN_TOKEN_PATTERN = re.compile(r"[a-z0-9_]{3,}")
-CJK_SEQUENCE_PATTERN = re.compile(r"[\u4e00-\u9fff]{2,}")
-
 # 这里显式把 eval case 收敛成两条面试叙事主线：
 # 1. ask 归到问答 benchmark
 # 2. governance / digest / resume 归到治理 benchmark
@@ -80,6 +80,8 @@ SCENARIO_DISPLAY_NAMES = {
     "digest": "Daily Digest",
     "resume_workflow": "Resume Workflow",
 }
+TASK_CHECKBOX_PATTERN = re.compile(r"^- \[[ xX]\]", re.MULTILINE)
+DAILY_NOTE_STEM_PATTERN = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 
 
 @dataclass(frozen=True)
@@ -312,12 +314,12 @@ def _build_resume_waiting_digest_proposal() -> Proposal:
     return Proposal(
         proposal_id="prop_digest_resume",
         action_type=WorkflowAction.DAILY_DIGEST,
-        target_note_path="/vault/Digest/2026-03-14.md",
+        target_note_path="Digest/2026-03-14.md",
         summary="Insert the generated digest into the daily review note.",
         risk_level=RiskLevel.HIGH,
         evidence=[
             ProposalEvidence(
-                source_path="/vault/Daily/2026-03-14.md",
+                source_path="Daily/2026-03-14.md",
                 heading_path="Summary",
                 chunk_id="chunk_digest_source",
                 reason="The digest is grounded in the latest indexed note summary.",
@@ -326,12 +328,12 @@ def _build_resume_waiting_digest_proposal() -> Proposal:
         patch_ops=[
             PatchOp(
                 op="frontmatter_merge",
-                target_path="/vault/Digest/2026-03-14.md",
+                target_path="Digest/2026-03-14.md",
                 payload={"reviewed": False},
             ),
             PatchOp(
                 op="insert_under_heading",
-                target_path="/vault/Digest/2026-03-14.md",
+                target_path="Digest/2026-03-14.md",
                 payload={
                     "heading_path": "## Digest",
                     "content": "- Review retrieval fallback cases",
@@ -437,6 +439,24 @@ def _install_embedding_profile_mocks(
                 ),
             )
         )
+        stack.enter_context(
+            patch(
+                "app.quality.faithfulness.embed_texts",
+                side_effect=lambda texts, **_: EmbeddingBatchResult(
+                    embeddings=[
+                        [1.0, 0.0]
+                        if "roadmap" in text.casefold()
+                        else [0.9, 0.1]
+                        if "strategy" in text.casefold()
+                        else [0.0, 1.0]
+                        for text in texts
+                    ],
+                    provider_key="cloud",
+                    provider_name=settings.cloud_provider_name,
+                    model_name="text-embedding-eval",
+                ),
+            )
+        )
         return
 
     if profile_name == "alpha_beta_hybrid":
@@ -459,6 +479,20 @@ def _install_embedding_profile_mocks(
                 "app.retrieval.sqlite_vector.embed_texts",
                 return_value=EmbeddingBatchResult(
                     embeddings=[[1.0, 0.0]],
+                    provider_key="cloud",
+                    provider_name=settings.cloud_provider_name,
+                    model_name="text-embedding-eval",
+                ),
+            )
+        )
+        stack.enter_context(
+            patch(
+                "app.quality.faithfulness.embed_texts",
+                side_effect=lambda texts, **_: EmbeddingBatchResult(
+                    embeddings=[
+                        [1.0, 0.0] if "alpha" in text.casefold() else [0.8, 0.2]
+                        for text in texts
+                    ],
                     provider_key="cloud",
                     provider_name=settings.cloud_provider_name,
                     model_name="text-embedding-eval",
@@ -526,6 +560,7 @@ def run_case(case_payload: dict[str, Any]) -> dict[str, Any]:
             actual_snapshot["quality_metrics"] = build_quality_metrics_snapshot(
                 case_payload=case_payload,
                 actual=actual_snapshot,
+                settings=settings,
             )
             assert_case_matches(case_payload["expected"], actual_snapshot)
             outcome = "passed"
@@ -637,6 +672,7 @@ def build_invoke_snapshot(
         "run_id": workflow_result.run_id,
         "thread_id": workflow_result.thread_id,
         "fixture_id": fixture.fixture_id,
+        "fixture_vault_path": str(fixture.vault_path),
         "fixture_db_path": str(fixture.db_path),
         "trace_path_exists": fixture.trace_path.exists(),
         "ask_result": None,
@@ -751,6 +787,7 @@ def build_resume_snapshot(
         "thread_id": workflow_result.thread_id,
         "proposal_id": workflow_result.proposal_id,
         "fixture_id": fixture.fixture_id,
+        "fixture_vault_path": str(fixture.vault_path),
         "fixture_db_path": str(fixture.db_path),
         "trace_path_exists": fixture.trace_path.exists(),
         "proposal": build_proposal_snapshot(workflow_result.proposal),
@@ -772,134 +809,6 @@ def build_resume_snapshot(
             audit_event_id=workflow_result.audit_event_id,
         ),
     }
-
-
-def build_ask_groundedness_snapshot(
-    ask_result: AskWorkflowResult,
-) -> dict[str, Any]:
-    if ask_result.mode != AskResultMode.GENERATED_ANSWER:
-        return {
-            "bucket": "not_generated_answer",
-            "consistent": None,
-            "reason": "ask_result_not_generated_answer",
-            "citation_numbers": [],
-            "cited_candidate_count": 0,
-            "unsupported_terms": [],
-            "answer_text": _strip_citation_markers(ask_result.answer),
-        }
-
-    citation_numbers = _dedupe_preserve_order(
-        int(match.group(1)) for match in CITATION_PATTERN.finditer(ask_result.answer)
-    )
-    if not citation_numbers:
-        return {
-            "bucket": "citation_missing",
-            "consistent": False,
-            "reason": "answer_has_no_citation_markers",
-            "citation_numbers": [],
-            "cited_candidate_count": 0,
-            "unsupported_terms": [],
-            "answer_text": _strip_citation_markers(ask_result.answer),
-        }
-
-    invalid_numbers = [
-        citation_number
-        for citation_number in citation_numbers
-        if citation_number < 1 or citation_number > len(ask_result.retrieved_candidates)
-    ]
-    if invalid_numbers:
-        return {
-            "bucket": "citation_invalid",
-            "consistent": False,
-            "reason": "answer_references_missing_candidates",
-            "citation_numbers": citation_numbers,
-            "invalid_citation_numbers": invalid_numbers,
-            "cited_candidate_count": 0,
-            "unsupported_terms": [],
-            "answer_text": _strip_citation_markers(ask_result.answer),
-        }
-
-    cited_candidates = [
-        ask_result.retrieved_candidates[citation_number - 1]
-        for citation_number in citation_numbers
-    ]
-    evidence_text = "\n".join(candidate.text for candidate in cited_candidates)
-    answer_text = _strip_citation_markers(ask_result.answer)
-    unsupported_terms = _find_unsupported_answer_terms(
-        answer_text=answer_text,
-        evidence_text=evidence_text,
-    )
-    if unsupported_terms:
-        return {
-            "bucket": "unsupported_claim",
-            "consistent": False,
-            "reason": "answer_contains_terms_not_found_in_cited_evidence",
-            "citation_numbers": citation_numbers,
-            "cited_candidate_count": len(cited_candidates),
-            "unsupported_terms": unsupported_terms,
-            "answer_text": answer_text,
-        }
-
-    return {
-        "bucket": "grounded",
-        "consistent": True,
-        "reason": "all_answer_terms_supported_by_cited_evidence",
-        "citation_numbers": citation_numbers,
-        "cited_candidate_count": len(cited_candidates),
-        "unsupported_terms": [],
-        "answer_text": answer_text,
-    }
-
-
-def _find_unsupported_answer_terms(
-    *,
-    answer_text: str,
-    evidence_text: str,
-) -> list[str]:
-    answer_terms = _extract_semantic_terms(answer_text)
-    evidence_terms = set(_extract_semantic_terms(evidence_text))
-
-    unsupported_terms: list[str] = []
-    for term in answer_terms:
-        if term in evidence_terms or term in unsupported_terms:
-            continue
-        unsupported_terms.append(term)
-
-    # 这里故意只保留前几个不被证据覆盖的 term，目标是让 eval 结果可排障，
-    # 而不是把所有 n-gram 全量倒出来，避免结果文件变成低信噪比噪音。
-    return unsupported_terms[:8]
-
-
-def _extract_semantic_terms(text: str) -> list[str]:
-    normalized_text = text.casefold()
-    terms: list[str] = []
-
-    for token in LATIN_TOKEN_PATTERN.findall(normalized_text):
-        if token not in terms:
-            terms.append(token)
-
-    for sequence in CJK_SEQUENCE_PATTERN.findall(text):
-        if len(sequence) <= 4:
-            if sequence not in terms:
-                terms.append(sequence)
-            continue
-
-        # 中文离线 eval 先不引入分词器；这里用 2~4 字窗口抽 term，
-        # 是为了在无联网、无额外依赖的前提下，至少把“自动写回/双链治理”
-        # 这类明显越界 claim 稳定抓出来。
-        for window_size in (2, 3, 4):
-            if len(sequence) < window_size:
-                continue
-            for index in range(0, len(sequence) - window_size + 1):
-                token = sequence[index : index + window_size]
-                if token not in terms:
-                    terms.append(token)
-
-    return terms
-
-
-def _strip_citation_markers(text: str) -> str:
-    return CITATION_PATTERN.sub("", text).strip()
 
 
 def _dedupe_preserve_order(values: Any) -> list[Any]:
@@ -1038,6 +947,7 @@ def build_quality_metrics_snapshot(
     *,
     case_payload: dict[str, Any],
     actual: dict[str, Any],
+    settings: Settings,
 ) -> dict[str, Any]:
     expected = dict(case_payload.get("expected", {}))
     quality_reference = dict(case_payload.get("quality_reference", {}))
@@ -1074,6 +984,7 @@ def build_quality_metrics_snapshot(
     faithfulness_score, faithfulness_reason = _compute_faithfulness_score(
         actual=actual,
         context_recall_score=context_recall_score,
+        settings=settings,
     )
 
     return {
@@ -1192,7 +1103,30 @@ def _compute_faithfulness_score(
     *,
     actual: dict[str, Any],
     context_recall_score: float | None,
+    settings: Settings,
 ) -> tuple[float | None, str]:
+    semantic_subject = _extract_faithfulness_subject_text(actual)
+    evidence_texts = _load_faithfulness_evidence_texts(actual)
+    ask_result = actual.get("ask_result")
+    if (
+        semantic_subject
+        and evidence_texts
+        and (
+            not isinstance(ask_result, dict)
+            or str(ask_result.get("mode")) == "generated_answer"
+        )
+    ):
+        semantic_report = build_claim_faithfulness_report(
+            semantic_subject,
+            evidence_texts=evidence_texts,
+            settings=settings,
+        )
+        if semantic_report.get("score") is not None:
+            return (
+                float(semantic_report["score"]),
+                str(semantic_report["reason"]),
+            )
+
     ask_groundedness = actual.get("ask_groundedness")
     if isinstance(ask_groundedness, dict):
         bucket = str(ask_groundedness.get("bucket"))
@@ -1202,11 +1136,233 @@ def _compute_faithfulness_score(
             return 0.0, f"ask_groundedness:{bucket}"
 
     if context_recall_score is not None:
-        # 对 governance / digest 这类非标准 QA 场景，首版 faithfulness 不假装做复杂 judge，
-        # 而是退回到“关键支持上下文是否真的被拉进结果快照”这个可解释、可回归的基线。
         return context_recall_score, "supporting_context_path_coverage"
 
     return None, "not_applicable"
+
+
+def _extract_faithfulness_subject_text(actual: dict[str, Any]) -> str:
+    ask_result = actual.get("ask_result")
+    if isinstance(ask_result, dict) and ask_result.get("mode") == "generated_answer":
+        return str(ask_result.get("answer") or "")
+
+    proposal = actual.get("proposal")
+    if isinstance(proposal, dict) and proposal.get("present"):
+        return str(proposal.get("summary") or "")
+
+    digest_result = actual.get("digest_result")
+    if isinstance(digest_result, dict):
+        return str(digest_result.get("digest_markdown") or "")
+
+    return str(actual.get("message") or "")
+
+
+def _load_faithfulness_evidence_texts(actual: dict[str, Any]) -> list[str]:
+    fixture_vault_path = actual.get("fixture_vault_path")
+    if not fixture_vault_path:
+        return []
+
+    vault_path = Path(str(fixture_vault_path))
+    evidence_paths = _extract_faithfulness_evidence_paths(actual)
+    evidence_texts: list[str] = []
+    note_text_by_path: dict[str, str] = {}
+    for raw_path in evidence_paths:
+        candidate_path = Path(raw_path)
+        resolved_path = candidate_path if candidate_path.is_absolute() else vault_path / candidate_path
+        try:
+            evidence_text = resolved_path.read_text(encoding="utf-8")
+        except OSError:
+            continue
+        note_text_by_path[str(resolved_path)] = evidence_text
+        if evidence_text not in evidence_texts:
+            evidence_texts.append(evidence_text)
+    for structured_evidence in _build_structured_faithfulness_evidence(
+        actual=actual,
+        note_text_by_path=note_text_by_path,
+    ):
+        if structured_evidence not in evidence_texts:
+            evidence_texts.append(structured_evidence)
+    return evidence_texts
+
+
+def _extract_faithfulness_evidence_paths(actual: dict[str, Any]) -> list[str]:
+    ask_result = actual.get("ask_result")
+    if isinstance(ask_result, dict):
+        citation_paths = [
+            str(path)
+            for path in ask_result.get("citation_paths", [])
+            if str(path).strip()
+        ]
+        if citation_paths:
+            return citation_paths
+
+    proposal = actual.get("proposal")
+    if isinstance(proposal, dict):
+        evidence_paths = [
+            str(path)
+            for path in proposal.get("evidence_paths", [])
+            if str(path).strip()
+        ]
+        if evidence_paths:
+            return evidence_paths
+
+    digest_result = actual.get("digest_result")
+    if isinstance(digest_result, dict):
+        source_paths = [
+            str(path)
+            for path in digest_result.get("source_note_paths", [])
+            if str(path).strip()
+        ]
+        if source_paths:
+            return source_paths
+
+    analysis_result = actual.get("analysis_result")
+    if isinstance(analysis_result, dict):
+        return [
+            str(path)
+            for path in analysis_result.get("related_candidate_paths", [])
+            if str(path).strip()
+        ]
+
+    return []
+
+
+def _build_structured_faithfulness_evidence(
+    *,
+    actual: dict[str, Any],
+    note_text_by_path: dict[str, str],
+) -> list[str]:
+    evidence: list[str] = []
+
+    analysis_result = actual.get("analysis_result")
+    if isinstance(analysis_result, dict):
+        target_title = str(analysis_result.get("target_note_title") or "").strip()
+        if target_title:
+            evidence.append(f"为 {target_title} 补最小治理标记与审查小节")
+        related_candidate_count = analysis_result.get("related_candidate_count")
+        if isinstance(related_candidate_count, int):
+            evidence.append(f"结合 {related_candidate_count} 条 related retrieve 上下文")
+        finding_types = [
+            str(finding_type)
+            for finding_type in analysis_result.get("finding_types", [])
+            if str(finding_type).strip()
+        ]
+        if finding_types:
+            evidence.append(
+                f"聚焦 {len(finding_types)} 个治理信号（{'、'.join(finding_types)}）"
+            )
+        if analysis_result.get("fallback_used"):
+            evidence.append("Ingest workflow completed with scoped note sync")
+            evidence.append("scoped note sync")
+            evidence.append("no approval proposal was generated")
+            fallback_reason = str(analysis_result.get("fallback_reason") or "").strip()
+            if fallback_reason:
+                evidence.append(f"fallback_reason:{fallback_reason}")
+
+    digest_result = actual.get("digest_result")
+    if isinstance(digest_result, dict):
+        note_descriptors = _build_digest_note_descriptors(
+            digest_result=digest_result,
+            note_text_by_path=note_text_by_path,
+        )
+        source_note_count = digest_result.get("source_note_count")
+        if isinstance(source_note_count, int):
+            evidence.append(f"本次 DAILY_DIGEST 基于最近 {source_note_count} 篇已索引笔记生成")
+        if note_descriptors:
+            type_counter: Counter[str] = Counter(
+                descriptor["note_type"] for descriptor in note_descriptors
+            )
+            distribution_parts = [
+                f"{note_type} {count} 篇" for note_type, count in sorted(type_counter.items())
+            ]
+            evidence.append(f"来源分布：{'，'.join(distribution_parts)}")
+
+            daily_dates = [
+                descriptor["date_label"]
+                for descriptor in note_descriptors
+                if descriptor["note_type"] == "daily_note"
+            ]
+            if daily_dates:
+                evidence.append(
+                    f"覆盖日期：{min(daily_dates)} 至 {max(daily_dates)}"
+                )
+
+            total_task_count = sum(int(descriptor["task_count"]) for descriptor in note_descriptors)
+            evidence.append(f"待跟进任务：来源笔记中共检测到 {total_task_count} 项任务")
+            evidence.append("重点来源")
+
+            for descriptor in note_descriptors:
+                evidence.append(
+                    f"{descriptor['title']}（{descriptor['note_type']}，{descriptor['date_label']}，任务 {descriptor['task_count']} 项）"
+                )
+
+        proposal = actual.get("proposal")
+        if isinstance(proposal, dict) and proposal.get("present"):
+            target_path = str(proposal.get("target_note_path") or "")
+            if target_path:
+                target_title = _resolve_digest_target_title(
+                    target_path=target_path,
+                    digest_result=digest_result,
+                )
+                if target_title:
+                    evidence.append(f"将本次 DAILY_DIGEST 写入 {target_title}")
+            if actual.get("approval_required"):
+                evidence.append("标记这次摘要需要人工审批")
+
+    return evidence
+
+
+def _build_digest_note_descriptors(
+    *,
+    digest_result: dict[str, Any],
+    note_text_by_path: dict[str, str],
+) -> list[dict[str, Any]]:
+    source_note_paths = [
+        str(path)
+        for path in digest_result.get("source_note_paths", [])
+        if str(path).strip()
+    ]
+    source_note_titles = [
+        str(title)
+        for title in digest_result.get("source_note_titles", [])
+    ]
+
+    descriptors: list[dict[str, Any]] = []
+    for index, source_note_path in enumerate(source_note_paths):
+        path = Path(source_note_path)
+        stem = path.stem
+        note_type = "daily_note" if DAILY_NOTE_STEM_PATTERN.match(stem) else "summary_note"
+        date_label = stem if note_type == "daily_note" else path.name
+        note_text = note_text_by_path.get(str(path), "")
+        descriptors.append(
+            {
+                "title": source_note_titles[index] if index < len(source_note_titles) else stem,
+                "note_type": note_type,
+                "date_label": date_label,
+                "task_count": len(TASK_CHECKBOX_PATTERN.findall(note_text)),
+            }
+        )
+    return descriptors
+
+
+def _resolve_digest_target_title(
+    *,
+    target_path: str,
+    digest_result: dict[str, Any],
+) -> str | None:
+    source_note_paths = [
+        str(path)
+        for path in digest_result.get("source_note_paths", [])
+        if str(path).strip()
+    ]
+    source_note_titles = [
+        str(title)
+        for title in digest_result.get("source_note_titles", [])
+    ]
+    for index, source_note_path in enumerate(source_note_paths):
+        if source_note_path == target_path and index < len(source_note_titles):
+            return source_note_titles[index]
+    return None
 
 
 def assert_case_matches(expected: dict[str, Any], actual: dict[str, Any]) -> None:
@@ -2234,7 +2390,10 @@ def _build_metric_overview(case_results: list[dict[str, Any]]) -> dict[str, Any]
     for metric_name in ("faithfulness", "relevancy", "context_precision", "context_recall"):
         scores: list[float] = []
         for case_result in case_results:
-            quality_metrics = case_result.get("actual", {}).get("quality_metrics")
+            actual_snapshot = case_result.get("actual")
+            if not isinstance(actual_snapshot, dict):
+                continue
+            quality_metrics = actual_snapshot.get("quality_metrics")
             if not isinstance(quality_metrics, dict):
                 continue
             metric_payload = quality_metrics.get(metric_name)

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from app.contracts.workflow import (
     AskCitation,
+    AskWorkflowResult,
     ContextBundle,
     GuardrailAction,
     GuardrailOutcome,
@@ -9,6 +10,7 @@ from app.contracts.workflow import (
     ToolExecutionResult,
     WorkflowAction,
 )
+from app.quality.faithfulness import build_ask_faithfulness_snapshot
 from app.tools.registry import validate_tool_call
 
 
@@ -56,3 +58,27 @@ def evaluate_final_ask_response(
             reasons=["missing_citations"],
         )
     return GuardrailOutcome(action=GuardrailAction.ALLOW, applied=False)
+
+
+def evaluate_runtime_ask_faithfulness(
+    ask_result: AskWorkflowResult,
+) -> GuardrailOutcome:
+    snapshot = build_ask_faithfulness_snapshot(ask_result)
+    if snapshot["bucket"] != "unsupported_claim":
+        return GuardrailOutcome(action=GuardrailAction.ALLOW, applied=False)
+
+    reasons = [str(snapshot["reason"])]
+    unsupported_terms = [
+        str(term)
+        for term in snapshot.get("unsupported_terms", [])
+        if str(term).strip()
+    ]
+    if unsupported_terms:
+        reasons.append(
+            "unsupported_terms:" + ",".join(unsupported_terms[:3])
+        )
+    return GuardrailOutcome(
+        action=GuardrailAction.REFUSE_STRONG_CLAIM,
+        applied=True,
+        reasons=reasons,
+    )

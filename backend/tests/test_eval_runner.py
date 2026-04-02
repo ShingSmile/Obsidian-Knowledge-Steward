@@ -210,21 +210,25 @@ class EvalRunnerTests(unittest.TestCase):
             self.assertFalse(
                 case_map["ask_fixture_semantic_overclaim_writeback"]["actual"]["ask_groundedness"]["consistent"]
             )
-            self.assertIn(
-                "自动",
-                "\n".join(
-                    case_map["ask_fixture_semantic_overclaim_writeback"]["actual"]["ask_groundedness"]["unsupported_terms"]
-                ),
+            self.assertEqual(
+                case_map["ask_fixture_semantic_overclaim_writeback"]["actual"]["ask_result"]["mode"],
+                "retrieval_only",
+            )
+            self.assertEqual(
+                case_map["ask_fixture_semantic_overclaim_writeback"]["actual"]["ask_result"]["guardrail_action"],
+                "refuse_strong_claim",
             )
             self.assertEqual(
                 case_map["ask_fixture_semantic_overclaim_governance"]["actual"]["ask_groundedness"]["bucket"],
                 "unsupported_claim",
             )
-            self.assertIn(
-                "双链",
-                "\n".join(
-                    case_map["ask_fixture_semantic_overclaim_governance"]["actual"]["ask_groundedness"]["unsupported_terms"]
-                ),
+            self.assertEqual(
+                case_map["ask_fixture_semantic_overclaim_governance"]["actual"]["ask_result"]["mode"],
+                "retrieval_only",
+            )
+            self.assertEqual(
+                case_map["ask_fixture_semantic_overclaim_governance"]["actual"]["ask_result"]["guardrail_action"],
+                "refuse_strong_claim",
             )
 
     def test_run_eval_reports_tool_and_guardrail_scenario_metrics(self) -> None:
@@ -345,6 +349,14 @@ class EvalRunnerTests(unittest.TestCase):
             self.assertIn(
                 "hybrid_rrf",
                 case_map["ask_fixture_hybrid_retrieval_only"]["actual"]["ask_result"]["retrieved_candidate_retrieval_sources"],
+            )
+            self.assertIn(
+                "semantic_claim_report",
+                case_map["governance_fixture_waiting_proposal_hybrid"]["actual"]["quality_metrics"]["faithfulness"]["reason"],
+            )
+            self.assertIn(
+                "semantic_claim_report",
+                case_map["digest_fixture_structured_result_metrics"]["actual"]["quality_metrics"]["faithfulness"]["reason"],
             )
             self.assertIn(
                 "hybrid_rrf",

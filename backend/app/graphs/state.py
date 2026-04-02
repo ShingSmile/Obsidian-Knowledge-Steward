@@ -29,6 +29,21 @@ class StewardState(TypedDict, total=False):
     raw_markdown: str | None
     note_meta: dict
     retrieved_chunks: list[dict]
+    ask_query: str
+    ask_candidates: list[dict]
+    ask_bundle: dict
+    ask_tool_decision: dict | None
+    ask_tool_results: list[dict]
+    ask_prompt_tool_results: list[dict]
+    ask_prompt_candidates: list[dict]
+    ask_citations: list[dict]
+    ask_tool_call_rounds: int
+    ask_max_tool_rounds: int
+    ask_should_finalize: bool
+    ask_retrieval_fallback_used: bool
+    ask_retrieval_fallback_reason: str | None
+    ask_tool_call_attempted: bool
+    ask_tool_call_used: str | None
     ask_result: AskWorkflowResult | None
     ingest_result: IngestWorkflowResult | None
     analysis_result: IngestAnalysisResult | None

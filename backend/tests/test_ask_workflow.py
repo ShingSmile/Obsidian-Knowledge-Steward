@@ -7,6 +7,7 @@ import sqlite3
 import tempfile
 import unittest
 from unittest.mock import patch
+from uuid import uuid4
 
 from fastapi import HTTPException, Response
 
@@ -31,11 +32,10 @@ from app.main import invoke_workflow
 from app.observability.runtime_trace import query_run_trace_events_in_db
 from app.retrieval.embeddings import EmbeddingBatchResult
 from app.services import ask as ask_service
-from app.services.ask import run_minimal_ask
 
 
 class AskWorkflowTests(unittest.TestCase):
-    def test_run_minimal_ask_returns_retrieval_only_when_no_chat_provider_is_available(self) -> None:
+    def test_ask_workflow_returns_retrieval_only_when_no_chat_provider_is_available(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             db_path = self._build_index_fixture(Path(temp_dir))
             settings = replace(
@@ -46,7 +46,7 @@ class AskWorkflowTests(unittest.TestCase):
                 local_chat_model="",
             )
 
-            result = run_minimal_ask(
+            result = self._invoke_ask_result(
                 WorkflowInvokeRequest(
                     action_type=WorkflowAction.ASK_QA,
                     user_query="Roadmap",
@@ -61,7 +61,7 @@ class AskWorkflowTests(unittest.TestCase):
             self.assertGreaterEqual(len(result.citations), 1)
             self.assertIn("当前未使用模型生成答案", result.answer)
 
-    def test_run_minimal_ask_returns_generated_answer_when_provider_call_succeeds(self) -> None:
+    def test_ask_workflow_returns_generated_answer_when_provider_call_succeeds(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             db_path = self._build_index_fixture(Path(temp_dir))
             settings = replace(
@@ -73,7 +73,7 @@ class AskWorkflowTests(unittest.TestCase):
             )
 
             with patch("app.services.ask._request_grounded_answer", return_value="Roadmap 已拆成检索与 ask 两段实现。[1]") as mocked_request:
-                result = run_minimal_ask(
+                result = self._invoke_ask_result(
                     WorkflowInvokeRequest(
                         action_type=WorkflowAction.ASK_QA,
                         user_query="Roadmap",
@@ -88,7 +88,7 @@ class AskWorkflowTests(unittest.TestCase):
             self.assertIn("[1]", result.answer)
             mocked_request.assert_called_once()
 
-    def test_run_minimal_ask_executes_registered_tool_and_reassembles_context(self) -> None:
+    def test_ask_workflow_executes_registered_tool_and_reassembles_context(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             db_path = self._build_index_fixture(Path(temp_dir))
             settings = replace(
@@ -101,12 +101,15 @@ class AskWorkflowTests(unittest.TestCase):
 
             with patch(
                 "app.services.ask._request_tool_call_decision",
-                return_value=ToolCallDecision(
-                    requested=True,
-                    tool_name="load_note_excerpt",
-                    arguments={"note_path": "Roadmap.md", "max_chars": 200},
-                    rationale="Need the note body for a precise answer.",
-                ),
+                side_effect=[
+                    ToolCallDecision(
+                        requested=True,
+                        tool_name="load_note_excerpt",
+                        arguments={"note_path": "Roadmap.md", "max_chars": 200},
+                        rationale="Need the note body for a precise answer.",
+                    ),
+                    ToolCallDecision(requested=False),
+                ],
             ) as mocked_decision:
                 with patch(
                     "app.services.ask.execute_tool_call",
@@ -139,7 +142,7 @@ class AskWorkflowTests(unittest.TestCase):
                         "app.services.ask._request_grounded_answer",
                         side_effect=_capture_grounded_answer,
                     ):
-                        result = run_minimal_ask(
+                        result = self._invoke_ask_result(
                             WorkflowInvokeRequest(
                                 action_type=WorkflowAction.ASK_QA,
                                 user_query="Roadmap",
@@ -150,8 +153,9 @@ class AskWorkflowTests(unittest.TestCase):
             self.assertEqual(result.mode, AskResultMode.GENERATED_ANSWER)
             self.assertFalse(result.retrieval_fallback_used)
             self.assertTrue(result.tool_call_attempted)
+            self.assertEqual(result.tool_call_rounds, 1)
             self.assertEqual(result.tool_call_used, "load_note_excerpt")
-            mocked_decision.assert_called_once()
+            self.assertEqual(mocked_decision.call_count, 2)
             mocked_execute.assert_called_once()
             self.assertIn("messages", captured_messages)
             self.assertIn(
@@ -159,7 +163,7 @@ class AskWorkflowTests(unittest.TestCase):
                 captured_messages["messages"][1]["content"],
             )
 
-    def test_run_minimal_ask_ignores_invalid_tool_and_downgrades_to_retrieval_only(self) -> None:
+    def test_ask_workflow_ignores_invalid_tool_and_downgrades_to_retrieval_only(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             db_path = self._build_index_fixture(Path(temp_dir))
             settings = replace(
@@ -180,7 +184,7 @@ class AskWorkflowTests(unittest.TestCase):
                 ),
             ) as mocked_decision:
                 with patch("app.services.ask.execute_tool_call") as mocked_execute:
-                    result = run_minimal_ask(
+                    result = self._invoke_ask_result(
                         WorkflowInvokeRequest(
                             action_type=WorkflowAction.ASK_QA,
                             user_query="Roadmap",
@@ -196,7 +200,7 @@ class AskWorkflowTests(unittest.TestCase):
             mocked_decision.assert_called_once()
             mocked_execute.assert_not_called()
 
-    def test_run_minimal_ask_downgrades_when_requested_tool_fails(self) -> None:
+    def test_ask_workflow_downgrades_when_requested_tool_fails(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             db_path = self._build_index_fixture(Path(temp_dir))
             settings = replace(
@@ -227,7 +231,7 @@ class AskWorkflowTests(unittest.TestCase):
                     ),
                 ) as mocked_execute:
                     with patch("app.services.ask._request_grounded_answer") as mocked_answer:
-                        result = run_minimal_ask(
+                        result = self._invoke_ask_result(
                             WorkflowInvokeRequest(
                                 action_type=WorkflowAction.ASK_QA,
                                 user_query="Roadmap",
@@ -244,7 +248,7 @@ class AskWorkflowTests(unittest.TestCase):
             mocked_execute.assert_called_once()
             mocked_answer.assert_not_called()
 
-    def test_run_minimal_ask_includes_verified_outline_payload_in_prompt(self) -> None:
+    def test_ask_workflow_includes_verified_outline_payload_in_prompt(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             db_path = self._build_index_fixture(Path(temp_dir))
             settings = replace(
@@ -304,13 +308,13 @@ class AskWorkflowTests(unittest.TestCase):
                             query=query,
                             bundle=bundle,
                         )
-                        return "Roadmap 的结构已确认。[1]"
+                        return "The roadmap details live here.[1]"
 
                     with patch(
                         "app.services.ask._request_grounded_answer",
                         side_effect=_capture_grounded_answer,
                     ):
-                        result = run_minimal_ask(
+                        result = self._invoke_ask_result(
                             WorkflowInvokeRequest(
                                 action_type=WorkflowAction.ASK_QA,
                                 user_query="Roadmap",
@@ -325,7 +329,7 @@ class AskWorkflowTests(unittest.TestCase):
             self.assertIn('"headings"', grounded_prompt)
             self.assertNotIn("verified_outline", grounded_prompt)
 
-    def test_run_minimal_ask_short_circuits_when_all_visible_context_is_flagged(self) -> None:
+    def test_ask_workflow_short_circuits_when_all_visible_context_is_flagged(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_root = Path(temp_dir)
             vault_path = temp_root / "vault"
@@ -349,7 +353,7 @@ class AskWorkflowTests(unittest.TestCase):
                 "app.services.ask._request_grounded_answer",
                 return_value="该笔记包含需要警惕的可疑指令文本。[1]",
             ) as mocked_answer:
-                result = run_minimal_ask(
+                result = self._invoke_ask_result(
                     WorkflowInvokeRequest(
                         action_type=WorkflowAction.ASK_QA,
                         user_query="Injection",
@@ -366,7 +370,7 @@ class AskWorkflowTests(unittest.TestCase):
             self.assertEqual(result.citations, [])
             mocked_answer.assert_not_called()
 
-    def test_run_minimal_ask_blocks_suspicious_tool_result_before_generation(self) -> None:
+    def test_ask_workflow_blocks_suspicious_tool_result_before_generation(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             db_path = self._build_index_fixture(Path(temp_dir))
             settings = replace(
@@ -402,7 +406,7 @@ class AskWorkflowTests(unittest.TestCase):
                         "app.services.ask._request_grounded_answer",
                         return_value="这段文本看起来可疑。[1]",
                     ) as mocked_answer:
-                        result = run_minimal_ask(
+                        result = self._invoke_ask_result(
                             WorkflowInvokeRequest(
                                 action_type=WorkflowAction.ASK_QA,
                                 user_query="Roadmap",
@@ -418,7 +422,7 @@ class AskWorkflowTests(unittest.TestCase):
             self.assertFalse(result.model_fallback_used)
             mocked_answer.assert_not_called()
 
-    def test_run_minimal_ask_excludes_unanchored_excerpt_from_grounded_prompt(self) -> None:
+    def test_ask_workflow_excludes_unanchored_excerpt_from_grounded_prompt(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             db_path = self._build_index_fixture(Path(temp_dir))
             settings = replace(
@@ -469,7 +473,7 @@ class AskWorkflowTests(unittest.TestCase):
                         "app.services.ask._request_grounded_answer",
                         side_effect=_capture_grounded_answer,
                     ):
-                        result = run_minimal_ask(
+                        result = self._invoke_ask_result(
                             WorkflowInvokeRequest(
                                 action_type=WorkflowAction.ASK_QA,
                                 user_query="Roadmap",
@@ -484,7 +488,7 @@ class AskWorkflowTests(unittest.TestCase):
                 captured_messages["messages"][1]["content"],
             )
 
-    def test_run_minimal_ask_downgrades_when_find_backlinks_cannot_safely_reenter(self) -> None:
+    def test_ask_workflow_downgrades_when_find_backlinks_cannot_safely_reenter(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             db_path = self._build_index_fixture(Path(temp_dir))
             settings = replace(
@@ -526,7 +530,7 @@ class AskWorkflowTests(unittest.TestCase):
                     ),
                 ):
                     with patch("app.services.ask._request_grounded_answer") as mocked_answer:
-                        result = run_minimal_ask(
+                        result = self._invoke_ask_result(
                             WorkflowInvokeRequest(
                                 action_type=WorkflowAction.ASK_QA,
                                 user_query="Roadmap",
@@ -540,7 +544,7 @@ class AskWorkflowTests(unittest.TestCase):
             self.assertEqual(result.guardrail_action, GuardrailAction.TOOL_RESULT_INSUFFICIENT)
             mocked_answer.assert_not_called()
 
-    def test_run_minimal_ask_downgrades_when_search_notes_cannot_safely_reenter(self) -> None:
+    def test_ask_workflow_downgrades_when_search_notes_cannot_safely_reenter(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             db_path = self._build_index_fixture(Path(temp_dir))
             settings = replace(
@@ -580,7 +584,7 @@ class AskWorkflowTests(unittest.TestCase):
                     ),
                 ):
                     with patch("app.services.ask._request_grounded_answer") as mocked_answer:
-                        result = run_minimal_ask(
+                        result = self._invoke_ask_result(
                             WorkflowInvokeRequest(
                                 action_type=WorkflowAction.ASK_QA,
                                 user_query="Roadmap",
@@ -594,7 +598,7 @@ class AskWorkflowTests(unittest.TestCase):
             self.assertEqual(result.guardrail_action, GuardrailAction.TOOL_RESULT_INSUFFICIENT)
             mocked_answer.assert_not_called()
 
-    def test_run_minimal_ask_suppresses_colliding_basename_reentry(self) -> None:
+    def test_ask_workflow_suppresses_colliding_basename_reentry(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             db_path = self._build_index_fixture(Path(temp_dir))
             settings = replace(
@@ -680,13 +684,13 @@ class AskWorkflowTests(unittest.TestCase):
                                 query=query,
                                 bundle=bundle,
                             )
-                            return "Roadmap 已拆成检索与 ask 两段实现。[1]"
+                            return "alpha roadmap snippet.[1]"
 
                         with patch(
                             "app.services.ask._request_grounded_answer",
                             side_effect=_capture_grounded_answer,
                         ):
-                            result = run_minimal_ask(
+                            result = self._invoke_ask_result(
                                 WorkflowInvokeRequest(
                                     action_type=WorkflowAction.ASK_QA,
                                     user_query="Roadmap",
@@ -701,7 +705,7 @@ class AskWorkflowTests(unittest.TestCase):
                 captured_messages["messages"][1]["content"],
             )
 
-    def test_run_minimal_ask_downgrades_when_verified_outline_exceeds_prompt_budget(self) -> None:
+    def test_ask_workflow_downgrades_when_verified_outline_exceeds_prompt_budget(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             db_path = self._build_index_fixture(Path(temp_dir))
             settings = replace(
@@ -753,7 +757,7 @@ class AskWorkflowTests(unittest.TestCase):
                     ),
                 ):
                     with patch("app.services.ask._request_grounded_answer") as mocked_answer:
-                        result = run_minimal_ask(
+                        result = self._invoke_ask_result(
                             WorkflowInvokeRequest(
                                 action_type=WorkflowAction.ASK_QA,
                                 user_query="Roadmap",
@@ -767,7 +771,7 @@ class AskWorkflowTests(unittest.TestCase):
             self.assertEqual(result.guardrail_action, GuardrailAction.TOOL_RESULT_INSUFFICIENT)
             mocked_answer.assert_not_called()
 
-    def test_run_minimal_ask_consumes_hybrid_retrieval_candidates(self) -> None:
+    def test_ask_workflow_consumes_hybrid_retrieval_candidates(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_root = Path(temp_dir)
             vault_path = temp_root / "vault"
@@ -819,7 +823,7 @@ class AskWorkflowTests(unittest.TestCase):
                     model_name=settings.cloud_embedding_model,
                 ),
             ):
-                result = run_minimal_ask(
+                result = self._invoke_ask_result(
                     WorkflowInvokeRequest(
                         action_type=WorkflowAction.ASK_QA,
                         user_query="Roadmap",
@@ -834,7 +838,7 @@ class AskWorkflowTests(unittest.TestCase):
             self.assertEqual(Path(result.retrieved_candidates[1].path).name, "Strategy.md")
             self.assertEqual(result.citations[0].retrieval_source, "hybrid_rrf")
 
-    def test_run_minimal_ask_includes_source_title_and_position_hint_in_prompt(self) -> None:
+    def test_ask_workflow_includes_source_title_and_position_hint_in_prompt(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             db_path = self._build_index_fixture(Path(temp_dir))
             settings = replace(
@@ -892,7 +896,7 @@ class AskWorkflowTests(unittest.TestCase):
                     query=query,
                     bundle=bundle,
                 )
-                return "Roadmap 已拆成检索与 ask 两段实现。[1]"
+                return "roadmap snippet.[1]"
 
             with patch(
                 "app.services.ask.search_hybrid_chunks_in_db",
@@ -910,7 +914,7 @@ class AskWorkflowTests(unittest.TestCase):
                             "app.services.ask._request_grounded_answer",
                             side_effect=_capture_grounded_answer,
                         ):
-                            result = run_minimal_ask(
+                            result = self._invoke_ask_result(
                                 WorkflowInvokeRequest(
                                     action_type=WorkflowAction.ASK_QA,
                                     user_query="Roadmap",
@@ -924,7 +928,7 @@ class AskWorkflowTests(unittest.TestCase):
             self.assertIn("source_note_title: Roadmap Master", prompt)
             self.assertIn("position_hint: 3/7", prompt)
 
-    def test_run_minimal_ask_builds_citations_from_post_assembly_visible_evidence(self) -> None:
+    def test_ask_workflow_builds_citations_from_post_assembly_visible_evidence(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             db_path = self._build_index_fixture(Path(temp_dir))
             settings = replace(
@@ -1030,9 +1034,9 @@ class AskWorkflowTests(unittest.TestCase):
                     ):
                         with patch(
                             "app.services.ask._request_grounded_answer",
-                            return_value="Roadmap 已拆成检索与 ask 两段实现。[1][2]",
+                            return_value="second raw snippet.[1] first raw snippet.[2]",
                         ):
-                            result = run_minimal_ask(
+                            result = self._invoke_ask_result(
                                 WorkflowInvokeRequest(
                                     action_type=WorkflowAction.ASK_QA,
                                     user_query="Roadmap",
@@ -1045,7 +1049,7 @@ class AskWorkflowTests(unittest.TestCase):
             self.assertEqual([citation.chunk_id for citation in result.citations], ["raw-second", "raw-first"])
             self.assertNotIn("raw-filtered", [citation.chunk_id for citation in result.citations])
 
-    def test_run_minimal_ask_downgrades_when_generated_answer_has_no_citation(self) -> None:
+    def test_ask_workflow_downgrades_when_generated_answer_has_no_citation(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             db_path = self._build_index_fixture(Path(temp_dir))
             settings = replace(
@@ -1060,7 +1064,7 @@ class AskWorkflowTests(unittest.TestCase):
                 "app.services.ask._request_grounded_answer",
                 return_value="Roadmap 已拆成检索与 ask 两段实现。",
             ):
-                result = run_minimal_ask(
+                result = self._invoke_ask_result(
                     WorkflowInvokeRequest(
                         action_type=WorkflowAction.ASK_QA,
                         user_query="Roadmap",
@@ -1076,7 +1080,7 @@ class AskWorkflowTests(unittest.TestCase):
             )
             self.assertIn("当前未使用模型生成答案", result.answer)
 
-    def test_run_minimal_ask_downgrades_when_generated_answer_has_out_of_range_citation(self) -> None:
+    def test_ask_workflow_downgrades_when_generated_answer_has_out_of_range_citation(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             db_path = self._build_index_fixture(Path(temp_dir))
             settings = replace(
@@ -1091,7 +1095,7 @@ class AskWorkflowTests(unittest.TestCase):
                 "app.services.ask._request_grounded_answer",
                 return_value="Roadmap 已拆成检索与 ask 两段实现。[9]",
             ):
-                result = run_minimal_ask(
+                result = self._invoke_ask_result(
                     WorkflowInvokeRequest(
                         action_type=WorkflowAction.ASK_QA,
                         user_query="Roadmap",
@@ -1106,6 +1110,68 @@ class AskWorkflowTests(unittest.TestCase):
                 "citation_alignment_out_of_range",
             )
             self.assertIn("[1]", result.answer)
+
+    def test_invoke_ask_graph_downgrades_semantic_overclaim_answer(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            db_path = self._build_index_fixture(Path(temp_dir))
+            settings = replace(
+                get_settings(),
+                index_db_path=db_path,
+                cloud_base_url="https://example.com",
+                cloud_chat_model="gpt-test",
+                local_chat_model="",
+            )
+
+            with patch(
+                "app.services.ask._request_grounded_answer",
+                return_value="Roadmap 会自动写回知识库。[1]",
+            ):
+                execution = invoke_ask_graph(
+                    WorkflowInvokeRequest(
+                        thread_id="thread_overclaim_runtime",
+                        action_type=WorkflowAction.ASK_QA,
+                        user_query="Roadmap",
+                    ),
+                    settings=settings,
+                    thread_id="thread_overclaim_runtime",
+                    run_id="run_overclaim_runtime",
+                )
+
+            self.assertEqual(execution.ask_result.mode, AskResultMode.RETRIEVAL_ONLY)
+            self.assertEqual(
+                execution.ask_result.guardrail_action,
+                GuardrailAction.REFUSE_STRONG_CLAIM,
+            )
+            self.assertIn("当前未使用模型生成答案", execution.ask_result.answer)
+
+    def test_invoke_ask_graph_keeps_grounded_generated_answer(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            db_path = self._build_index_fixture(Path(temp_dir))
+            settings = replace(
+                get_settings(),
+                index_db_path=db_path,
+                cloud_base_url="https://example.com",
+                cloud_chat_model="gpt-test",
+                local_chat_model="",
+            )
+
+            with patch(
+                "app.services.ask._request_grounded_answer",
+                return_value="Roadmap 已拆成检索与 ask 两段实现。[1]",
+            ):
+                execution = invoke_ask_graph(
+                    WorkflowInvokeRequest(
+                        thread_id="thread_grounded_runtime",
+                        action_type=WorkflowAction.ASK_QA,
+                        user_query="Roadmap",
+                    ),
+                    settings=settings,
+                    thread_id="thread_grounded_runtime",
+                    run_id="run_grounded_runtime",
+                )
+
+            self.assertEqual(execution.ask_result.mode, AskResultMode.GENERATED_ANSWER)
+            self.assertEqual(execution.ask_result.guardrail_action, GuardrailAction.ALLOW)
 
     def test_invoke_workflow_returns_completed_ask_result_with_retrieval_fallback_signal(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -1236,7 +1302,7 @@ class AskWorkflowTests(unittest.TestCase):
                 )
 
                 with patch(
-                    "app.graphs.ask_graph.run_minimal_ask",
+                    "app.graphs.ask_graph.build_initial_ask_turn",
                     side_effect=AssertionError("resume should not rerun ask execution"),
                 ):
                     resumed_response = Response()
@@ -1302,11 +1368,12 @@ class AskWorkflowTests(unittest.TestCase):
             self.assertEqual(execution.state["thread_id"], "thread_graph_test")
             self.assertEqual(execution.state["run_id"], "run_graph_test")
             self.assertEqual(execution.ask_result.mode, AskResultMode.RETRIEVAL_ONLY)
+            self.assertEqual(execution.ask_result.tool_call_rounds, 0)
             self.assertFalse(hasattr(execution, "used_langgraph"))
             self.assertEqual(len(execution.trace_events), 3)
             self.assertEqual(
                 [event["node_name"] for event in execution.trace_events],
-                ["prepare_ask", "execute_ask", "finalize_ask"],
+                ["prepare_ask", "llm_call", "finalize_ask"],
             )
             self.assertEqual(len(trace_events), 3)
             self.assertTrue(all(event["thread_id"] == "thread_graph_test" for event in trace_events))
@@ -1318,7 +1385,7 @@ class AskWorkflowTests(unittest.TestCase):
             self.assertEqual(len(persisted_events), 3)
             self.assertEqual(
                 [event["node_name"] for event in persisted_events],
-                ["prepare_ask", "execute_ask", "finalize_ask"],
+                ["prepare_ask", "llm_call", "finalize_ask"],
             )
             self.assertTrue(all(event["run_id"] == "run_graph_test" for event in persisted_events))
             self.assertTrue(
@@ -1398,12 +1465,78 @@ class AskWorkflowTests(unittest.TestCase):
             execute_event = next(
                 event
                 for event in execution.trace_events
-                if event["node_name"] == "execute_ask"
+                if event["node_name"] == "llm_call"
             )
             details = execute_event["details"]
             self.assertIn("tool_call_attempted", details)
             self.assertIn("tool_call_used", details)
             self.assertIn("guardrail_action", details)
+            self.assertIn("tool_call_rounds", details)
+
+    def test_invoke_ask_graph_loops_between_llm_and_tool_nodes(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            db_path = self._build_index_fixture(Path(temp_dir))
+            trace_path = Path(temp_dir) / "traces" / "ask_runtime.jsonl"
+            settings = replace(
+                get_settings(),
+                index_db_path=db_path,
+                ask_runtime_trace_path=trace_path,
+                cloud_base_url="https://example.com",
+                cloud_chat_model="gpt-test",
+                local_chat_model="",
+            )
+
+            with patch(
+                "app.services.ask._request_tool_call_decision",
+                side_effect=[
+                    ToolCallDecision(
+                        requested=True,
+                        tool_name="load_note_excerpt",
+                        arguments={"note_path": "Roadmap.md", "max_chars": 200},
+                        rationale="Need note body before answering.",
+                    ),
+                    ToolCallDecision(requested=False),
+                ],
+            ):
+                with patch(
+                    "app.services.ask.execute_tool_call",
+                    return_value=ToolExecutionResult(
+                        tool_name="load_note_excerpt",
+                        ok=True,
+                        data={
+                            "note_path": "Roadmap.md",
+                            "excerpt": "The roadmap details live here.",
+                            "line_count": 4,
+                        },
+                    ),
+                ):
+                    with patch(
+                        "app.services.ask._request_grounded_answer",
+                        return_value="Roadmap 已拆成检索与 ask 两段实现。[1]",
+                    ):
+                        execution = invoke_ask_graph(
+                            WorkflowInvokeRequest(
+                                thread_id="thread_graph_loop",
+                                action_type=WorkflowAction.ASK_QA,
+                                user_query="Roadmap",
+                            ),
+                            settings=settings,
+                            thread_id="thread_graph_loop",
+                            run_id="run_graph_loop",
+                        )
+
+            self.assertEqual(execution.ask_result.mode, AskResultMode.GENERATED_ANSWER)
+            self.assertEqual(execution.ask_result.tool_call_rounds, 1)
+            self.assertEqual(
+                [event["node_name"] for event in execution.trace_events],
+                [
+                    "prepare_ask",
+                    "llm_call",
+                    "tool_node",
+                    "llm_call",
+                    "finalize_ask",
+                ],
+            )
 
     def test_invoke_workflow_persists_run_trace_rows_and_supports_query(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -1435,7 +1568,7 @@ class AskWorkflowTests(unittest.TestCase):
             self.assertEqual(len(run_trace_events), 3)
             self.assertEqual(
                 [event.node_name for event in run_trace_events],
-                ["prepare_ask", "execute_ask", "finalize_ask"],
+                ["prepare_ask", "llm_call", "finalize_ask"],
             )
             self.assertTrue(all(event.run_id == result.run_id for event in run_trace_events))
             self.assertTrue(all(event.thread_id == result.thread_id for event in run_trace_events))
@@ -1591,13 +1724,35 @@ class AskWorkflowTests(unittest.TestCase):
         self.assertIn("non-empty user_query", context.exception.detail)
 
     @staticmethod
+    def _invoke_ask_result(
+        request: WorkflowInvokeRequest,
+        *,
+        settings,
+    ):
+        thread_id = request.thread_id or "thread_test"
+        execution = invoke_ask_graph(
+            request,
+            settings=settings,
+            thread_id=thread_id,
+            run_id=f"run_{uuid4().hex}",
+        )
+        return execution.ask_result
+
+    @staticmethod
     def _build_index_fixture(temp_root: Path) -> Path:
         vault_path = temp_root / "vault"
         vault_path.mkdir()
         db_path = temp_root / "knowledge_steward.sqlite3"
 
         (vault_path / "Roadmap.md").write_text(
-            "# Roadmap\n\nThe roadmap details live here.\n\n## Ask\n\nAsk response should carry citations.\n",
+            (
+                "# Roadmap\n\n"
+                "The roadmap details live here.\n"
+                "Roadmap 已拆成检索与 ask 两段实现。\n\n"
+                "## Ask\n\n"
+                "Ask response should carry citations.\n"
+                "Roadmap 的结构已确认。\n"
+            ),
             encoding="utf-8",
         )
         ingest_vault(vault_path=vault_path, db_path=db_path)

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Project Session Governor"
+  short_description: "Govern multi-session project work and closeouts"
+  default_prompt: "Use $project-session-governor to bootstrap governance, start a governed session, or close the current governed session."

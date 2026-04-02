@@ -5,14 +5,18 @@ from typing import Any
 
 from app.config import Settings
 from app.contracts.workflow import (
+    AskCitation,
     AskWorkflowResult,
+    ContextBundle,
     RetrievalMetadataFilter,
+    RetrievedChunkCandidate,
+    ToolCallDecision,
+    ToolExecutionResult,
     WorkflowInvokeRequest,
 )
 from app.graphs.runtime import (
     END,
     START,
-    GraphStep,
     StateGraph,
     TraceHook,
     append_trace_event,
@@ -26,7 +30,17 @@ from app.graphs.runtime import (
 )
 from app.graphs.checkpoint import WorkflowCheckpointStatus
 from app.graphs.state import StewardState
-from app.services.ask import run_minimal_ask
+from app.services.ask import (
+    AskTurnContext,
+    apply_ask_tool_turn,
+    build_retrieval_only_ask_result,
+    build_initial_ask_turn,
+    decide_ask_tool_call,
+    generate_ask_result,
+)
+
+
+DEFAULT_ASK_MAX_TOOL_ROUNDS = 3
 
 
 @dataclass(frozen=True)
@@ -107,6 +121,9 @@ def build_initial_ask_state(
     thread_id: str,
     run_id: str,
 ) -> StewardState:
+    configured_max_rounds = request.metadata.get("max_tool_rounds", DEFAULT_ASK_MAX_TOOL_ROUNDS)
+    if not isinstance(configured_max_rounds, int) or configured_max_rounds < 0:
+        configured_max_rounds = DEFAULT_ASK_MAX_TOOL_ROUNDS
     return {
         **build_base_workflow_state(
             request,
@@ -114,6 +131,21 @@ def build_initial_ask_state(
             run_id=run_id,
         ),
         "retrieved_chunks": [],
+        "ask_query": "",
+        "ask_candidates": [],
+        "ask_bundle": {},
+        "ask_tool_decision": None,
+        "ask_tool_results": [],
+        "ask_prompt_candidates": [],
+        "ask_citations": [],
+        "ask_tool_call_rounds": 0,
+        "ask_max_tool_rounds": configured_max_rounds,
+        "ask_should_finalize": False,
+        "ask_prompt_tool_results": [],
+        "ask_retrieval_fallback_used": False,
+        "ask_retrieval_fallback_reason": None,
+        "ask_tool_call_attempted": False,
+        "ask_tool_call_used": None,
     }
 
 
@@ -124,13 +156,22 @@ def build_ask_graph(
     checkpointer: Any | None = None,
 ):
     workflow = StateGraph(StewardState)
-    steps = _build_ask_steps(settings=settings, trace_hook=trace_hook)
-    for current_step in steps:
-        workflow.add_node(current_step.name, current_step.node)
-    workflow.add_edge(START, steps[0].name)
-    for current_step, next_step in zip(steps, steps[1:]):
-        workflow.add_edge(current_step.name, next_step.name)
-    workflow.add_edge(steps[-1].name, END)
+    workflow.add_node("prepare_ask", lambda state: _prepare_ask_node(state, settings=settings, trace_hook=trace_hook))
+    workflow.add_node("llm_call", lambda state: _llm_call_node(state, settings=settings, trace_hook=trace_hook))
+    workflow.add_node("tool_node", lambda state: _tool_node(state, settings=settings, trace_hook=trace_hook))
+    workflow.add_node("finalize_ask", lambda state: _finalize_ask_node(state, settings=settings, trace_hook=trace_hook))
+    workflow.add_edge(START, "prepare_ask")
+    workflow.add_edge("prepare_ask", "llm_call")
+    workflow.add_conditional_edges(
+        "llm_call",
+        _route_after_llm_call,
+        {
+            "tool_node": "tool_node",
+            "finalize_ask": "finalize_ask",
+        },
+    )
+    workflow.add_edge("tool_node", "llm_call")
+    workflow.add_edge("finalize_ask", END)
     return workflow.compile(checkpointer=checkpointer)
 
 
@@ -141,30 +182,10 @@ def _resolve_last_completed_node(state: StewardState) -> str | None:
     return trace_events[-1]["node_name"]
 
 
-def _build_ask_steps(
-    *,
-    settings: Settings,
-    trace_hook: TraceHook | None,
-) -> list[GraphStep]:
-    return [
-        GraphStep(
-            name="prepare_ask",
-            node=lambda state: _prepare_ask_node(state, trace_hook=trace_hook),
-        ),
-        GraphStep(
-            name="execute_ask",
-            node=lambda state: _execute_ask_node(state, settings=settings, trace_hook=trace_hook),
-        ),
-        GraphStep(
-            name="finalize_ask",
-            node=lambda state: _finalize_ask_node(state, trace_hook=trace_hook),
-        ),
-    ]
-
-
 def _prepare_ask_node(
     state: StewardState,
     *,
+    settings: Settings,
     trace_hook: TraceHook | None,
 ) -> StewardState:
     retrieval_filter = state.get("retrieval_filter", RetrievalMetadataFilter())
@@ -185,24 +206,7 @@ def _prepare_ask_node(
         },
         trace_hook=trace_hook,
     )
-    return {
-        "approval_required": False,
-        "trace_events": trace_events,
-        "transient_prompt_context": {
-            "graph_name": "ask_graph",
-            "thread_id": state["thread_id"],
-            "run_id": state["run_id"],
-        },
-    }
-
-
-def _execute_ask_node(
-    state: StewardState,
-    *,
-    settings: Settings,
-    trace_hook: TraceHook | None,
-) -> StewardState:
-    ask_result = run_minimal_ask(
+    initial_turn = build_initial_ask_turn(
         WorkflowInvokeRequest(
             thread_id=state["thread_id"],
             action_type=state["action_type"],
@@ -216,42 +220,220 @@ def _execute_ask_node(
         ),
         settings=settings,
     )
+    updates: StewardState = {
+        "approval_required": False,
+        "trace_events": trace_events,
+        "transient_prompt_context": {
+            "graph_name": "ask_graph",
+            "thread_id": state["thread_id"],
+            "run_id": state["run_id"],
+        },
+    }
+    if isinstance(initial_turn, AskWorkflowResult):
+        updates["ask_result"] = initial_turn
+        updates["ask_query"] = initial_turn.query
+        updates["ask_should_finalize"] = True
+        updates["retrieved_chunks"] = [
+            candidate.model_dump(mode="json")
+            for candidate in initial_turn.retrieved_candidates
+        ]
+        updates["ask_prompt_candidates"] = [
+            candidate.model_dump(mode="json")
+            for candidate in initial_turn.retrieved_candidates
+        ]
+        updates["ask_citations"] = [
+            citation.model_dump(mode="json")
+            for citation in initial_turn.citations
+        ]
+        updates["ask_retrieval_fallback_used"] = initial_turn.retrieval_fallback_used
+        updates["ask_retrieval_fallback_reason"] = initial_turn.retrieval_fallback_reason
+        updates["ask_tool_call_attempted"] = initial_turn.tool_call_attempted
+        updates["ask_tool_call_used"] = initial_turn.tool_call_used
+        updates["ask_tool_call_rounds"] = initial_turn.tool_call_rounds
+        return updates
+
+    updates.update(_turn_context_to_state_updates(initial_turn))
+    updates["ask_should_finalize"] = False
+    return updates
+
+
+def _llm_call_node(
+    state: StewardState,
+    *,
+    settings: Settings,
+    trace_hook: TraceHook | None,
+) -> StewardState:
+    if state.get("ask_result") is not None:
+        ask_result = state["ask_result"]
+        trace_events = append_trace_event(
+            state,
+            graph_name="ask_graph",
+            node_name="llm_call",
+            event_type="completed",
+            details={
+                "result_mode": ask_result.mode.value if ask_result is not None else "",
+                "tool_call_attempted": state.get("ask_tool_call_attempted", False),
+                "tool_call_used": state.get("ask_tool_call_used") or "",
+                "guardrail_action": (
+                    ask_result.guardrail_action.value
+                    if ask_result is not None and ask_result.guardrail_action
+                    else ""
+                ),
+                "tool_call_rounds": state.get("ask_tool_call_rounds", 0),
+                "requested_tool_call": False,
+                "route": "finalize_ask",
+            },
+            trace_hook=trace_hook,
+        )
+        return {
+            "trace_events": trace_events,
+            "ask_should_finalize": True,
+        }
+
+    turn = _turn_context_from_state(state)
+    decision, guardrail = decide_ask_tool_call(
+        turn,
+        settings=settings,
+        provider_preference=state.get("provider_preference"),
+        workflow_action=state["action_type"],
+    )
+    tool_call_attempted = state.get("ask_tool_call_attempted", False) or decision.requested
+    tool_call_used = decision.tool_name if decision.requested else state.get("ask_tool_call_used")
+    route = "finalize_ask"
+    forced_finalize_reason = ""
+    updates: StewardState = {
+        "ask_tool_decision": decision.model_dump(mode="json"),
+        "ask_tool_call_attempted": tool_call_attempted,
+        "ask_tool_call_used": tool_call_used,
+    }
+    if guardrail.applied:
+        updates["ask_result"] = _build_guardrailed_result(
+            state=state,
+            turn=turn,
+            decision=decision,
+            guardrail=guardrail,
+        )
+        updates["ask_should_finalize"] = True
+    elif decision.requested and state.get("ask_tool_call_rounds", 0) < state.get("ask_max_tool_rounds", DEFAULT_ASK_MAX_TOOL_ROUNDS):
+        route = "tool_node"
+        updates["ask_should_finalize"] = False
+    else:
+        updates["ask_should_finalize"] = True
+        if decision.requested:
+            forced_finalize_reason = "max_tool_rounds"
+
     trace_events = append_trace_event(
         state,
         graph_name="ask_graph",
-        node_name="execute_ask",
+        node_name="llm_call",
         event_type="completed",
         details={
-            "result_mode": ask_result.mode.value,
-            "candidate_count": len(ask_result.retrieved_candidates),
-            "retrieval_fallback_used": ask_result.retrieval_fallback_used,
-            "model_fallback_used": ask_result.model_fallback_used,
-            "tool_call_attempted": ask_result.tool_call_attempted,
-            "tool_call_used": ask_result.tool_call_used or "",
+            "result_mode": (
+                updates["ask_result"].mode.value
+                if updates.get("ask_result") is not None
+                else ""
+            ),
+            "tool_call_attempted": tool_call_attempted,
+            "tool_call_used": tool_call_used or "",
+            "guardrail_action": guardrail.action.value if guardrail.applied else "",
+            "tool_call_rounds": state.get("ask_tool_call_rounds", 0),
+            "requested_tool_call": decision.requested,
+            "route": route,
+            "forced_finalize_reason": forced_finalize_reason,
+        },
+        trace_hook=trace_hook,
+    )
+    updates["trace_events"] = trace_events
+    return updates
+
+
+def _route_after_llm_call(state: StewardState) -> str:
+    if state.get("ask_should_finalize", False):
+        return "finalize_ask"
+    decision = state.get("ask_tool_decision")
+    if isinstance(decision, dict) and decision.get("requested") is True:
+        return "tool_node"
+    return "finalize_ask"
+
+
+def _tool_node(
+    state: StewardState,
+    *,
+    settings: Settings,
+    trace_hook: TraceHook | None,
+) -> StewardState:
+    turn = _turn_context_from_state(state)
+    decision = _tool_decision_from_state(state)
+    next_turn = apply_ask_tool_turn(
+        turn,
+        decision=decision,
+        workflow_action=state["action_type"],
+        settings=settings,
+    )
+    updates: StewardState = {
+        "ask_tool_call_rounds": state.get("ask_tool_call_rounds", 0) + 1,
+    }
+    if isinstance(next_turn, AskWorkflowResult):
+        updates["ask_result"] = next_turn
+        updates["ask_should_finalize"] = True
+        updates["retrieved_chunks"] = [
+            candidate.model_dump(mode="json")
+            for candidate in next_turn.retrieved_candidates
+        ]
+        updates["ask_prompt_candidates"] = [
+            candidate.model_dump(mode="json")
+            for candidate in next_turn.retrieved_candidates
+        ]
+        updates["ask_citations"] = [
+            citation.model_dump(mode="json")
+            for citation in next_turn.citations
+        ]
+    else:
+        updates.update(_turn_context_to_state_updates(next_turn))
+        updates["ask_should_finalize"] = False
+
+    trace_events = append_trace_event(
+        state,
+        graph_name="ask_graph",
+        node_name="tool_node",
+        event_type="completed",
+        details={
+            "result_mode": (
+                next_turn.mode.value
+                if isinstance(next_turn, AskWorkflowResult)
+                else ""
+            ),
+            "tool_call_used": decision.tool_name or "",
+            "tool_call_rounds": updates["ask_tool_call_rounds"],
             "guardrail_action": (
-                ask_result.guardrail_action.value
-                if ask_result.guardrail_action
+                next_turn.guardrail_action.value
+                if isinstance(next_turn, AskWorkflowResult) and next_turn.guardrail_action
                 else ""
             ),
         },
         trace_hook=trace_hook,
     )
-    return {
-        "ask_result": ask_result,
-        "retrieved_chunks": [
-            candidate.model_dump(mode="json")
-            for candidate in ask_result.retrieved_candidates
-        ],
-        "trace_events": trace_events,
-    }
+    updates["trace_events"] = trace_events
+    return updates
 
 
 def _finalize_ask_node(
     state: StewardState,
     *,
+    settings: Settings,
     trace_hook: TraceHook | None,
 ) -> StewardState:
     ask_result = state.get("ask_result")
+    if ask_result is None:
+        turn = _turn_context_from_state(state)
+        ask_result = generate_ask_result(
+            turn,
+            settings=settings,
+            provider_preference=state.get("provider_preference"),
+            tool_call_attempted=state.get("ask_tool_call_attempted", False),
+            tool_call_used=state.get("ask_tool_call_used"),
+            tool_call_rounds=state.get("ask_tool_call_rounds", 0),
+        )
     trace_events = append_trace_event(
         state,
         graph_name="ask_graph",
@@ -260,9 +442,113 @@ def _finalize_ask_node(
         details={
             "result_mode": ask_result.mode.value if ask_result is not None else "missing",
             "trace_event_count_before_finalize": len(state.get("trace_events", [])),
+            "tool_call_rounds": ask_result.tool_call_rounds if ask_result is not None else 0,
         },
         trace_hook=trace_hook,
     )
     return {
+        "ask_result": ask_result,
+        "retrieved_chunks": [
+            candidate.model_dump(mode="json")
+            for candidate in ask_result.retrieved_candidates
+        ] if ask_result is not None else [],
+        "ask_prompt_candidates": [
+            candidate.model_dump(mode="json")
+            for candidate in ask_result.retrieved_candidates
+        ] if ask_result is not None else [],
+        "ask_citations": [
+            citation.model_dump(mode="json")
+            for citation in ask_result.citations
+        ] if ask_result is not None else [],
         "trace_events": trace_events,
     }
+
+
+def _turn_context_to_state_updates(turn: AskTurnContext) -> StewardState:
+    return {
+        "ask_query": turn.query,
+        "ask_candidates": [
+            candidate.model_dump(mode="json")
+            for candidate in turn.candidates
+        ],
+        "ask_bundle": turn.bundle.model_dump(mode="json"),
+        "ask_prompt_candidates": [
+            candidate.model_dump(mode="json")
+            for candidate in turn.prompt_candidates
+        ],
+        "ask_citations": [
+            citation.model_dump(mode="json")
+            for citation in turn.citations
+        ],
+        "ask_tool_results": [
+            result.model_dump(mode="json")
+            for result in turn.raw_tool_results
+        ],
+        "ask_prompt_tool_results": [
+            result.model_dump(mode="json")
+            for result in turn.prompt_tool_results
+        ],
+        "ask_retrieval_fallback_used": turn.retrieval_fallback_used,
+        "ask_retrieval_fallback_reason": turn.retrieval_fallback_reason,
+        "retrieved_chunks": [
+            candidate.model_dump(mode="json")
+            for candidate in turn.prompt_candidates
+        ],
+    }
+
+
+def _turn_context_from_state(state: StewardState) -> AskTurnContext:
+    return AskTurnContext(
+        query=state.get("ask_query", ""),
+        candidates=[
+            RetrievedChunkCandidate.model_validate(candidate)
+            for candidate in state.get("ask_candidates", [])
+        ],
+        bundle=ContextBundle.model_validate(state.get("ask_bundle", {})),
+        prompt_candidates=[
+            RetrievedChunkCandidate.model_validate(candidate)
+            for candidate in state.get("ask_prompt_candidates", [])
+        ],
+        citations=[
+            AskCitation.model_validate(citation)
+            for citation in state.get("ask_citations", [])
+        ],
+        retrieval_fallback_used=state.get("ask_retrieval_fallback_used", False),
+        retrieval_fallback_reason=state.get("ask_retrieval_fallback_reason"),
+        allowed_tool_names=ContextBundle.model_validate(state.get("ask_bundle", {})).allowed_tool_names,
+        raw_tool_results=[
+            ToolExecutionResult.model_validate(result)
+            for result in state.get("ask_tool_results", [])
+        ],
+        prompt_tool_results=[
+            ToolExecutionResult.model_validate(result)
+            for result in state.get("ask_prompt_tool_results", [])
+        ],
+    )
+
+
+def _tool_decision_from_state(state: StewardState) -> ToolCallDecision:
+    decision = state.get("ask_tool_decision")
+    if isinstance(decision, dict):
+        return ToolCallDecision.model_validate(decision)
+    return ToolCallDecision(requested=False)
+
+
+def _build_guardrailed_result(
+    *,
+    state: StewardState,
+    turn: AskTurnContext,
+    decision: ToolCallDecision,
+    guardrail,
+) -> AskWorkflowResult:
+    return build_retrieval_only_ask_result(
+        query=turn.query,
+        citations=turn.citations,
+        candidates=turn.prompt_candidates,
+        retrieval_fallback_used=turn.retrieval_fallback_used,
+        retrieval_fallback_reason=turn.retrieval_fallback_reason,
+        tool_call_attempted=state.get("ask_tool_call_attempted", False) or decision.requested,
+        tool_call_rounds=state.get("ask_tool_call_rounds", 0),
+        tool_call_used=decision.tool_name,
+        guardrail_outcome=guardrail,
+    )
