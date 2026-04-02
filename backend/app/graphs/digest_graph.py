@@ -235,6 +235,26 @@ def _build_digest_node(
             "source_note_count": digest_result.source_note_count,
             "fallback_used": digest_result.fallback_used,
             "fallback_reason": digest_result.fallback_reason or "",
+            "runtime_faithfulness_outcome": (
+                digest_result.runtime_faithfulness.outcome.value
+                if digest_result.runtime_faithfulness is not None
+                else ""
+            ),
+            "runtime_faithfulness_score": (
+                digest_result.runtime_faithfulness.score
+                if digest_result.runtime_faithfulness is not None
+                else None
+            ),
+            "runtime_faithfulness_threshold": (
+                digest_result.runtime_faithfulness.threshold
+                if digest_result.runtime_faithfulness is not None
+                else None
+            ),
+            "runtime_faithfulness_backend": (
+                digest_result.runtime_faithfulness.backend
+                if digest_result.runtime_faithfulness is not None
+                else ""
+            ),
         },
         trace_hook=trace_hook,
     )

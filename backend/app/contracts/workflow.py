@@ -103,6 +103,22 @@ class GuardrailOutcome(BaseModel):
     applied: bool = False
 
 
+class RuntimeFaithfulnessOutcome(str, Enum):
+    ALLOW = "allow"
+    DOWNGRADE_TO_RETRIEVAL_ONLY = "downgrade_to_retrieval_only"
+    LOW_CONFIDENCE = "low_confidence"
+
+
+class RuntimeFaithfulnessSignal(BaseModel):
+    outcome: RuntimeFaithfulnessOutcome = RuntimeFaithfulnessOutcome.ALLOW
+    score: float | None = None
+    threshold: float | None = None
+    backend: str = "not_applicable"
+    reason: str = ""
+    claim_count: int = 0
+    unsupported_claim_count: int = 0
+
+
 class RunStatus(str, Enum):
     ACCEPTED = "accepted"
     WAITING_FOR_APPROVAL = "waiting_for_approval"
@@ -295,6 +311,7 @@ class AskWorkflowResult(BaseModel):
     tool_call_rounds: int = 0
     tool_call_used: str | None = None
     guardrail_action: GuardrailAction | None = None
+    runtime_faithfulness: RuntimeFaithfulnessSignal | None = None
 
 
 class IngestWorkflowResult(BaseModel):
@@ -352,6 +369,7 @@ class DigestWorkflowResult(BaseModel):
     fallback_used: bool = False
     fallback_reason: str | None = None
     context_bundle_summary: dict[str, object] = Field(default_factory=dict)
+    runtime_faithfulness: RuntimeFaithfulnessSignal | None = None
 
 
 class WorkflowInvokeRequest(BaseModel):

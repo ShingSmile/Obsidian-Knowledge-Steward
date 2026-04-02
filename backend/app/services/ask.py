@@ -19,6 +19,7 @@ from app.contracts.workflow import (
     GuardrailAction,
     GuardrailOutcome,
     RetrievedChunkCandidate,
+    RuntimeFaithfulnessSignal,
     ToolCallDecision,
     ToolExecutionResult,
     WorkflowAction,
@@ -29,6 +30,7 @@ from app.guardrails.ask import (
     evaluate_runtime_ask_faithfulness,
     evaluate_tool_call_outcome,
 )
+from app.quality.faithfulness import build_runtime_ask_faithfulness_signal
 from app.retrieval.hybrid import search_hybrid_chunks_in_db
 from app.tools.registry import execute_tool_call, get_allowed_tools_for_workflow
 
@@ -299,7 +301,15 @@ def generate_ask_result(
         tool_call_used=tool_call_used,
         guardrail_action=final_guardrail.action,
     )
-    faithfulness_guardrail = evaluate_runtime_ask_faithfulness(generated_result)
+    runtime_faithfulness = build_runtime_ask_faithfulness_signal(
+        generated_result,
+        settings=settings,
+        provider_preference=provider_preference,
+    )
+    generated_result = generated_result.model_copy(
+        update={"runtime_faithfulness": runtime_faithfulness}
+    )
+    faithfulness_guardrail = evaluate_runtime_ask_faithfulness(runtime_faithfulness)
     if faithfulness_guardrail.applied:
         return _build_retrieval_only_result(
             query=turn.query,
@@ -311,6 +321,7 @@ def generate_ask_result(
             tool_call_rounds=tool_call_rounds,
             tool_call_used=tool_call_used,
             guardrail_outcome=faithfulness_guardrail,
+            runtime_faithfulness=runtime_faithfulness,
         )
     return generated_result
 
@@ -522,6 +533,7 @@ def _build_retrieval_only_result(
     tool_call_rounds: int = 0,
     tool_call_used: str | None = None,
     guardrail_outcome: GuardrailOutcome | None = None,
+    runtime_faithfulness: RuntimeFaithfulnessSignal | None = None,
 ) -> AskWorkflowResult:
     return AskWorkflowResult(
         mode=AskResultMode.RETRIEVAL_ONLY,
@@ -541,6 +553,7 @@ def _build_retrieval_only_result(
         tool_call_rounds=tool_call_rounds,
         tool_call_used=tool_call_used,
         guardrail_action=guardrail_outcome.action if guardrail_outcome is not None else None,
+        runtime_faithfulness=runtime_faithfulness,
     )
 
 

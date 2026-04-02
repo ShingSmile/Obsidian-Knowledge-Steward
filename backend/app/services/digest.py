@@ -13,10 +13,12 @@ from app.contracts.workflow import (
     Proposal,
     ProposalEvidence,
     RiskLevel,
+    RuntimeFaithfulnessOutcome,
     SafetyChecks,
     WorkflowAction,
 )
 from app.indexing.store import connect_sqlite, initialize_index_db
+from app.quality.faithfulness import build_runtime_faithfulness_signal
 
 
 DIGEST_SOURCE_LIMIT = 6
@@ -45,11 +47,18 @@ def run_minimal_digest(*, settings: Settings) -> DigestWorkflowResult:
         source_notes=source_notes,
         token_budget=DIGEST_CONTEXT_TOKEN_BUDGET,
     )
+    digest_markdown = _build_digest_markdown(
+        source_notes=source_notes,
+        fallback_reason=fallback_reason,
+    )
+    runtime_faithfulness = build_runtime_faithfulness_signal(
+        digest_markdown,
+        evidence_texts=[item.text for item in context_bundle.evidence_items],
+        failure_outcome=RuntimeFaithfulnessOutcome.LOW_CONFIDENCE,
+        settings=settings,
+    )
     return DigestWorkflowResult(
-        digest_markdown=_build_digest_markdown(
-            source_notes=source_notes,
-            fallback_reason=fallback_reason,
-        ),
+        digest_markdown=digest_markdown,
         source_notes=source_notes,
         source_note_count=len(source_notes),
         fallback_used=fallback_reason is not None,
@@ -58,6 +67,7 @@ def run_minimal_digest(*, settings: Settings) -> DigestWorkflowResult:
             "evidence_count": len(context_bundle.evidence_items),
             "assembly_notes": context_bundle.assembly_notes,
         },
+        runtime_faithfulness=runtime_faithfulness,
     )
 
 

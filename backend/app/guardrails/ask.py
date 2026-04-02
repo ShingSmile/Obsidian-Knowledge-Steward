@@ -6,11 +6,12 @@ from app.contracts.workflow import (
     ContextBundle,
     GuardrailAction,
     GuardrailOutcome,
+    RuntimeFaithfulnessOutcome,
+    RuntimeFaithfulnessSignal,
     ToolCallDecision,
     ToolExecutionResult,
     WorkflowAction,
 )
-from app.quality.faithfulness import build_ask_faithfulness_snapshot
 from app.tools.registry import validate_tool_call
 
 
@@ -61,22 +62,18 @@ def evaluate_final_ask_response(
 
 
 def evaluate_runtime_ask_faithfulness(
-    ask_result: AskWorkflowResult,
+    signal: RuntimeFaithfulnessSignal,
 ) -> GuardrailOutcome:
-    snapshot = build_ask_faithfulness_snapshot(ask_result)
-    if snapshot["bucket"] != "unsupported_claim":
+    if signal.outcome != RuntimeFaithfulnessOutcome.DOWNGRADE_TO_RETRIEVAL_ONLY:
         return GuardrailOutcome(action=GuardrailAction.ALLOW, applied=False)
 
-    reasons = [str(snapshot["reason"])]
-    unsupported_terms = [
-        str(term)
-        for term in snapshot.get("unsupported_terms", [])
-        if str(term).strip()
-    ]
-    if unsupported_terms:
-        reasons.append(
-            "unsupported_terms:" + ",".join(unsupported_terms[:3])
-        )
+    reasons = [signal.reason]
+    if signal.score is not None:
+        reasons.append(f"runtime_faithfulness_score:{signal.score}")
+    if signal.threshold is not None:
+        reasons.append(f"runtime_faithfulness_threshold:{signal.threshold}")
+    if signal.backend:
+        reasons.append(f"runtime_faithfulness_backend:{signal.backend}")
     return GuardrailOutcome(
         action=GuardrailAction.REFUSE_STRONG_CLAIM,
         applied=True,

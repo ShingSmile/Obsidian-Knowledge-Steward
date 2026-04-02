@@ -20,6 +20,7 @@ from app.contracts.workflow import (
     RetrievalMetadataFilter,
     RetrievalSearchResponse,
     RetrievedChunkCandidate,
+    RuntimeFaithfulnessOutcome,
     RunStatus,
     ToolCallDecision,
     ToolExecutionResult,
@@ -1142,6 +1143,11 @@ class AskWorkflowTests(unittest.TestCase):
                 execution.ask_result.guardrail_action,
                 GuardrailAction.REFUSE_STRONG_CLAIM,
             )
+            self.assertIsNotNone(execution.ask_result.runtime_faithfulness)
+            self.assertEqual(
+                execution.ask_result.runtime_faithfulness.outcome,
+                RuntimeFaithfulnessOutcome.DOWNGRADE_TO_RETRIEVAL_ONLY,
+            )
             self.assertIn("当前未使用模型生成答案", execution.ask_result.answer)
 
     def test_invoke_ask_graph_keeps_grounded_generated_answer(self) -> None:
@@ -1172,6 +1178,48 @@ class AskWorkflowTests(unittest.TestCase):
 
             self.assertEqual(execution.ask_result.mode, AskResultMode.GENERATED_ANSWER)
             self.assertEqual(execution.ask_result.guardrail_action, GuardrailAction.ALLOW)
+            self.assertIsNotNone(execution.ask_result.runtime_faithfulness)
+            self.assertEqual(
+                execution.ask_result.runtime_faithfulness.outcome,
+                RuntimeFaithfulnessOutcome.ALLOW,
+            )
+
+    def test_invoke_ask_graph_emits_runtime_faithfulness_trace_fields(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            db_path = self._build_index_fixture(Path(temp_dir))
+            settings = replace(
+                get_settings(),
+                index_db_path=db_path,
+                cloud_base_url="https://example.com",
+                cloud_chat_model="gpt-test",
+                local_chat_model="",
+            )
+
+            with patch(
+                "app.services.ask._request_grounded_answer",
+                return_value="Roadmap 会自动写回知识库。[1]",
+            ):
+                execution = invoke_ask_graph(
+                    WorkflowInvokeRequest(
+                        thread_id="thread_runtime_faithfulness_trace",
+                        action_type=WorkflowAction.ASK_QA,
+                        user_query="Roadmap",
+                    ),
+                    settings=settings,
+                    thread_id="thread_runtime_faithfulness_trace",
+                    run_id="run_runtime_faithfulness_trace",
+                )
+
+            finalize_event = next(
+                event
+                for event in execution.trace_events
+                if event["node_name"] == "finalize_ask"
+            )
+            details = finalize_event["details"]
+            self.assertIn("runtime_faithfulness_outcome", details)
+            self.assertIn("runtime_faithfulness_score", details)
+            self.assertIn("runtime_faithfulness_threshold", details)
+            self.assertIn("runtime_faithfulness_backend", details)
 
     def test_invoke_workflow_returns_completed_ask_result_with_retrieval_fallback_signal(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

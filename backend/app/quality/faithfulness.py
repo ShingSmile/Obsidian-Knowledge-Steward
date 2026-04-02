@@ -8,6 +8,7 @@ from app.config import Settings
 from app.retrieval.embeddings import embed_texts
 
 from app.contracts.workflow import AskResultMode, AskWorkflowResult, GuardrailAction
+from app.contracts.workflow import RuntimeFaithfulnessOutcome, RuntimeFaithfulnessSignal
 
 
 CITATION_PATTERN = re.compile(r"\[(\d+)\]")
@@ -29,6 +30,7 @@ EMBEDDING_ENTAILMENT_THRESHOLD = 0.82
 EMBEDDING_SUPPORT_THRESHOLD = 0.68
 LEXICAL_ENTAILMENT_THRESHOLD = 0.72
 LEXICAL_CONTRADICTION_THRESHOLD = 0.5
+RUNTIME_FAITHFULNESS_SCORE_THRESHOLD = 0.67
 
 
 @dataclass(frozen=True)
@@ -238,6 +240,76 @@ def build_claim_faithfulness_report(
             for verdict in verdicts
         ],
     }
+
+
+def build_runtime_faithfulness_signal(
+    text: str,
+    *,
+    evidence_texts: Sequence[str],
+    failure_outcome: RuntimeFaithfulnessOutcome,
+    settings: Settings | None = None,
+    provider_preference: str | None = None,
+) -> RuntimeFaithfulnessSignal:
+    report = build_claim_faithfulness_report(
+        text,
+        evidence_texts,
+        settings=settings,
+        provider_preference=provider_preference,
+    )
+    verdict_breakdown = report.get("verdict_breakdown", {})
+    contradicted_count = int(verdict_breakdown.get("contradicted", 0) or 0)
+    neutral_count = int(verdict_breakdown.get("neutral", 0) or 0)
+    unsupported_claim_count = contradicted_count + neutral_count
+    claim_count = int(report.get("claim_count", 0) or 0)
+    score = report.get("score")
+    outcome = RuntimeFaithfulnessOutcome.ALLOW
+    if score is not None and score < RUNTIME_FAITHFULNESS_SCORE_THRESHOLD:
+        outcome = failure_outcome
+
+    return RuntimeFaithfulnessSignal(
+        outcome=outcome,
+        score=float(score) if score is not None else None,
+        threshold=RUNTIME_FAITHFULNESS_SCORE_THRESHOLD,
+        backend=str(report.get("backend", "not_applicable") or "not_applicable"),
+        reason=str(report.get("reason", "")),
+        claim_count=claim_count,
+        unsupported_claim_count=unsupported_claim_count,
+    )
+
+
+def build_runtime_ask_faithfulness_signal(
+    ask_result: AskWorkflowResult,
+    *,
+    settings: Settings | None = None,
+    provider_preference: str | None = None,
+) -> RuntimeFaithfulnessSignal:
+    if ask_result.mode != AskResultMode.GENERATED_ANSWER:
+        return RuntimeFaithfulnessSignal(
+            outcome=RuntimeFaithfulnessOutcome.ALLOW,
+            threshold=RUNTIME_FAITHFULNESS_SCORE_THRESHOLD,
+            backend="not_applicable",
+            reason="runtime_semantic_gate:not_generated_answer",
+        )
+
+    citation_numbers = _dedupe_preserve_order(
+        int(match.group(1))
+        for match in CITATION_PATTERN.finditer(ask_result.answer)
+    )
+    evidence_texts: list[str] = []
+    for citation_number in citation_numbers:
+        if citation_number < 1 or citation_number > len(ask_result.retrieved_candidates):
+            continue
+        evidence_texts.append(
+            ask_result.retrieved_candidates[citation_number - 1].text
+        )
+
+    return build_runtime_faithfulness_signal(
+        _strip_citation_markers(ask_result.answer),
+        evidence_texts=evidence_texts,
+        failure_outcome=RuntimeFaithfulnessOutcome.DOWNGRADE_TO_RETRIEVAL_ONLY,
+        settings=settings,
+        provider_preference=provider_preference,
+    )
 
 
 def _find_unsupported_answer_terms(

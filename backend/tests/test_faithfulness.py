@@ -5,8 +5,10 @@ import unittest
 from unittest.mock import patch
 
 from app.config import get_settings
+from app.contracts.workflow import RuntimeFaithfulnessOutcome
 from app.quality.faithfulness import (
     build_claim_faithfulness_report,
+    build_runtime_faithfulness_signal,
     split_atomic_claims,
 )
 from app.retrieval.embeddings import EmbeddingBatchResult
@@ -83,6 +85,29 @@ class ClaimFaithfulnessCoreTests(unittest.TestCase):
         self.assertEqual(report["backend"], "embedding_semantic")
         self.assertEqual(report["score"], 1.0)
         self.assertEqual(report["claims"][0]["verdict"], "entailed")
+
+    def test_build_runtime_faithfulness_signal_flags_low_confidence_when_score_below_threshold(
+        self,
+    ) -> None:
+        signal = build_runtime_faithfulness_signal(
+            "Alpha 已完成。",
+            evidence_texts=["Beta 正在规划下一阶段。"],
+            failure_outcome=RuntimeFaithfulnessOutcome.LOW_CONFIDENCE,
+        )
+
+        self.assertEqual(signal.outcome, RuntimeFaithfulnessOutcome.LOW_CONFIDENCE)
+        self.assertEqual(signal.unsupported_claim_count, 1)
+        self.assertEqual(signal.threshold, 0.67)
+
+    def test_build_runtime_faithfulness_signal_allows_supported_claims(self) -> None:
+        signal = build_runtime_faithfulness_signal(
+            "Alpha 已完成。",
+            evidence_texts=["Alpha 当前状态为已完成，并已归档。"],
+            failure_outcome=RuntimeFaithfulnessOutcome.LOW_CONFIDENCE,
+        )
+
+        self.assertEqual(signal.outcome, RuntimeFaithfulnessOutcome.ALLOW)
+        self.assertEqual(signal.unsupported_claim_count, 0)
 
 
 if __name__ == "__main__":

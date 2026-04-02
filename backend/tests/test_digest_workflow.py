@@ -15,6 +15,7 @@ from app.contracts.workflow import (
     PatchOp,
     Proposal,
     RiskLevel,
+    RuntimeFaithfulnessOutcome,
     RunStatus,
     SafetyChecks,
     WorkflowAction,
@@ -45,6 +46,31 @@ class DigestWorkflowTests(unittest.TestCase):
             result = run_minimal_digest(settings=settings)
 
             self.assertGreaterEqual(result.context_bundle_summary["evidence_count"], 1)
+
+    def test_run_minimal_digest_marks_low_confidence_for_overclaim_markdown(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_root = Path(temp_dir)
+            vault_path = self._build_digest_vault_fixture(temp_root)
+            db_path = temp_root / "knowledge_steward.sqlite3"
+            ingest_vault(vault_path=vault_path, db_path=db_path)
+            settings = replace(
+                get_settings(),
+                sample_vault_dir=vault_path,
+                index_db_path=db_path,
+            )
+
+            with patch(
+                "app.services.digest._build_digest_markdown",
+                return_value="DAILY_DIGEST 已自动写回知识库并完成审批。",
+            ):
+                result = run_minimal_digest(settings=settings)
+
+            self.assertIsNotNone(result.runtime_faithfulness)
+            self.assertEqual(
+                result.runtime_faithfulness.outcome,
+                RuntimeFaithfulnessOutcome.LOW_CONFIDENCE,
+            )
+            self.assertEqual(result.runtime_faithfulness.threshold, 0.67)
 
     def test_invoke_digest_graph_returns_structured_digest_and_trace_events(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -83,12 +109,19 @@ class DigestWorkflowTests(unittest.TestCase):
             self.assertFalse(hasattr(execution, "used_langgraph"))
             self.assertIn("本次 DAILY_DIGEST 基于最近 3 篇已索引笔记生成。", execution.digest_result.digest_markdown)
             self.assertIn("重点来源", execution.digest_result.digest_markdown)
+            self.assertIsNotNone(execution.digest_result.runtime_faithfulness)
             self.assertEqual(len(execution.trace_events), 3)
             self.assertEqual(
                 [event["node_name"] for event in execution.trace_events],
                 ["prepare_digest", "build_digest", "finalize_digest"],
             )
             self.assertEqual(len(trace_events), 3)
+            build_event = next(
+                event for event in execution.trace_events if event["node_name"] == "build_digest"
+            )
+            self.assertIn("runtime_faithfulness_outcome", build_event["details"])
+            self.assertIn("runtime_faithfulness_score", build_event["details"])
+            self.assertIn("runtime_faithfulness_threshold", build_event["details"])
 
             persisted_events = [
                 json.loads(line)

@@ -443,6 +443,26 @@ def _finalize_ask_node(
             "result_mode": ask_result.mode.value if ask_result is not None else "missing",
             "trace_event_count_before_finalize": len(state.get("trace_events", [])),
             "tool_call_rounds": ask_result.tool_call_rounds if ask_result is not None else 0,
+            "runtime_faithfulness_outcome": (
+                ask_result.runtime_faithfulness.outcome.value
+                if ask_result is not None and ask_result.runtime_faithfulness is not None
+                else ""
+            ),
+            "runtime_faithfulness_score": (
+                ask_result.runtime_faithfulness.score
+                if ask_result is not None and ask_result.runtime_faithfulness is not None
+                else None
+            ),
+            "runtime_faithfulness_threshold": (
+                ask_result.runtime_faithfulness.threshold
+                if ask_result is not None and ask_result.runtime_faithfulness is not None
+                else None
+            ),
+            "runtime_faithfulness_backend": (
+                ask_result.runtime_faithfulness.backend
+                if ask_result is not None and ask_result.runtime_faithfulness is not None
+                else ""
+            ),
         },
         trace_hook=trace_hook,
     )
