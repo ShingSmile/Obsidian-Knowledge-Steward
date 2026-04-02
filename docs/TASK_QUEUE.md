@@ -182,7 +182,7 @@
 - `derived_tasks`:
   - `medium: TASK-050 抽取共享 ask faithfulness 判定层并接通 ask runtime 启发式 gate（已完成）`
   - `medium: TASK-051 建立共享 claim 拆解 + NLI faithfulness core（已完成）`
-  - `medium: TASK-052 用 embedding 相似度接通 ask / digest runtime faithfulness gate`
+  - `medium: TASK-052 用 embedding 相似度接通 ask / digest runtime faithfulness gate（已完成）`
   - `medium: TASK-053 完成 ask 离线四维度评估与 faithfulness golden 扩充`
   - `medium: TASK-054 完成 ingest / digest 场景评估指标与 golden 基线`
 - `notes`: `SES-20260401-02` 实际实现后已经证明，这块工作把“共享语义底座、runtime 安全闸门、ask 四维度离线指标、ingest / digest 场景指标、golden 扩充”全部塞进一个 `medium` 会导致执行边界失真。因此从本次起保留 `TASK-048` 作为 umbrella，只负责定义总目标与拆分关系；真实执行改由 `TASK-050` 到 `TASK-054` 承担。`TASK-033` 也随之改为被 `TASK-050` / `TASK-052` 吸收。
@@ -264,11 +264,11 @@
 ### TASK-052
 
 - `task_id`: `TASK-052`
-- `session_id`:
+- `session_id`: `SES-20260402-01`
 - `title`: 用 embedding 相似度接通 ask / digest runtime faithfulness gate
 - `category`: `Eval`
 - `priority`: `P1`
-- `status`: `planned`
+- `status`: `completed`
 - `scope`: `medium`
 - `goal`: 把当前 ask runtime 的启发式降级逻辑升级为更稳定的 embedding/cosine 近似 gate，并把同类 runtime 质量闸门扩展到 digest 链路，形成“低延迟、可配置阈值、保守降级”的统一运行时策略。
 - `out_of_scope`:
@@ -287,15 +287,19 @@
   - `backend/app/services/ask.py`
   - `backend/app/guardrails/ask.py`
   - `backend/app/services/digest.py`
+  - `backend/app/graphs/ask_graph.py`
   - `backend/app/graphs/digest_graph.py`
+  - `backend/app/graphs/runtime.py`
   - `backend/app/contracts/workflow.py`
   - `backend/tests/test_faithfulness.py`
   - `backend/tests/test_ask_workflow.py`
   - `backend/tests/test_digest_workflow.py`
+  - `backend/tests/test_workflow_invoke_contract.py`
+  - `backend/tests/test_eval_runner.py`
 - `derived_tasks`:
   - `small: 评估是否将 runtime faithfulness score 作为可选质量元数据暴露给插件侧`
   - `small: 为 digest 的低置信度文案增加更细粒度 reason code`
-- `notes`: 本任务承接 `TASK-033` 的 runtime safety 目标，但不再停留在 term-overlap 启发式上。`TASK-051` 已经把共享 claim-level semantic core 与 embedding-backed offline backend 落到 [backend/app/quality/faithfulness.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/app/quality/faithfulness.py)；这里需要把同一套语义底座真正接进 ask / digest runtime，并把 score、threshold 与 guardrail outcome 落到结构化 trace。
+- `notes`: `SES-20260402-01` 已完成本任务： [backend/app/quality/faithfulness.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/app/quality/faithfulness.py) 新增了共享 `RuntimeFaithfulnessSignal` 归约层，在 claim-level semantic report 之上输出 `outcome / score / threshold / backend / reason / unsupported_claim_count`；[backend/app/services/ask.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/app/services/ask.py) 与 [backend/app/guardrails/ask.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/app/guardrails/ask.py) 已改为消费这套 shared runtime signal，对低分 generated answer 保守降级为 `retrieval_only`；[backend/app/services/digest.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/app/services/digest.py) 与 [backend/app/contracts/workflow.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/app/contracts/workflow.py) 也已为 digest 增加结构化 `runtime_faithfulness` outcome；[backend/app/graphs/ask_graph.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/app/graphs/ask_graph.py) 与 [backend/app/graphs/digest_graph.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/app/graphs/digest_graph.py) 会把 `score / threshold / outcome / backend` 落到 trace；[backend/app/graphs/runtime.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/app/graphs/runtime.py) 也已补齐 serializer allowlist，避免 completed checkpoint resume 因新 enum / model 产生 warning。验收期内已通过 `tests.test_ask_guardrails + tests.test_faithfulness + tests.test_ask_workflow + tests.test_digest_workflow + tests.test_workflow_invoke_contract + tests.test_eval_runner` 共 66 个 backend tests。 
 
 ### TASK-053
 
@@ -501,7 +505,7 @@
 - `derived_tasks`:
   - `small: 为 groundedness term extractor 增加停用词 / allowlist，减少中文短窗误报`
   - `small: 评估是否需要把 LLM judge 只作为人工抽样辅助，而不是主链路依赖`
-- `notes`: `TASK-028` 已经证明 ask 存在“引用编号合法，但答案语义越界”的 bad case。该问题在 `SES-20260401-02` 中先由 `TASK-050` 以共享启发式 snapshot + `retrieval_only` 安全降级的方式落下第一刀；后续更稳定的 embedding runtime gate 继续由 `TASK-052` 承接。因此本任务不再单独执行，拆分吸收到 `TASK-050` / `TASK-052`。
+- `notes`: `TASK-028` 已经证明 ask 存在“引用编号合法，但答案语义越界”的 bad case。该问题在 `SES-20260401-02` 中先由 `TASK-050` 以共享启发式 snapshot + `retrieval_only` 安全降级的方式落下第一刀，随后在 `SES-20260402-01` 由 `TASK-052` 以 shared semantic runtime gate + 结构化 runtime trace 的方式正式收口。因此本任务不再单独执行，拆分吸收到 `TASK-050` / `TASK-052`。
 
 ## Recent Completed
 

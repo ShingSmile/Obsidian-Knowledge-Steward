@@ -25,11 +25,13 @@
 - `TASK-048` 已在 `SES-20260401-02` 确认超出单个 `medium` 边界，现重定义为 umbrella，并拆为 `TASK-050` 到 `TASK-054` 五段执行。
 - `TASK-050` 已在 `SES-20260401-02` 完成：ask runtime 已接入共享 faithfulness snapshot，对明显 `unsupported_claim` 的 generated answer 会保守降级为 `retrieval_only`，离线 eval 也已复用同一判定层。
 - `TASK-051` 已在 `SES-20260401-03` 完成： [backend/app/quality/faithfulness.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/app/quality/faithfulness.py) 已升级为共享 claim-level faithfulness core，可输出 `entailed / contradicted / neutral` verdict，并在 embedding provider 可用时走更强的 semantic backend；[eval/run_eval.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/eval/run_eval.py) 也已让 ask / governance / digest 共用这套判定层，governance / digest 的 faithfulness 不再直接退回 `context_recall` 充当替代指标。
+- `TASK-052` 已在 `SES-20260402-01` 完成：ask / digest runtime 已共用基于 claim-level semantic core 的 `RuntimeFaithfulnessSignal`；ask 对低分 generated answer 会保守降级为 `retrieval_only`，digest 现已输出结构化 `runtime_faithfulness` quality outcome，ask / digest trace 与 checkpoint serializer allowlist 也已对齐新 contract。
 
 ## 最近完成
 
 | task_id | 日期 | 结果 |
 | --- | --- | --- |
+| `TASK-052` | 2026-04-02 | 已完成：ask / digest runtime 已共用 `RuntimeFaithfulnessSignal`，ask 会在低分时保守降级为 `retrieval_only`，digest 新增结构化 `runtime_faithfulness` outcome 与 trace 字段；相关 backend 66 tests 全部通过 |
 | `TASK-051` | 2026-04-02 | 已完成：共享 claim-level semantic faithfulness core 已落到 [backend/app/quality/faithfulness.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/app/quality/faithfulness.py)，`eval/run_eval.py` 已让 ask / governance / digest 共用同一套 claim verdict 层；相关 backend 15 tests 与 4 条 targeted eval case 全部通过 |
 | `TASK-050` | 2026-04-01 | 已完成：共享 ask faithfulness 判定层已抽出到 `backend/app/quality/faithfulness.py`，ask runtime 会对 `unsupported_claim` 保守降级到 `retrieval_only`，相关 backend 45 tests 与 7 条 targeted eval case 全部通过 |
 | `TASK-046` | 2026-04-01 | 已完成：ask 已收敛为 graph-only ReAct 循环，新增 `tool_call_rounds`，`tests.test_ask_workflow` 共 32 tests 与 2 条 ask eval case 全部通过 |
@@ -40,12 +42,12 @@
 
 ## 默认下一任务
 
-- 默认进入 `TASK-052`
-  - 主题：用 embedding 相似度收敛 ask / digest runtime faithfulness gate，并补阈值、score 与降级 outcome 的结构化 trace。
-- 若先把 ask 评估做完整：`TASK-053`
+- 默认进入 `TASK-053`
   - 主题：完成 ask 的 Faithfulness / Answer Relevancy / Context Precision / Context Recall 四维度离线评估，并扩充 ask golden cases。
 - 若先把 ingest / digest 评估补齐：`TASK-054`
   - 主题：完成 ingest 的 Rationale Faithfulness + Patch Safety，以及 digest 的 Faithfulness + Coverage 与对应 golden 基线。
+- 若回溯刚完成的 `TASK-052`
+  - 主题：已完成；仅剩 runtime faithfulness score 的插件侧暴露与 digest `low_confidence` 更细粒度 reason code 两个 `small` 尾项，不应再单独开一个 `medium`。
 - 若优先升级工具调用协议：`TASK-049`
   - 主题：将工具调用从 prompt-based JSON 约定迁移到 OpenAI Function Calling 协议，ToolSpec schema 直接映射为 `tools` 参数。
 - 若查看原 umbrella：`TASK-048`
@@ -61,21 +63,20 @@
 - 若回溯刚完成的 `TASK-045`
   - 主题：已完成；仅剩 `replace_section.max_changed_lines` 与 validator 配置化两个 `small` 尾项，不应再单独开一个 `medium`。
 - 若回溯刚完成的 `TASK-051`
-  - 主题：已完成；仅剩 claim 拆解的中文停用词 / allowlist 与 low-confidence trace 两个 `small` 尾项，不应再单独开一个 `medium`。
+  - 主题：已完成；claim 拆解的中文停用词 / allowlist 仍未落地，而 runtime score / threshold / low-confidence trace 已由 `TASK-052` 的 shared runtime signal 先补到运行时层，不应再单独开一个 `medium`。
 
 ## 当前风险
 
 - `TASK-046` 已完成，但仍留有三个 `small` 尾项：ReAct 循环还没有 token 消耗累计统计、多轮工具调用场景还没有独立 eval golden case，循环中间 context 的增量去重也还没落地。
 - `TASK-047` 已完成，但仍留有三个 `small` 尾项：`assembly_metadata` 还没有写入结构化 trace，多样性淘汰的 chunk 还没有备选池，相关性阈值比例也还缺离线 eval 覆盖。
 - `TASK-045` 已完成，但仍留有两个 `small` 尾项：`replace_section` 的 `max_changed_lines` 安全检查尚未落地，proposal validator 的阈值 / 白名单也还没抽到配置层。
+- `TASK-052` 已完成，但仍留有两个 `small` 尾项：runtime faithfulness score 还没有作为可选质量元数据暴露给插件侧，digest 的 `low_confidence` 文案 reason code 也还较粗。
 - ask 链路的工具调用仍为 prompt-based JSON 约定 + 手动解析，没有使用 API 级别的 Structured Tool Calling，格式合法性不受保证，对应 `TASK-049`。
-- `TASK-051` 已完成，但仍留有两个 `small` 尾项：claim 拆解的中文停用词 / allowlist 与 NLI 低置信度 trace 还没落地。
-- ask / ingest / digest 的离线 faithfulness 已收敛到共享 claim-level semantic core，不再只靠 ask bucket 或 `context_recall` 替代；但 ask runtime 仍只具备第一层 `unsupported_claim -> retrieval_only` 启发式降级，digest runtime 也还没有等价质量闸门，对应 `TASK-052`。
+- `TASK-051` 已完成，但 claim 拆解的中文停用词 / allowlist 仍未落地；运行时阈值、score 与 low-confidence trace 已由 `TASK-052` 的 shared runtime signal 在 ask / digest 链路先补齐。
 - ask 还没有真正落地 Faithfulness / Answer Relevancy / Context Precision / Context Recall 四维度离线评估与扩充 golden，对应 `TASK-053`。
 - ingest / digest 仍缺少各自场景化的内容质量指标与 golden 基线，对应 `TASK-054`。
 - 控制面与副作用面仍有断口：本地写回成功但后端记账失败时，当前还没有跨会话恢复入口，对应 `TASK-031`。
 - scoped ingest 仍会整库重建 `chunk_fts`，一旦 approval 高频触发，成本会持续放大，对应 `TASK-032`。
-- 本地工作区仍然是脏的：`git stash list` 当前为空，但根工作区还存在与当前任务无关的已修改 / 未跟踪文件；继续开发前需要明确哪些改动要保留、哪些只是历史或环境产物。
 
 ## 默认读取顺序
 
@@ -147,13 +148,15 @@
 - [eval/golden/governance_cases.json](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/eval/golden/governance_cases.json)
 - [eval/golden/digest_cases.json](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/eval/golden/digest_cases.json)
 
-### 若继续 `TASK-052`
+### 若回溯已完成的 `TASK-052`
 
 - [backend/app/quality/faithfulness.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/app/quality/faithfulness.py)
 - [backend/app/services/ask.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/app/services/ask.py)
 - [backend/app/guardrails/ask.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/app/guardrails/ask.py)
 - [backend/app/services/digest.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/app/services/digest.py)
+- [backend/app/graphs/ask_graph.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/app/graphs/ask_graph.py)
 - [backend/app/graphs/digest_graph.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/app/graphs/digest_graph.py)
+- [backend/app/graphs/runtime.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/app/graphs/runtime.py)
 - [backend/app/contracts/workflow.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/app/contracts/workflow.py)
 - [backend/tests/test_faithfulness.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/tests/test_faithfulness.py)
 - [backend/tests/test_ask_workflow.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/tests/test_ask_workflow.py)

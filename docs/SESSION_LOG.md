@@ -12,6 +12,7 @@
 
 | 会话 ID | 日期 | 主题 | 类型 | 状态 | 对应任务 |
 | --- | --- | --- | --- | --- | --- |
+| `SES-20260402-01` | 2026-04-02 | 完成 ask / digest runtime semantic gate 并收口 `TASK-052` | `Eval` | `已完成` | `TASK-052` |
 | `SES-20260401-03` | 2026-04-02 | 完成共享 claim-level faithfulness core 并收口 `TASK-051` | `Eval` | `已完成` | `TASK-051` |
 | `SES-20260401-02` | 2026-04-01 | 完成 ask runtime faithfulness 首刀并拆分 `TASK-048` umbrella | `Eval` | `已完成` | `TASK-050` |
 | `SES-20260401-01` | 2026-04-01 | 完成 ask 图级 ReAct 循环并收口 `TASK-046` | `Graph` | `已完成` | `TASK-046` |
@@ -29,6 +30,127 @@
 - 当前 2026-03 历史快照位于：
   [docs/archive/session_logs/SESSION_LOG_2026-03.md](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/docs/archive/session_logs/SESSION_LOG_2026-03.md)
 - 更早历史会话、旧索引与旧任务阶段记录，请优先查 archive，再按 `task_id` 回溯。
+
+## [SES-20260402-01] 完成 ask / digest runtime semantic gate 并收口 `TASK-052`
+
+- 日期：2026-04-02
+- task_id：`TASK-052`
+- 类型：`Eval`
+- 状态：`已完成`
+- 验收结论：`完全满足`
+- 对应任务：`TASK-052`
+- 本会话唯一目标：把 `TASK-051` 已落地的共享 claim-level semantic core 真正接进 ask / digest runtime，补齐统一的 `score / threshold / outcome / backend / reason` 运行时信号，并把相关 trace / checkpoint 兼容性一起收口在当前 `medium` 内。
+
+### 1. 本次目标
+
+- 为 ask / digest runtime 提供共享 semantic runtime gate，而不是继续让 ask 停留在启发式 snapshot、digest 完全没有等价质量 outcome。
+- 让 ask generated answer 在低分时保守降级为 `retrieval_only`，同时不误伤 grounded answer。
+- 让 digest 生成结果具备结构化 `low_confidence` 或等价质量字段，而不是把质量状态埋进自由文本或弱结构 summary。
+- 让 `score / threshold / outcome / backend / reason` 进入 ask / digest trace，并保证 completed checkpoint resume 不因新增 enum / model 出现 serializer warning。
+
+### 2. 本次完成内容
+
+- 在 [backend/app/quality/faithfulness.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/app/quality/faithfulness.py) 中新增 shared `RuntimeFaithfulnessSignal` 归约逻辑，在现有 claim-level semantic report 之上统一产出 `outcome / score / threshold / backend / reason / claim_count / unsupported_claim_count`。
+- 在 [backend/app/contracts/workflow.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/app/contracts/workflow.py) 中新增 `RuntimeFaithfulnessOutcome`、`RuntimeFaithfulnessSignal`，并让 `AskWorkflowResult`、`DigestWorkflowResult` 输出结构化 `runtime_faithfulness` 元数据。
+- 在 [backend/app/guardrails/ask.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/app/guardrails/ask.py) 与 [backend/app/services/ask.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/app/services/ask.py) 中把 ask runtime gate 从旧启发式 bucket 改为 shared semantic signal：低分 generated answer 会保守降级到 `retrieval_only`，grounded answer 保持 `generated_answer`。
+- 在 [backend/app/services/digest.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/app/services/digest.py) 中让 digest markdown 复用同一套 runtime semantic signal，并把低置信度结果显式挂到 `runtime_faithfulness`，而不是继续只有 `fallback_reason`。
+- 在 [backend/app/graphs/ask_graph.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/app/graphs/ask_graph.py) 与 [backend/app/graphs/digest_graph.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/app/graphs/digest_graph.py) 中把 `runtime_faithfulness_outcome / score / threshold / backend` 写进结构化 trace。
+- 在 [backend/app/graphs/runtime.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/app/graphs/runtime.py) 中补齐 LangGraph msgpack allowlist，解决 completed digest checkpoint resume 对新增 enum / model 的 warning。
+- 在 [backend/tests/test_faithfulness.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/tests/test_faithfulness.py)、[backend/tests/test_ask_workflow.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/tests/test_ask_workflow.py)、[backend/tests/test_digest_workflow.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/tests/test_digest_workflow.py) 中补齐 shared runtime signal、ask 降级 / 不误伤、digest `low_confidence` 与 trace 字段回归。
+- 在 [docs/superpowers/specs/2026-04-02-task-052-runtime-semantic-gate-design.md](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/docs/superpowers/specs/2026-04-02-task-052-runtime-semantic-gate-design.md) 与 [docs/superpowers/plans/2026-04-02-task-052-runtime-semantic-gate.md](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/docs/superpowers/plans/2026-04-02-task-052-runtime-semantic-gate.md) 中补齐本次任务的 design / plan，并先将代码收口提交到 `df535af`。
+
+### 3. 本次未完成内容
+
+- 没有推进 ask 的 Faithfulness / Answer Relevancy / Context Precision / Context Recall 四维度离线评估；这继续留给 `TASK-053`。
+- 没有推进 ingest / digest 的场景化评估指标与 golden 扩面；这继续留给 `TASK-054`。
+- 没有推进工具调用协议升级 `TASK-049`，避免把当前会话扩成第二个 `medium`。
+- 没有把 runtime faithfulness score 暴露到插件侧，也没有细化 digest `low_confidence` 的 reason code；这两项继续保留为 `small` 尾项。
+
+### 4. 关键决策
+
+- 不再额外造一套 runtime 专属判定逻辑，而是让 ask / digest 直接消费 `TASK-051` 已落地的 shared semantic core；原因是 runtime 与 offline 如果继续分叉，后面的 `TASK-053` / `TASK-054` 会立刻失真。
+- ask 继续沿用现有外层行为，只在低分时退回 `retrieval_only`；原因是当前任务目标是收口 runtime gate，而不是重写 ask 外部 contract。
+- digest 不做“拒绝输出”，而是输出结构化 `low_confidence`；原因是 digest 当前仍是模板化摘要链路，保守标记比直接拒绝更符合现有产品边界。
+- completed checkpoint resume 的 serializer warning 视为本任务范围内问题并一并收口；原因是新增 runtime enum / model 已经进入 checkpoint state，如果把 allowlist 留到后续处理，会让 `TASK-052` 的 contract 不完整。
+
+### 5. 修改过的文件
+
+- [backend/app/contracts/workflow.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/app/contracts/workflow.py)
+- [backend/app/quality/faithfulness.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/app/quality/faithfulness.py)
+- [backend/app/guardrails/ask.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/app/guardrails/ask.py)
+- [backend/app/services/ask.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/app/services/ask.py)
+- [backend/app/services/digest.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/app/services/digest.py)
+- [backend/app/graphs/ask_graph.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/app/graphs/ask_graph.py)
+- [backend/app/graphs/digest_graph.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/app/graphs/digest_graph.py)
+- [backend/app/graphs/runtime.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/app/graphs/runtime.py)
+- [backend/tests/test_faithfulness.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/tests/test_faithfulness.py)
+- [backend/tests/test_ask_workflow.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/tests/test_ask_workflow.py)
+- [backend/tests/test_digest_workflow.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/tests/test_digest_workflow.py)
+- [docs/superpowers/specs/2026-04-02-task-052-runtime-semantic-gate-design.md](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/docs/superpowers/specs/2026-04-02-task-052-runtime-semantic-gate-design.md)
+- [docs/superpowers/plans/2026-04-02-task-052-runtime-semantic-gate.md](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/docs/superpowers/plans/2026-04-02-task-052-runtime-semantic-gate.md)
+- [docs/TASK_QUEUE.md](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/docs/TASK_QUEUE.md)
+- [docs/CURRENT_STATE.md](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/docs/CURRENT_STATE.md)
+- [docs/SESSION_LOG.md](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/docs/SESSION_LOG.md)
+- [docs/PROJECT_MASTER_PLAN.md](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/docs/PROJECT_MASTER_PLAN.md)
+- [docs/CHANGELOG.md](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/docs/CHANGELOG.md)
+
+### 6. 验证与测试
+
+- 跑了什么命令
+  - `cd backend && ../.conda/knowledge-steward/bin/python -m unittest tests.test_faithfulness tests.test_ask_workflow.AskWorkflowTests.test_invoke_ask_graph_downgrades_semantic_overclaim_answer tests.test_ask_workflow.AskWorkflowTests.test_invoke_ask_graph_keeps_grounded_generated_answer tests.test_ask_workflow.AskWorkflowTests.test_invoke_ask_graph_emits_runtime_faithfulness_trace_fields tests.test_digest_workflow.DigestWorkflowTests.test_run_minimal_digest_marks_low_confidence_for_overclaim_markdown tests.test_digest_workflow.DigestWorkflowTests.test_invoke_digest_graph_returns_structured_digest_and_trace_events -v`
+  - `cd backend && ../.conda/knowledge-steward/bin/python -m unittest tests.test_digest_workflow.DigestWorkflowTests.test_invoke_workflow_resumes_completed_digest_from_checkpoint -v`
+  - `cd backend && ../.conda/knowledge-steward/bin/python -m unittest tests.test_ask_guardrails tests.test_faithfulness tests.test_ask_workflow tests.test_digest_workflow tests.test_workflow_invoke_contract tests.test_eval_runner -v`
+- 结果如何
+  - 最小红绿回归 11 tests 通过。
+  - digest checkpoint resume 定向回归 1 test 通过。
+  - 扩大后的 backend 回归共 66 tests 通过。
+- 哪些没法验证
+  - 没有在真实 Obsidian 宿主里手动查看 digest `low_confidence` 文案展示效果。
+  - 没有在真实云 / 本地 embedding provider 下做非 mock 的阈值校准；当前仍以 deterministic fixture 与 embedding mock 为主。
+- 哪些只是静态修改
+  - 本次对 [docs/TASK_QUEUE.md](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/docs/TASK_QUEUE.md)、[docs/CURRENT_STATE.md](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/docs/CURRENT_STATE.md)、[docs/SESSION_LOG.md](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/docs/SESSION_LOG.md)、[docs/PROJECT_MASTER_PLAN.md](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/docs/PROJECT_MASTER_PLAN.md) 与 [docs/CHANGELOG.md](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/docs/CHANGELOG.md) 的修改都属于 governed closeout 同步。
+
+### 7. 范围偏移与原因
+
+- 没有引入第二个 `medium`；本次范围始终停留在 runtime semantic gate、contract、trace 与 checkpoint 兼容性。
+- 会话中途额外补了 serializer allowlist，不算范围漂移；原因是新增 runtime enum / model 已经进入 checkpoint state，不修这个 warning 就不能算本任务完整收口。
+
+### 8. 未解决问题
+
+- ask 还没有真正落地四维度离线评估与更系统的 ask golden 扩面。
+- ingest / digest 还没有补齐各自场景化评估指标与 coverage 基线。
+- runtime faithfulness score 还没有作为可选质量元数据暴露给插件侧。
+- digest `low_confidence` 的 reason code 仍比较粗。
+
+### 9. 新增风险 / 技术债 / 假设
+
+- 技术债：当前 runtime semantic gate 仍优先复用现有 embedding provider abstraction，没有引入专门 NLI 模型或外部 judge 子系统。
+- 风险：digest 目前仍是模板化摘要，`runtime_faithfulness` 虽然能标记低置信度，但真正的覆盖质量仍要靠 `TASK-054` 的评估扩面来校准。
+- 假设：下一步最合理的顺序是先做 `TASK-053`，把 ask 四维度评估补成可回归基线，再进 `TASK-054` 扩大到 ingest / digest。
+
+### 10. 下一步最优先任务
+
+- 默认进入 `TASK-053`，完成 ask 的 Faithfulness / Answer Relevancy / Context Precision / Context Recall 四维度离线评估与 golden 扩充。
+- 之后进入 `TASK-054`，补齐 ingest / digest 的场景评估指标与 golden 基线。
+- 若评估主线暂缓，再回到 `TASK-049`，收敛工具调用协议到 Structured Tool Calling。
+- `TASK-052` 已完成，不应再作为新的 `medium` 直接执行。
+
+### 11. 下一次新会话应该先读哪些文件
+
+- [docs/TASK_QUEUE.md](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/docs/TASK_QUEUE.md)
+- [docs/CURRENT_STATE.md](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/docs/CURRENT_STATE.md)
+- [docs/SESSION_LOG.md](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/docs/SESSION_LOG.md)
+- 若继续 `TASK-053`：
+  - [backend/app/quality/faithfulness.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/app/quality/faithfulness.py)
+  - [eval/run_eval.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/eval/run_eval.py)
+  - [eval/golden/ask_cases.json](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/eval/golden/ask_cases.json)
+  - [backend/tests/test_eval_runner.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/tests/test_eval_runner.py)
+  - [backend/tests/test_ask_workflow.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/tests/test_ask_workflow.py)
+
+### 12. 当前最容易被追问的点
+
+- 为什么 `TASK-052` 不只是“把旧启发式换个名字”？正确回答必须落到“runtime 现在不再消费 ask 专属 snapshot，而是直接复用 claim-level semantic core，并把 `score / threshold / outcome / backend / reason` 收敛到统一 runtime signal，ask / digest trace 与 checkpoint 兼容性也已对齐”。
+- 为什么 digest 不直接拒绝输出，而是标 `low_confidence`？正确回答必须落到“当前 digest 仍是模板化摘要链路，保守标记比直接拒绝更符合现有产品边界；真正的质量校准和 coverage 证明继续由 `TASK-054` 承担”。
 
 ## [SES-20260401-03] 完成共享 claim-level faithfulness core 并收口 `TASK-051`
 
