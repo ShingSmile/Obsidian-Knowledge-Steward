@@ -987,16 +987,19 @@ def build_quality_metrics_snapshot(
         settings=settings,
     )
 
+    answer_relevancy_payload = {
+        "score": relevancy_score,
+        "matched_output_hint_count": matched_output_hint_count,
+        "expected_output_hint_count": len(output_hints),
+    }
+
     return {
         "faithfulness": {
             "score": faithfulness_score,
             "reason": faithfulness_reason,
         },
-        "relevancy": {
-            "score": relevancy_score,
-            "matched_output_hint_count": matched_output_hint_count,
-            "expected_output_hint_count": len(output_hints),
-        },
+        "answer_relevancy": dict(answer_relevancy_payload),
+        "relevancy": dict(answer_relevancy_payload),
         "context_precision": {
             "score": context_precision_score,
             "matched_context_count": matched_actual_context_count,
@@ -1891,7 +1894,13 @@ def assert_quality_metrics_matches(
     if actual is None:
         raise EvalAssertionError("Expected quality_metrics to be present, but it was missing.")
 
-    for metric_name in ("faithfulness", "relevancy", "context_precision", "context_recall"):
+    for metric_name in (
+        "faithfulness",
+        "answer_relevancy",
+        "relevancy",
+        "context_precision",
+        "context_recall",
+    ):
         metric_expectation = expected.get(metric_name)
         if metric_expectation is None:
             continue
@@ -2387,7 +2396,12 @@ def _build_resume_core_metrics(case_results: list[dict[str, Any]]) -> dict[str, 
 
 def _build_metric_overview(case_results: list[dict[str, Any]]) -> dict[str, Any]:
     overview: dict[str, Any] = {}
-    for metric_name in ("faithfulness", "relevancy", "context_precision", "context_recall"):
+    for metric_name in (
+        "faithfulness",
+        "answer_relevancy",
+        "context_precision",
+        "context_recall",
+    ):
         scores: list[float] = []
         for case_result in case_results:
             actual_snapshot = case_result.get("actual")
@@ -2410,6 +2424,8 @@ def _build_metric_overview(case_results: list[dict[str, Any]]) -> dict[str, Any]
             "min_score": min(scores) if scores else None,
             "max_score": max(scores) if scores else None,
         }
+
+    overview["relevancy"] = dict(overview["answer_relevancy"])
     return overview
 
 

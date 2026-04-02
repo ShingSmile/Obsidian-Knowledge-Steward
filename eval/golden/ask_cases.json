@@ -129,6 +129,66 @@
       }
     },
     {
+      "case_id": "ask_fixture_semantic_partial_support",
+      "scenario": "ask",
+      "fixture": "ask_hybrid_basic",
+      "description": "答案分别复述两条受支撑事实，但把两份独立证据合并成单个复合 claim 时，离线 eval 应记录为 partial support 而不是满分 faithfulness。",
+      "quality_reference": {
+        "reference_context_path_suffixes": [
+          "Roadmap.md",
+          "Strategy.md"
+        ]
+      },
+      "request": {
+        "action_type": "ask_qa",
+        "user_query": "Roadmap"
+      },
+      "setup": {
+        "provider_mode": "mocked_cloud",
+        "mock_embedding_profile": "roadmap_strategy_hybrid",
+        "prewarm_requests": [
+          {
+            "thread_id": "thread_eval_ask_partial_support_prewarm",
+            "action_type": "ingest_steward"
+          }
+        ],
+        "mock_provider_answer": "Roadmap delivery plan.[1]\nSemantic strategy note.[2]\nRoadmap.[1]\nRoadmap delivery plan Semantic strategy note.[1][2]"
+      },
+      "expected": {
+        "http_status": 200,
+        "workflow_status": "completed",
+        "message_contains": "grounded answer",
+        "approval_required": false,
+        "ask_result": {
+          "mode": "generated_answer",
+          "model_fallback_used": false,
+          "provider_name": "openai-compatible",
+          "min_citation_count": 2,
+          "min_retrieved_candidate_count": 2,
+          "answer_contains": [
+            "Roadmap",
+            "Roadmap delivery plan",
+            "Semantic strategy note"
+          ]
+        },
+        "quality_metrics": {
+          "faithfulness": {
+            "min": 0.7,
+            "max": 0.8
+          },
+          "answer_relevancy": {
+            "min": 1.0
+          },
+          "context_precision": {
+            "min": 1.0
+          },
+          "context_recall": {
+            "min": 1.0
+          }
+        }
+      }
+    },
+    {
       "case_id": "ask_fixture_invalid_citation_downgrades",
       "scenario": "ask",
       "fixture": "ask_basic",
