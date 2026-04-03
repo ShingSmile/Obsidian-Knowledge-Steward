@@ -200,6 +200,10 @@ class ResumeWorkflowTests(unittest.TestCase):
             self.assertIsNotNone(result.writeback_result)
             assert result.writeback_result is not None
             self.assertTrue(result.writeback_result.applied)
+            self.assertEqual(
+                result.writeback_result.target_note_path,
+                "Digest/2026-03-14.md",
+            )
             self.assertEqual(result.writeback_result.after_hash, "sha256:after_success")
             self.assertIsNotNone(result.post_writeback_sync)
             assert result.post_writeback_sync is not None
@@ -218,6 +222,10 @@ class ResumeWorkflowTests(unittest.TestCase):
             assert checkpoint is not None
             self.assertIsNotNone(checkpoint.state["writeback_result"])
             self.assertTrue(checkpoint.state["writeback_result"].applied)
+            self.assertEqual(
+                checkpoint.state["writeback_result"].target_note_path,
+                "Digest/2026-03-14.md",
+            )
             self.assertEqual(
                 checkpoint.state["writeback_result"].after_hash,
                 "sha256:after_success",
@@ -664,6 +672,10 @@ class ResumeWorkflowTests(unittest.TestCase):
             )
             self.assertTrue(result.rollback_result.applied)
             self.assertEqual(
+                result.rollback_result.target_note_path,
+                "Digest/2026-03-14.md",
+            )
+            self.assertEqual(
                 result.rollback_result.after_hash,
                 proposal.safety_checks.before_hash,
             )
@@ -677,6 +689,10 @@ class ResumeWorkflowTests(unittest.TestCase):
             assert checkpoint is not None
             self.assertIsNotNone(checkpoint.state["rollback_result"])
             self.assertTrue(checkpoint.state["rollback_result"].applied)
+            self.assertEqual(
+                checkpoint.state["rollback_result"].target_note_path,
+                "Digest/2026-03-14.md",
+            )
             self.assertEqual(
                 checkpoint.state["rollback_result"].before_hash,
                 "sha256:after_success",
@@ -765,6 +781,10 @@ class ResumeWorkflowTests(unittest.TestCase):
 
             self.assertEqual(result.status, RunStatus.COMPLETED)
             self.assertFalse(result.rollback_result.applied)
+            self.assertEqual(
+                result.rollback_result.target_note_path,
+                "Digest/2026-03-14.md",
+            )
             self.assertEqual(
                 result.message,
                 "Workflow rollback recorded a failed local rollback result. No content was reverted.",
@@ -858,7 +878,9 @@ class ResumeWorkflowTests(unittest.TestCase):
             risk_level=RiskLevel.HIGH,
             evidence=[
                 ProposalEvidence(
-                    source_path="/vault/Daily/2026-03-14.md",
+                    source_path=str(
+                        (normalized_target_note_path.parent.parent / "Daily" / "2026-03-14.md").resolve()
+                    ),
                     heading_path="Summary",
                     chunk_id="chunk_digest_source",
                     reason="The digest is grounded in the latest indexed note summary.",
@@ -905,6 +927,8 @@ class ResumeWorkflowTests(unittest.TestCase):
             self.assertIsNotNone(persisted)
         finally:
             connection.close()
+        assert persisted is not None
+        proposal = persisted.proposal
 
         save_graph_checkpoint(
             db_path,

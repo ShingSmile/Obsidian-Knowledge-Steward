@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import replace
 from datetime import datetime, timezone
 import json
 from pathlib import Path
@@ -7,6 +8,7 @@ import sqlite3
 import tempfile
 import unittest
 
+from app.config import get_settings
 from app.contracts.workflow import (
     ApprovalDecision,
     AskResultMode,
@@ -397,19 +399,26 @@ body text
 
     def test_save_and_load_proposal_roundtrip(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
-            db_path = Path(temp_dir) / "knowledge_steward.sqlite3"
+            temp_root = Path(temp_dir)
+            vault_path = temp_root / "vault"
+            vault_path.mkdir()
+            db_path = temp_root / "knowledge_steward.sqlite3"
             initialize_index_db(db_path)
 
             connection = connect_sqlite(db_path)
             try:
+                proposal_settings = replace(
+                    get_settings(),
+                    sample_vault_dir=vault_path,
+                )
                 proposal = Proposal(
                     proposal_id="prop_roundtrip",
                     action_type=WorkflowAction.INGEST_STEWARD,
-                    target_note_path="/vault/daily/2026-03-14.md",
+                    target_note_path=str((vault_path / "daily" / "2026-03-14.md").resolve()),
                     summary="补两个标签并在 Summary 下插入一段回链建议",
                     evidence=[
                         ProposalEvidence(
-                            source_path="/vault/notes/langgraph.md",
+                            source_path=str((vault_path / "notes" / "langgraph.md").resolve()),
                             heading_path="Overview > Why",
                             chunk_id="chunk_langgraph_1",
                             reason="当前笔记缺少这条概念回链。",
@@ -418,12 +427,16 @@ body text
                     patch_ops=[
                         PatchOp(
                             op="frontmatter_merge",
-                            target_path="/vault/daily/2026-03-14.md",
+                            target_path=str(
+                                (vault_path / "daily" / "2026-03-14.md").resolve()
+                            ),
                             payload={"tags_add": ["langgraph", "review"]},
                         ),
                         PatchOp(
                             op="insert_under_heading",
-                            target_path="/vault/daily/2026-03-14.md",
+                            target_path=str(
+                                (vault_path / "daily" / "2026-03-14.md").resolve()
+                            ),
                             payload={"heading_path": "Summary", "text": "- Related: [[LangGraph]]"},
                         ),
                     ],
@@ -441,6 +454,7 @@ body text
                     approval_required=True,
                     run_id="run_prop_roundtrip",
                     idempotency_key="idem_prop_roundtrip",
+                    settings=proposal_settings,
                 )
 
                 persisted = load_proposal(connection, proposal_id=proposal.proposal_id)
@@ -467,20 +481,154 @@ body text
             finally:
                 connection.close()
 
+    def test_save_proposal_persists_absolute_in_vault_paths_as_canonical_relative_values(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_root = Path(temp_dir)
+            vault_path = temp_root / "vault"
+            vault_path.mkdir()
+            target_note_path = vault_path / "Digest" / "2026-03-14.md"
+            target_note_path.parent.mkdir(parents=True)
+            target_note_path.write_text("# Digest\n", encoding="utf-8")
+            linked_note_path = vault_path / "Notes" / "Alpha.md"
+            linked_note_path.parent.mkdir(parents=True)
+            linked_note_path.write_text("# Alpha\n", encoding="utf-8")
+
+            db_path = temp_root / "knowledge_steward.sqlite3"
+            initialize_index_db(db_path)
+
+            proposal = Proposal(
+                proposal_id="prop_canonical_store",
+                action_type=WorkflowAction.DAILY_DIGEST,
+                target_note_path=str(target_note_path.resolve()),
+                summary="Insert the generated digest into the daily review note.",
+                evidence=[
+                    ProposalEvidence(
+                        source_path=str(linked_note_path.resolve()),
+                        heading_path="Summary",
+                        chunk_id="chunk_alpha",
+                        reason="The note is grounded in a vault-local source.",
+                    )
+                ],
+                patch_ops=[
+                    PatchOp(
+                        op="merge_frontmatter",
+                        target_path=str(target_note_path.resolve()),
+                        payload={"reviewed": False},
+                    ),
+                    PatchOp(
+                        op="add_wikilink",
+                        target_path=str(target_note_path.resolve()),
+                        payload={
+                            "heading": "## Links",
+                            "linked_note_path": str(linked_note_path.resolve()),
+                        },
+                    ),
+                ],
+                safety_checks=SafetyChecks(
+                    before_hash="sha256:canonical_before",
+                    max_changed_lines=12,
+                    contains_delete=False,
+                ),
+            )
+
+            connection = connect_sqlite(db_path)
+            try:
+                save_proposal(
+                    connection,
+                    thread_id="thread_prop_canonical",
+                    proposal=proposal,
+                    approval_required=True,
+                    run_id="run_prop_canonical",
+                    idempotency_key="idem_prop_canonical",
+                    settings=replace(get_settings(), sample_vault_dir=vault_path),
+                )
+
+                persisted = load_proposal(connection, proposal_id=proposal.proposal_id)
+                self.assertIsNotNone(persisted)
+                assert persisted is not None
+                self.assertEqual(persisted.thread_id, "thread_prop_canonical")
+                self.assertEqual(persisted.run_id, "run_prop_canonical")
+                self.assertEqual(persisted.idempotency_key, "idem_prop_canonical")
+                self.assertTrue(persisted.approval_required)
+                self.assertEqual(
+                    persisted.proposal.target_note_path,
+                    "Digest/2026-03-14.md",
+                )
+                self.assertEqual(len(persisted.proposal.evidence), 1)
+                self.assertEqual(
+                    persisted.proposal.evidence[0].source_path,
+                    "Notes/Alpha.md",
+                )
+                self.assertEqual(len(persisted.proposal.patch_ops), 2)
+                self.assertEqual(
+                    persisted.proposal.patch_ops[0].target_path,
+                    "Digest/2026-03-14.md",
+                )
+                self.assertEqual(
+                    persisted.proposal.patch_ops[1].target_path,
+                    "Digest/2026-03-14.md",
+                )
+                self.assertEqual(
+                    persisted.proposal.patch_ops[1].payload["linked_note_path"],
+                    "Notes/Alpha.md",
+                )
+
+                proposal_row = connection.execute(
+                    """
+                    SELECT target_note_path
+                    FROM proposal
+                    WHERE proposal_id = ?;
+                    """,
+                    (proposal.proposal_id,),
+                ).fetchone()
+                evidence_row = connection.execute(
+                    """
+                    SELECT source_path
+                    FROM proposal_evidence
+                    WHERE proposal_id = ?;
+                    """,
+                    (proposal.proposal_id,),
+                ).fetchone()
+                patch_op_rows = connection.execute(
+                    """
+                    SELECT target_path, payload_json
+                    FROM patch_op
+                    WHERE proposal_id = ?
+                    ORDER BY ordinal ASC;
+                    """,
+                    (proposal.proposal_id,),
+                ).fetchall()
+
+                assert proposal_row is not None
+                assert evidence_row is not None
+                self.assertEqual(proposal_row[0], "Digest/2026-03-14.md")
+                self.assertEqual(evidence_row[0], "Notes/Alpha.md")
+                self.assertEqual(patch_op_rows[0][0], "Digest/2026-03-14.md")
+                self.assertEqual(patch_op_rows[1][0], "Digest/2026-03-14.md")
+                self.assertEqual(
+                    json.loads(patch_op_rows[1][1])["linked_note_path"],
+                    "Notes/Alpha.md",
+                )
+            finally:
+                connection.close()
+
     def test_list_pending_approval_records_only_returns_waiting_checkpoint_items(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
-            db_path = Path(temp_dir) / "knowledge_steward.sqlite3"
+            temp_root = Path(temp_dir)
+            vault_path = temp_root / "vault"
+            vault_path.mkdir()
+            db_path = temp_root / "knowledge_steward.sqlite3"
             initialize_index_db(db_path)
 
             waiting_proposal = Proposal(
                 proposal_id="prop_waiting_digest",
                 action_type=WorkflowAction.DAILY_DIGEST,
-                target_note_path="/vault/daily/2026-03-16.md",
+                target_note_path=str((vault_path / "daily" / "2026-03-16.md").resolve()),
                 summary="把今日摘要写回日记，并补两条待跟进问题。",
                 risk_level=RiskLevel.MEDIUM,
                 evidence=[
                     ProposalEvidence(
-                        source_path="/vault/daily/2026-03-16.md",
+                        source_path=str((vault_path / "daily" / "2026-03-16.md").resolve()),
                         heading_path="今日总结",
                         chunk_id="chunk_waiting_digest",
                         reason="这条摘要已经有索引证据，可进入审批。",
@@ -489,7 +637,7 @@ body text
                 patch_ops=[
                     PatchOp(
                         op="insert_under_heading",
-                        target_path="/vault/daily/2026-03-16.md",
+                        target_path=str((vault_path / "daily" / "2026-03-16.md").resolve()),
                         payload={"heading_path": "## Digest", "content": "- Follow up on eval drift"},
                     )
                 ],
@@ -502,7 +650,7 @@ body text
             completed_proposal = Proposal(
                 proposal_id="prop_completed_digest",
                 action_type=WorkflowAction.DAILY_DIGEST,
-                target_note_path="/vault/daily/2026-03-15.md",
+                target_note_path=str((vault_path / "daily" / "2026-03-15.md").resolve()),
                 summary="这条 proposal 已经被处理，不应再出现在收件箱。",
                 risk_level=RiskLevel.HIGH,
                 evidence=[],
@@ -516,12 +664,17 @@ body text
 
             connection = connect_sqlite(db_path)
             try:
+                proposal_settings = replace(
+                    get_settings(),
+                    sample_vault_dir=vault_path,
+                )
                 save_proposal(
                     connection,
                     thread_id="thread_waiting_digest",
                     proposal=waiting_proposal,
                     approval_required=True,
                     run_id="run_waiting_digest",
+                    settings=proposal_settings,
                 )
                 save_proposal(
                     connection,
@@ -529,6 +682,7 @@ body text
                     proposal=completed_proposal,
                     approval_required=True,
                     run_id="run_completed_digest",
+                    settings=proposal_settings,
                 )
             finally:
                 connection.close()
@@ -583,21 +737,28 @@ body text
 
     def test_save_proposal_rejects_duplicate_idempotency_key(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
-            db_path = Path(temp_dir) / "knowledge_steward.sqlite3"
+            temp_root = Path(temp_dir)
+            vault_path = temp_root / "vault"
+            vault_path.mkdir()
+            db_path = temp_root / "knowledge_steward.sqlite3"
             initialize_index_db(db_path)
 
             connection = connect_sqlite(db_path)
             try:
+                proposal_settings = replace(
+                    get_settings(),
+                    sample_vault_dir=vault_path,
+                )
                 first_proposal = Proposal(
                     proposal_id="prop_idem_1",
                     action_type=WorkflowAction.DAILY_DIGEST,
-                    target_note_path="/vault/digest/daily.md",
+                    target_note_path=str((vault_path / "digest" / "daily.md").resolve()),
                     summary="first proposal",
                 )
                 second_proposal = Proposal(
                     proposal_id="prop_idem_2",
                     action_type=WorkflowAction.DAILY_DIGEST,
-                    target_note_path="/vault/digest/daily.md",
+                    target_note_path=str((vault_path / "digest" / "daily.md").resolve()),
                     summary="second proposal",
                 )
 
@@ -607,6 +768,7 @@ body text
                     proposal=first_proposal,
                     approval_required=True,
                     idempotency_key="idem_conflict",
+                    settings=proposal_settings,
                 )
 
                 with self.assertRaises(sqlite3.IntegrityError):
@@ -616,26 +778,34 @@ body text
                         proposal=second_proposal,
                         approval_required=True,
                         idempotency_key="idem_conflict",
+                        settings=proposal_settings,
                     )
             finally:
                 connection.close()
 
     def test_append_audit_log_event_persists_flattened_fields(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
-            db_path = Path(temp_dir) / "knowledge_steward.sqlite3"
+            temp_root = Path(temp_dir)
+            vault_path = temp_root / "vault"
+            vault_path.mkdir()
+            db_path = temp_root / "knowledge_steward.sqlite3"
             initialize_index_db(db_path)
 
             connection = connect_sqlite(db_path)
             try:
+                proposal_settings = replace(
+                    get_settings(),
+                    sample_vault_dir=vault_path,
+                )
                 proposal = Proposal(
                     proposal_id="prop_audit_1",
                     action_type=WorkflowAction.INGEST_STEWARD,
-                    target_note_path="/vault/notes/example.md",
+                    target_note_path=str((vault_path / "notes" / "example.md").resolve()),
                     summary="写回一条治理建议",
                     patch_ops=[
                         PatchOp(
                             op="insert_under_heading",
-                            target_path="/vault/notes/example.md",
+                            target_path=str((vault_path / "notes" / "example.md").resolve()),
                             payload={"heading_path": "Summary", "text": "todo"},
                         )
                     ],
@@ -647,6 +817,7 @@ body text
                     proposal=proposal,
                     approval_required=True,
                     run_id="run_audit_proposal",
+                    settings=proposal_settings,
                 )
 
                 audit_event = AuditEvent(

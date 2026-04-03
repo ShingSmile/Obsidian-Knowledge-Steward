@@ -10,6 +10,7 @@ from app.config import get_settings
 from app.contracts.workflow import (
     PatchOp,
     Proposal,
+    ProposalEvidence,
     RiskLevel,
     SafetyChecks,
     WorkflowAction,
@@ -17,11 +18,93 @@ from app.contracts.workflow import (
 from app.indexing.store import connect_sqlite, initialize_index_db, save_proposal
 from app.services.proposal_validation import (
     ProposalValidationError,
+    normalize_proposal_for_persistence,
     validate_proposal_for_persistence,
 )
 
 
 class ProposalValidationTests(unittest.TestCase):
+    def test_normalize_proposal_for_persistence_canonicalizes_absolute_in_vault_paths(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_root = Path(temp_dir)
+            vault_path = temp_root / "vault"
+            vault_path.mkdir()
+            target_note_path = vault_path / "Digest" / "2026-03-14.md"
+            target_note_path.parent.mkdir(parents=True)
+            target_note_path.write_text("# Digest\n", encoding="utf-8")
+            linked_note_path = vault_path / "Notes" / "Alpha.md"
+            linked_note_path.parent.mkdir(parents=True)
+            linked_note_path.write_text("# Alpha\n", encoding="utf-8")
+            settings = replace(get_settings(), sample_vault_dir=vault_path)
+            proposal = Proposal(
+                proposal_id="prop_normalize_paths",
+                action_type=WorkflowAction.DAILY_DIGEST,
+                target_note_path=str(target_note_path.resolve()),
+                summary="Insert the generated digest into the daily review note.",
+                risk_level=RiskLevel.MEDIUM,
+                evidence=[
+                    ProposalEvidence(
+                        source_path=str(linked_note_path.resolve()),
+                        heading_path="Summary",
+                        chunk_id="chunk_alpha",
+                        reason="The note is grounded in a vault-local source.",
+                    )
+                ],
+                patch_ops=[
+                    PatchOp(
+                        op="merge_frontmatter",
+                        target_path=str(target_note_path.resolve()),
+                        payload={"reviewed": False},
+                    ),
+                    PatchOp(
+                        op="add_wikilink",
+                        target_path=str(target_note_path.resolve()),
+                        payload={
+                            "heading": "## Links",
+                            "linked_note_path": str(linked_note_path.resolve()),
+                        },
+                    ),
+                ],
+                safety_checks=SafetyChecks(
+                    before_hash="sha256:before",
+                    max_changed_lines=12,
+                    contains_delete=False,
+                ),
+            )
+
+            normalized = normalize_proposal_for_persistence(
+                proposal,
+                settings=settings,
+            )
+
+            self.assertEqual(normalized.target_note_path, "Digest/2026-03-14.md")
+            self.assertEqual(normalized.evidence[0].source_path, "Notes/Alpha.md")
+            self.assertEqual(normalized.patch_ops[0].target_path, "Digest/2026-03-14.md")
+            self.assertEqual(normalized.patch_ops[1].target_path, "Digest/2026-03-14.md")
+            self.assertEqual(
+                normalized.patch_ops[1].payload["linked_note_path"],
+                "Notes/Alpha.md",
+            )
+
+    def test_validate_proposal_for_persistence_rejects_legacy_vault_prefix_in_normal_mode(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_root = Path(temp_dir)
+            vault_path = temp_root / "vault"
+            vault_path.mkdir()
+            settings = replace(get_settings(), sample_vault_dir=vault_path)
+            proposal = Proposal(
+                proposal_id="prop_legacy_vault_prefix",
+                action_type=WorkflowAction.DAILY_DIGEST,
+                target_note_path="/vault/Digest/2026-03-14.md",
+                summary="Legacy /vault path should not be accepted in normal mode.",
+            )
+
+            with self.assertRaisesRegex(ProposalValidationError, "/vault"):
+                validate_proposal_for_persistence(
+                    proposal,
+                    settings=settings,
+                )
+
     def test_validate_proposal_for_persistence_rejects_target_note_outside_vault(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_root = Path(temp_dir)

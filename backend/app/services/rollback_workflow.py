@@ -17,6 +17,7 @@ from app.indexing.store import (
     initialize_index_db,
     load_proposal,
 )
+from app.path_semantics import PathContractError, normalize_to_vault_relative
 from app.services.resume_workflow import (
     ResumeWorkflowConflictError,
     ResumeWorkflowNotFoundError,
@@ -89,6 +90,7 @@ def rollback_workflow(
             proposal=proposal,
             original_writeback_result=forward_writeback_result,
             rollback_result=rollback_result,
+            settings=settings,
         )
 
         persisted_rollback_result = matching_checkpoint.state.get("rollback_result")
@@ -186,10 +188,16 @@ def _materialize_rollback_result(
     proposal: Proposal,
     original_writeback_result: WritebackResult,
     rollback_result: WritebackResult,
+    settings: Settings,
 ) -> WritebackResult:
+    normalized_target_note_path = _normalize_optional_target_note_path(
+        rollback_result.target_note_path,
+        settings=settings,
+        field_name="rollback_result.target_note_path",
+    )
     if (
-        rollback_result.target_note_path is not None
-        and rollback_result.target_note_path != proposal.target_note_path
+        normalized_target_note_path is not None
+        and normalized_target_note_path != proposal.target_note_path
     ):
         raise ResumeWorkflowValidationError(
             "rollback_result.target_note_path must match proposal.target_note_path."
@@ -248,6 +256,25 @@ def _materialize_rollback_result(
     return rollback_result.model_copy(
         update={"target_note_path": proposal.target_note_path}
     )
+
+
+def _normalize_optional_target_note_path(
+    raw_path: str | None,
+    *,
+    settings: Settings,
+    field_name: str,
+) -> str | None:
+    if raw_path is None:
+        return None
+    try:
+        return normalize_to_vault_relative(
+            raw_path,
+            vault_root=settings.sample_vault_dir,
+        )
+    except PathContractError as exc:
+        raise ResumeWorkflowValidationError(
+            f"{field_name} must stay within the configured vault. {exc}"
+        ) from exc
 
 
 def _is_same_effective_writeback_result(

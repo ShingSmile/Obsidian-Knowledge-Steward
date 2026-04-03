@@ -19,7 +19,7 @@ from app.contracts.workflow import (
     SafetyChecks,
 )
 from app.indexing.models import ParsedNote
-from app.services.proposal_validation import validate_proposal_for_persistence
+from app.services.proposal_validation import normalize_proposal_for_persistence
 
 
 SCHEMA_VERSION = 7
@@ -898,56 +898,58 @@ def save_proposal_record(
         raise ValueError("thread_id must not be empty when saving a proposal.")
 
     effective_settings = settings or get_settings()
-    validate_proposal_for_persistence(
+    normalized_proposal = normalize_proposal_for_persistence(
         proposal,
         settings=effective_settings,
     )
 
     proposal_params = {
-        "proposal_id": proposal.proposal_id,
+        "proposal_id": normalized_proposal.proposal_id,
         "thread_id": thread_id,
         "run_id": run_id,
-        "action_type": proposal.action_type.value,
-        "target_note_path": proposal.target_note_path,
-        "summary": proposal.summary,
-        "risk_level": proposal.risk_level.value,
+        "action_type": normalized_proposal.action_type.value,
+        "target_note_path": normalized_proposal.target_note_path,
+        "summary": normalized_proposal.summary,
+        "risk_level": normalized_proposal.risk_level.value,
         "approval_required": int(approval_required),
         "idempotency_key": idempotency_key,
-        "before_hash": proposal.safety_checks.before_hash,
-        "max_changed_lines": proposal.safety_checks.max_changed_lines,
-        "contains_delete": int(proposal.safety_checks.contains_delete),
-        "safety_checks_json": _json_dumps(proposal.safety_checks.model_dump(mode="json")),
+        "before_hash": normalized_proposal.safety_checks.before_hash,
+        "max_changed_lines": normalized_proposal.safety_checks.max_changed_lines,
+        "contains_delete": int(normalized_proposal.safety_checks.contains_delete),
+        "safety_checks_json": _json_dumps(
+            normalized_proposal.safety_checks.model_dump(mode="json")
+        ),
     }
     evidence_params = [
         {
             "evidence_id": _build_child_row_id(
                 prefix="evid",
-                proposal_id=proposal.proposal_id,
+                proposal_id=normalized_proposal.proposal_id,
                 ordinal=ordinal,
             ),
-            "proposal_id": proposal.proposal_id,
+            "proposal_id": normalized_proposal.proposal_id,
             "ordinal": ordinal,
             "source_path": evidence.source_path,
             "heading_path": evidence.heading_path,
             "chunk_id": evidence.chunk_id,
             "reason": evidence.reason,
         }
-        for ordinal, evidence in enumerate(proposal.evidence)
+        for ordinal, evidence in enumerate(normalized_proposal.evidence)
     ]
     patch_op_params = [
         {
             "patch_op_id": _build_child_row_id(
                 prefix="patch",
-                proposal_id=proposal.proposal_id,
+                proposal_id=normalized_proposal.proposal_id,
                 ordinal=ordinal,
             ),
-            "proposal_id": proposal.proposal_id,
+            "proposal_id": normalized_proposal.proposal_id,
             "ordinal": ordinal,
             "op": patch_op.op,
             "target_path": patch_op.target_path,
             "payload_json": _json_dumps(patch_op.payload),
         }
-        for ordinal, patch_op in enumerate(proposal.patch_ops)
+        for ordinal, patch_op in enumerate(normalized_proposal.patch_ops)
     ]
 
     # proposal 允许在同一个 thread 内被重新生成或重算，因此这里显式做
@@ -1003,11 +1005,11 @@ def save_proposal_record(
     )
     connection.execute(
         "DELETE FROM proposal_evidence WHERE proposal_id = ?;",
-        (proposal.proposal_id,),
+        (normalized_proposal.proposal_id,),
     )
     connection.execute(
         "DELETE FROM patch_op WHERE proposal_id = ?;",
-        (proposal.proposal_id,),
+        (normalized_proposal.proposal_id,),
     )
     if evidence_params:
         connection.executemany(

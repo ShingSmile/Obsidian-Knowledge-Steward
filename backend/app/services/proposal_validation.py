@@ -6,6 +6,11 @@ import re
 
 from app.config import Settings
 from app.contracts.workflow import PatchOp, Proposal
+from app.path_semantics import (
+    PathContractError,
+    normalize_to_vault_relative,
+    resolve_vault_relative,
+)
 
 
 class ProposalValidationError(ValueError):
@@ -28,13 +33,81 @@ def validate_proposal_for_persistence(
     settings: Settings,
     content_limit: int = 2000,
 ) -> None:
+    normalize_proposal_for_persistence(
+        proposal,
+        settings=settings,
+        content_limit=content_limit,
+    )
+
+
+def normalize_proposal_for_persistence(
+    proposal: Proposal,
+    *,
+    settings: Settings,
+    content_limit: int = 2000,
+) -> Proposal:
     vault_root = _normalize_vault_root(settings.sample_vault_dir)
+    normalized_target_note_path = _normalize_contract_path(
+        proposal.target_note_path,
+        vault_root=vault_root,
+        field_name="proposal.target_note_path",
+    )
+    normalized_evidence = [
+        evidence.model_copy(
+            update={
+                "source_path": _normalize_contract_path(
+                    evidence.source_path,
+                    vault_root=vault_root,
+                    field_name=f"evidence[{ordinal}].source_path",
+                )
+            }
+        )
+        for ordinal, evidence in enumerate(proposal.evidence)
+    ]
+    normalized_patch_ops = [
+        _normalize_patch_op(
+            patch_op,
+            vault_root=vault_root,
+            ordinal=ordinal,
+        )
+        for ordinal, patch_op in enumerate(proposal.patch_ops)
+    ]
+    normalized_proposal = proposal.model_copy(
+        update={
+            "target_note_path": normalized_target_note_path,
+            "evidence": normalized_evidence,
+            "patch_ops": normalized_patch_ops,
+        }
+    )
+    _validate_normalized_proposal(
+        normalized_proposal,
+        vault_root=vault_root,
+        content_limit=content_limit,
+    )
+    return normalized_proposal
+
+
+def _normalize_vault_root(vault_root: Path) -> Path:
+    return vault_root.expanduser().resolve()
+
+
+def _validate_normalized_proposal(
+    proposal: Proposal,
+    *,
+    vault_root: Path,
+    content_limit: int,
+) -> None:
     _validate_path_within_vault(
         proposal.target_note_path,
         vault_root=vault_root,
         field_name="proposal.target_note_path",
     )
-
+    for ordinal, evidence in enumerate(proposal.evidence):
+        _validate_path_within_vault(
+            evidence.source_path,
+            vault_root=vault_root,
+            field_name=f"evidence[{ordinal}].source_path",
+        )
     for ordinal, patch_op in enumerate(proposal.patch_ops):
         _validate_patch_op(
             patch_op,
@@ -44,8 +117,35 @@ def validate_proposal_for_persistence(
         )
 
 
-def _normalize_vault_root(vault_root: Path) -> Path:
-    return vault_root.expanduser().resolve()
+def _normalize_patch_op(
+    patch_op: PatchOp,
+    *,
+    vault_root: Path,
+    ordinal: int,
+) -> PatchOp:
+    normalized_target_path = _normalize_contract_path(
+        patch_op.target_path,
+        vault_root=vault_root,
+        field_name=f"patch_ops[{ordinal}].target_path",
+    )
+    normalized_payload = (
+        dict(patch_op.payload) if isinstance(patch_op.payload, dict) else patch_op.payload
+    )
+    if isinstance(normalized_payload, dict) and patch_op.op == "add_wikilink":
+        linked_note_path = normalized_payload.get("linked_note_path")
+        if isinstance(linked_note_path, str):
+            normalized_payload = dict(normalized_payload)
+            normalized_payload["linked_note_path"] = _normalize_contract_path(
+                linked_note_path,
+                vault_root=vault_root,
+                field_name=f"patch_ops[{ordinal}].payload.linked_note_path",
+            )
+    return patch_op.model_copy(
+        update={
+            "target_path": normalized_target_path,
+            "payload": normalized_payload,
+        }
+    )
 
 
 def _validate_patch_op(
@@ -188,18 +288,37 @@ def _normalize_candidate_path(
     if not isinstance(raw_path, str) or not raw_path.strip():
         raise ProposalValidationError(f"{field_name} must be a non-empty string.")
 
-    candidate_path = Path(raw_path).expanduser()
-    if not candidate_path.is_absolute():
-        candidate_path = vault_root / candidate_path
-    normalized_candidate_path = candidate_path.resolve()
-
     try:
-        normalized_candidate_path.relative_to(vault_root)
-    except ValueError as exc:
+        normalized_relative_path = normalize_to_vault_relative(
+            raw_path,
+            vault_root=vault_root,
+        )
+    except PathContractError as exc:
         raise ProposalValidationError(
-            f"{field_name} must stay within the configured vault."
+            f"{field_name} must stay within the configured vault. {exc}"
         ) from exc
+
+    normalized_candidate_path = resolve_vault_relative(
+        normalized_relative_path,
+        vault_root=vault_root,
+    )
     return normalized_candidate_path
+
+
+def _normalize_contract_path(
+    raw_path: str,
+    *,
+    vault_root: Path,
+    field_name: str,
+) -> str:
+    if not isinstance(raw_path, str) or not raw_path.strip():
+        raise ProposalValidationError(f"{field_name} must be a non-empty string.")
+    try:
+        return normalize_to_vault_relative(raw_path, vault_root=vault_root)
+    except PathContractError as exc:
+        raise ProposalValidationError(
+            f"{field_name} must stay within the configured vault. {exc}"
+        ) from exc
 
 
 def _iter_strings(value: object) -> Iterable[str]:

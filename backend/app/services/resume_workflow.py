@@ -29,6 +29,7 @@ from app.indexing.store import (
     initialize_index_db,
     load_proposal,
 )
+from app.path_semantics import PathContractError, normalize_to_vault_relative
 from app.services.proposal_validation import (
     ProposalValidationError,
     validate_proposal_for_persistence,
@@ -108,6 +109,7 @@ def resume_workflow(
             proposal=proposal,
             approval_decision=approval_decision,
             writeback_result=request.writeback_result,
+            settings=settings,
         )
         matching_checkpoint = _select_matching_checkpoint(
             checkpoints=checkpoints,
@@ -290,6 +292,7 @@ def _materialize_writeback_result(
     proposal: Proposal,
     approval_decision: ApprovalDecision,
     writeback_result: WritebackResult | None,
+    settings: Settings,
 ) -> WritebackResult | None:
     if not approval_decision.approved:
         if writeback_result is not None:
@@ -301,9 +304,14 @@ def _materialize_writeback_result(
     if writeback_result is None:
         return None
 
+    normalized_target_note_path = _normalize_optional_target_note_path(
+        writeback_result.target_note_path,
+        settings=settings,
+        field_name="writeback_result.target_note_path",
+    )
     if (
-        writeback_result.target_note_path is not None
-        and writeback_result.target_note_path != proposal.target_note_path
+        normalized_target_note_path is not None
+        and normalized_target_note_path != proposal.target_note_path
     ):
         raise ResumeWorkflowValidationError(
             "writeback_result.target_note_path must match proposal.target_note_path."
@@ -356,6 +364,25 @@ def _materialize_writeback_result(
     return writeback_result.model_copy(
         update={"target_note_path": proposal.target_note_path}
     )
+
+
+def _normalize_optional_target_note_path(
+    raw_path: str | None,
+    *,
+    settings: Settings,
+    field_name: str,
+) -> str | None:
+    if raw_path is None:
+        return None
+    try:
+        return normalize_to_vault_relative(
+            raw_path,
+            vault_root=settings.sample_vault_dir,
+        )
+    except PathContractError as exc:
+        raise ResumeWorkflowValidationError(
+            f"{field_name} must stay within the configured vault. {exc}"
+        ) from exc
 
 
 def _is_same_effective_decision(
