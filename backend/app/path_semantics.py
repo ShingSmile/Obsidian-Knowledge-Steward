@@ -43,6 +43,7 @@ def normalize_to_vault_relative(
         return _validate_relative_contract_path(legacy_relative_path)
 
     if normalized_raw_path.startswith("/"):
+        _reject_escape_segments(normalized_raw_path)
         resolved_candidate = Path(normalized_raw_path).expanduser().resolve()
         try:
             relative_candidate = resolved_candidate.relative_to(resolved_vault_root)
@@ -64,13 +65,16 @@ def _validate_relative_contract_path(raw_path: str) -> str:
         raise PathContractError("Path value must be non-empty.")
     if normalized_path.startswith("/"):
         raise PathContractError("Path must be vault-relative and not absolute.")
-
-    parts = normalized_path.split("/")
-    if any(part in {".", ".."} for part in parts):
-        raise PathContractError("Path must not contain '.' or '..' segments.")
-    if any(part == "" for part in parts):
+    _reject_escape_segments(normalized_path)
+    if any(part == "" for part in normalized_path.split("/")):
         raise PathContractError("Path must not contain empty path segments.")
     if len(normalized_path) >= 2 and normalized_path[1] == ":" and normalized_path[0].isalpha():
         raise PathContractError("Path must be vault-relative and not a drive path.")
 
     return normalized_path
+
+
+def _reject_escape_segments(raw_path: str) -> None:
+    parts = [part for part in raw_path.split("/") if part]
+    if any(part in {".", ".."} for part in parts):
+        raise PathContractError("Path must not contain '.' or '..' segments.")

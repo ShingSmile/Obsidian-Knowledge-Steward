@@ -57,6 +57,17 @@ class VaultPathSemanticsTests(unittest.TestCase):
                 note_path.resolve(),
             )
 
+    def test_absolute_in_vault_path_with_traversal_is_rejected(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            vault_root = Path(temp_dir) / "vault"
+            vault_root.mkdir()
+
+            with self.assertRaises(PathContractError):
+                normalize_to_vault_relative(
+                    str(vault_root / "Daily" / ".." / "note.md"),
+                    vault_root=vault_root,
+                )
+
     def test_normal_mode_rejects_legacy_vault_prefix(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             vault_root = Path(temp_dir) / "vault"
