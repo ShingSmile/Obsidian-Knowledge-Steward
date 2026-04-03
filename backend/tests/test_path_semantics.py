@@ -68,6 +68,31 @@ class VaultPathSemanticsTests(unittest.TestCase):
                     vault_root=vault_root,
                 )
 
+    def test_absolute_path_outside_vault_is_rejected(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_root = Path(temp_dir)
+            vault_root = temp_root / "vault"
+            vault_root.mkdir()
+            outside_note = temp_root / "outside" / "note.md"
+            outside_note.parent.mkdir()
+            outside_note.write_text("# Outside\n", encoding="utf-8")
+
+            with self.assertRaises(PathContractError):
+                normalize_to_vault_relative(
+                    str(outside_note.resolve()),
+                    vault_root=vault_root,
+                )
+
+    def test_windows_absolute_in_vault_path_normalizes_to_vault_relative(self) -> None:
+        vault_root = Path("C:/Vault")
+
+        normalized = normalize_to_vault_relative(
+            "C:\\Vault\\Daily\\2026-03-14.md",
+            vault_root=vault_root,
+        )
+
+        self.assertEqual(normalized, "Daily/2026-03-14.md")
+
     def test_normal_mode_rejects_legacy_vault_prefix(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             vault_root = Path(temp_dir) / "vault"
@@ -106,3 +131,29 @@ class VaultPathSemanticsTests(unittest.TestCase):
                             vault_root=vault_root,
                             legacy_mode=True,
                         )
+
+    def test_resolve_vault_relative_rejects_symlink_escape(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_root = Path(temp_dir)
+            vault_root = temp_root / "vault"
+            vault_root.mkdir()
+            outside_dir = temp_root / "outside"
+            outside_dir.mkdir()
+            outside_note = outside_dir / "note.md"
+            outside_note.write_text("# Outside\n", encoding="utf-8")
+            escape_link = vault_root / "escape"
+
+            try:
+                escape_link.symlink_to(outside_dir, target_is_directory=True)
+            except (NotImplementedError, OSError):
+                self.skipTest("Symlinks are not available in this environment.")
+
+            with self.assertRaises(PathContractError):
+                resolve_vault_relative(
+                    "escape/note.md",
+                    vault_root=vault_root,
+                )
+
+
+if __name__ == "__main__":
+    unittest.main()
