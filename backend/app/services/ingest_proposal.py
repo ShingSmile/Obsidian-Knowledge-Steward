@@ -21,6 +21,7 @@ from app.contracts.workflow import (
 )
 from app.indexing.models import HeadingInfo, NoteChunk, ParsedNote
 from app.indexing.parser import parse_markdown_note
+from app.path_semantics import normalize_to_vault_relative, resolve_vault_relative
 from app.retrieval.hybrid import search_hybrid_chunks_in_db
 
 
@@ -70,7 +71,10 @@ def build_scoped_ingest_approval_proposal(
     provider_preference: str | None = None,
 ) -> IngestProposalBuildResult:
     normalized_note_paths = [
-        str(Path(note_path).expanduser().resolve())
+        normalize_to_vault_relative(
+            note_path,
+            vault_root=settings.sample_vault_dir,
+        )
         for note_path in note_paths
     ]
     note_meta: dict[str, object] = {
@@ -95,13 +99,17 @@ def build_scoped_ingest_approval_proposal(
             skip_reason=skip_reason,
         )
 
-    target_note_path = Path(normalized_note_paths[0])
-    parsed_note = parse_markdown_note(target_note_path)
+    target_note_path = normalized_note_paths[0]
+    resolved_target_note_path = resolve_vault_relative(
+        target_note_path,
+        vault_root=settings.sample_vault_dir,
+    )
+    parsed_note = parse_markdown_note(resolved_target_note_path)
     anchor_heading = _select_anchor_heading(parsed_note)
     existing_review_heading = _has_existing_review_heading(parsed_note)
     note_meta.update(
         {
-            "target_note_path": str(target_note_path),
+            "target_note_path": target_note_path,
             "title": parsed_note.title,
             "note_type": parsed_note.note_type,
             "template_family": parsed_note.template_family,
@@ -202,7 +210,7 @@ def build_scoped_ingest_approval_proposal(
     )
     proposal_evidence = _build_proposal_evidence(findings=findings)
     context_bundle = build_ingest_context_bundle(
-        target_note_path=str(target_note_path),
+        target_note_path=target_note_path,
         proposal_evidence=proposal_evidence,
         related_candidates=related_candidates,
         token_budget=INGEST_CONTEXT_TOKEN_BUDGET,
@@ -241,10 +249,10 @@ def build_scoped_ingest_approval_proposal(
     proposal = Proposal(
         proposal_id=_build_ingest_proposal_id(
             thread_id=thread_id,
-            target_note_path=str(target_note_path),
+            target_note_path=target_note_path,
         ),
         action_type=WorkflowAction.INGEST_STEWARD,
-        target_note_path=str(target_note_path),
+        target_note_path=target_note_path,
         summary=_build_summary(
             parsed_note=parsed_note,
             findings=findings,
@@ -255,7 +263,7 @@ def build_scoped_ingest_approval_proposal(
         patch_ops=[
             PatchOp(
                 op="merge_frontmatter",
-                target_path=str(target_note_path),
+                target_path=target_note_path,
                 payload={
                     "knowledge_steward": {
                         "governance_status": "needs_review",
@@ -270,7 +278,7 @@ def build_scoped_ingest_approval_proposal(
             ),
             PatchOp(
                 op="insert_under_heading",
-                target_path=str(target_note_path),
+                target_path=target_note_path,
                 payload={
                     "heading": anchor_heading_line,
                     "content": review_markdown,
@@ -278,7 +286,7 @@ def build_scoped_ingest_approval_proposal(
             ),
         ],
         safety_checks=SafetyChecks(
-            before_hash=_compute_note_before_hash(target_note_path),
+            before_hash=_compute_note_before_hash(resolved_target_note_path),
             max_changed_lines=len(review_markdown.splitlines()) + 8,
             contains_delete=False,
         ),
@@ -343,7 +351,7 @@ def _collect_governance_issues(
 
 def _collect_governance_findings(
     *,
-    note_path: Path,
+    note_path: str,
     parsed_note: ParsedNote,
     anchor_heading: HeadingInfo,
     related_candidates: list[RetrievedChunkCandidate],
@@ -406,7 +414,7 @@ def _collect_governance_findings(
                 reason=issue.reason,
                 review_message=issue.review_message,
                 source="local_structure",
-                evidence_path=str(note_path),
+                evidence_path=note_path,
                 evidence_heading_path=(
                     chunk.heading_path
                     if chunk and chunk.heading_path
@@ -503,7 +511,7 @@ def _build_proposal_evidence(
 
 def _build_analysis_result(
     *,
-    note_path: Path,
+    note_path: str,
     parsed_note: ParsedNote,
     retrieval_queries: list[str],
     related_candidates: list[RetrievedChunkCandidate],
@@ -512,7 +520,7 @@ def _build_analysis_result(
 ) -> IngestAnalysisResult:
     return IngestAnalysisResult(
         scope=REVIEW_SCOPE_LABEL,
-        target_note_path=str(note_path),
+        target_note_path=note_path,
         target_note_title=parsed_note.title,
         retrieval_queries=retrieval_queries,
         related_candidates=related_candidates,
@@ -550,7 +558,7 @@ def _select_issue_chunk(
 def _retrieve_related_candidates(
     *,
     db_path: Path,
-    target_note_path: Path,
+    target_note_path: str,
     parsed_note: ParsedNote,
     settings: Settings,
     provider_preference: str | None,
@@ -560,7 +568,6 @@ def _retrieve_related_candidates(
         return [], []
 
     related_candidates_by_chunk: dict[str, RetrievedChunkCandidate] = {}
-    normalized_target_path = str(target_note_path.expanduser().resolve())
     for query in retrieval_queries:
         try:
             response = search_hybrid_chunks_in_db(
@@ -575,9 +582,8 @@ def _retrieve_related_candidates(
             continue
 
         for candidate in response.candidates:
-            candidate_path = str(Path(candidate.path).expanduser().resolve())
             # 显式排除当前目标 note，避免 analysis 把“自己被检索到”误当成 related evidence。
-            if candidate_path == normalized_target_path:
+            if candidate.path == target_note_path:
                 continue
             related_candidates_by_chunk.setdefault(candidate.chunk_id, candidate)
 

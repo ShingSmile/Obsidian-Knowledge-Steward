@@ -11,6 +11,7 @@ from typing import Any, cast
 
 from pydantic import BaseModel
 
+from app.config import Settings
 from app.contracts.workflow import (
     ApprovalDecision,
     AskWorkflowResult,
@@ -88,8 +89,9 @@ def save_graph_checkpoint(
     last_completed_node: str | None,
     next_node_name: str | None,
     state: StewardState,
+    settings: Settings | None = None,
 ) -> None:
-    normalized_db_path = initialize_index_db(db_path)
+    normalized_db_path = initialize_index_db(db_path, settings=settings)
     connection = connect_sqlite(normalized_db_path)
     try:
         with connection:
@@ -184,8 +186,9 @@ def load_graph_checkpoint(
     *,
     thread_id: str,
     graph_name: str,
+    settings: Settings | None = None,
 ) -> PersistedGraphCheckpoint | None:
-    normalized_db_path = initialize_index_db(db_path)
+    normalized_db_path = initialize_index_db(db_path, settings=settings)
     connection = connect_sqlite(normalized_db_path)
     try:
         row = connection.execute(
@@ -221,8 +224,9 @@ def list_graph_checkpoints_for_thread(
     db_path: Path,
     *,
     thread_id: str,
+    settings: Settings | None = None,
 ) -> list[PersistedGraphCheckpoint]:
-    normalized_db_path = initialize_index_db(db_path)
+    normalized_db_path = initialize_index_db(db_path, settings=settings)
     connection = connect_sqlite(normalized_db_path)
     try:
         rows = connection.execute(

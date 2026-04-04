@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+from dataclasses import replace
 from pathlib import Path
 import tempfile
 import unittest
 
+from app.config import get_settings
 from app.contracts.workflow import RetrievalMetadataFilter
 from app.indexing.ingest import ingest_vault
 from app.retrieval.sqlite_fts import search_chunks_in_db
@@ -53,7 +55,10 @@ class SqliteFTSRetrievalTests(unittest.TestCase):
             self.assertTrue(
                 all(candidate.template_family == "daily_cn_template" for candidate in response.candidates)
             )
-            self.assertEqual({Path(candidate.path).name for candidate in response.candidates}, {"2026-03-14.md"})
+            self.assertEqual(
+                {candidate.path for candidate in response.candidates},
+                {"Daily/2026-03-14.md"},
+            )
 
     def test_search_chunks_supports_path_prefix_filter(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -78,16 +83,46 @@ class SqliteFTSRetrievalTests(unittest.TestCase):
                 "Plan",
                 limit=5,
                 metadata_filter=RetrievalMetadataFilter(
-                    path_prefixes=[str((vault_path / "Alpha").resolve())],
+                    path_prefixes=["Alpha/"],
                 ),
             )
 
             self.assertFalse(response.fallback_used)
             self.assertEqual(len(response.candidates), 1)
-            self.assertEqual(Path(response.candidates[0].path).name, "Alpha.md")
-            self.assertTrue(
-                response.candidates[0].path.startswith(str((vault_path / "Alpha").resolve()))
+            self.assertEqual(response.candidates[0].path, "Alpha/Alpha.md")
+
+    def test_search_chunks_normalizes_absolute_path_prefix_filter(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_root = Path(temp_dir)
+            vault_path = temp_root / "vault"
+            (vault_path / "Alpha").mkdir(parents=True)
+            (vault_path / "Beta").mkdir(parents=True)
+            db_path = temp_root / "knowledge_steward.sqlite3"
+
+            (vault_path / "Alpha" / "Alpha.md").write_text(
+                "# Alpha\n\nPlan the next retrieval iteration.\n",
+                encoding="utf-8",
             )
+            (vault_path / "Beta" / "Beta.md").write_text(
+                "# Beta\n\nPlan the next retrieval iteration.\n",
+                encoding="utf-8",
+            )
+
+            ingest_vault(vault_path=vault_path, db_path=db_path)
+            settings = replace(get_settings(), sample_vault_dir=vault_path)
+            response = search_chunks_in_db(
+                db_path,
+                "Plan",
+                limit=5,
+                metadata_filter=RetrievalMetadataFilter(
+                    path_prefixes=[str((vault_path / "Alpha").resolve())],
+                ),
+                settings=settings,
+            )
+
+            self.assertFalse(response.fallback_used)
+            self.assertEqual(len(response.candidates), 1)
+            self.assertEqual(response.candidates[0].path, "Alpha/Alpha.md")
 
     def test_search_chunks_falls_back_when_metadata_filter_is_too_strict(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -114,7 +149,7 @@ class SqliteFTSRetrievalTests(unittest.TestCase):
             self.assertEqual(response.requested_filters.note_types, ["summary_note"])
             self.assertTrue(response.effective_filters.is_empty())
             self.assertEqual(len(response.candidates), 1)
-            self.assertEqual(Path(response.candidates[0].path).name, "Roadmap.md")
+            self.assertEqual(response.candidates[0].path, "Roadmap.md")
 
     def test_search_chunks_normalizes_punctuation_and_rejects_blank_query(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -132,7 +167,7 @@ class SqliteFTSRetrievalTests(unittest.TestCase):
             response = search_chunks_in_db(db_path, "Roadmap!!!", limit=3)
 
             self.assertEqual(len(response.candidates), 1)
-            self.assertEqual(Path(response.candidates[0].path).name, "Roadmap.md")
+            self.assertEqual(response.candidates[0].path, "Roadmap.md")
 
             with self.assertRaises(ValueError):
                 search_chunks_in_db(db_path, "   ", limit=3)

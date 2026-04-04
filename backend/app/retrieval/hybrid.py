@@ -40,7 +40,10 @@ def search_hybrid_chunks(
     if limit <= 0:
         raise ValueError("Search limit must be greater than 0.")
 
-    requested_filter = _normalize_metadata_filter(metadata_filter)
+    requested_filter = _normalize_metadata_filter(
+        metadata_filter,
+        vault_root=settings.sample_vault_dir,
+    )
     primary_response = _search_hybrid_once(
         connection,
         query,
@@ -86,7 +89,10 @@ def search_hybrid_chunks_in_db(
     allow_filter_fallback: bool = True,
 ) -> RetrievalSearchResponse:
     runtime_settings = settings or get_settings()
-    initialized_db_path = initialize_index_db(db_path)
+    initialized_db_path = initialize_index_db(
+        db_path,
+        settings=runtime_settings,
+    )
     connection = connect_sqlite(initialized_db_path)
     try:
         return search_hybrid_chunks(
@@ -118,6 +124,7 @@ def _search_hybrid_once(
         limit=branch_limit,
         metadata_filter=metadata_filter,
         allow_filter_fallback=False,
+        vault_root=settings.sample_vault_dir,
     )
     vector_response = search_chunk_vectors(
         connection,

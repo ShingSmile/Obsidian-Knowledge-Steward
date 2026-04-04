@@ -36,6 +36,7 @@ from app.graphs.runtime import (
 from app.graphs.state import StewardState
 from app.indexing.ingest import ingest_vault, resolve_requested_markdown_notes
 from app.indexing.store import connect_sqlite, initialize_index_db, save_proposal_record
+from app.path_semantics import normalize_to_vault_relative
 from app.services.ingest_proposal import build_scoped_ingest_approval_proposal
 
 
@@ -145,7 +146,10 @@ def build_initial_ingest_state(
     scoped_note_paths: list[str] = []
     if request.note_path or request.note_paths:
         scoped_note_paths = [
-            str(note_path)
+            normalize_to_vault_relative(
+                note_path,
+                vault_root=settings.sample_vault_dir,
+            )
             for note_path in resolve_requested_markdown_notes(
                 settings.sample_vault_dir,
                 note_path=request.note_path,
@@ -370,6 +374,7 @@ def _invoke_ingest_graph_with_approval(
             last_completed_node="finalize_ingest",
             next_node_name=None,
             state=current_state,
+            settings=settings,
         )
         return CheckpointedGraphRun(
             state=current_state,
@@ -387,7 +392,10 @@ def _invoke_ingest_graph_with_approval(
     if proposal_updates:
         current_state.update(proposal_updates)
 
-    normalized_db_path = initialize_index_db(settings.index_db_path)
+    normalized_db_path = initialize_index_db(
+        settings.index_db_path,
+        settings=settings,
+    )
     connection = connect_sqlite(normalized_db_path)
     try:
         # proposal 与 waiting checkpoint 必须原子落盘，否则插件可能先拿到 proposal，

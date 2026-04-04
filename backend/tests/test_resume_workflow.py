@@ -244,7 +244,7 @@ class ResumeWorkflowTests(unittest.TestCase):
                         JOIN note ON note.note_id = chunk.note_id
                         WHERE note.path = ?;
                         """,
-                        (str(target_note_path.resolve()),),
+                        ("Digest/2026-03-14.md",),
                     ).fetchall()
                 }
                 refreshed_hits = connection.execute(

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import argparse
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 import hashlib
 import json
 import math
@@ -19,10 +19,11 @@ from app.contracts.workflow import (
     SafetyChecks,
 )
 from app.indexing.models import ParsedNote
+from app.path_semantics import PathContractError, normalize_to_vault_relative
 from app.services.proposal_validation import normalize_proposal_for_persistence
 
 
-SCHEMA_VERSION = 7
+SCHEMA_VERSION = 8
 
 CHUNK_FTS_POPULATE_SQL = """
 INSERT INTO chunk_fts (
@@ -50,8 +51,8 @@ def _sha1_hexdigest(content: str) -> str:
     return hashlib.sha1(content.encode("utf-8")).hexdigest()
 
 
-def normalize_note_path(note_path: Path) -> str:
-    return str(note_path.expanduser().resolve())
+def normalize_note_path(note_path: Path, *, vault_root: Path) -> str:
+    return normalize_to_vault_relative(note_path, vault_root=vault_root)
 
 
 @dataclass(frozen=True)
@@ -532,6 +533,10 @@ MIGRATIONS: dict[int, str] = {
     CREATE INDEX IF NOT EXISTS idx_chunk_embedding_note_id
         ON chunk_embedding(note_id);
     """,
+    8: """
+    -- Path-contract migration is executed by a Python post-migration hook so it can
+    -- normalize existing JSON payloads and legacy note rows with vault-aware logic.
+    """,
 }
 
 
@@ -543,11 +548,20 @@ def connect_sqlite(db_path: Path) -> sqlite3.Connection:
     return connection
 
 
-def initialize_index_db(db_path: Path) -> Path:
+def initialize_index_db(
+    db_path: Path,
+    *,
+    settings: Settings | None = None,
+) -> Path:
     normalized_path = db_path.expanduser().resolve()
     connection = connect_sqlite(normalized_path)
     try:
         _apply_migrations(connection)
+        _run_post_migration_hooks(
+            connection,
+            settings=settings or get_settings(),
+            strict=settings is not None,
+        )
     finally:
         connection.close()
     return normalized_path
@@ -569,6 +583,19 @@ def _apply_migrations(connection: sqlite3.Connection) -> None:
         connection.commit()
 
 
+def _run_post_migration_hooks(
+    connection: sqlite3.Connection,
+    *,
+    settings: Settings,
+    strict: bool,
+) -> None:
+    current_version = connection.execute("PRAGMA user_version;").fetchone()[0]
+    for target_version, hook in POST_MIGRATION_HOOKS.items():
+        if current_version < target_version:
+            continue
+        hook(connection, settings=settings, strict=strict)
+
+
 def _chunk_fts_exists(connection: sqlite3.Connection) -> bool:
     row = connection.execute(
         """
@@ -580,8 +607,287 @@ def _chunk_fts_exists(connection: sqlite3.Connection) -> bool:
     return row is not None
 
 
-def build_note_record(note_path: Path, parsed_note: ParsedNote) -> NoteRecord:
-    normalized_path = normalize_note_path(note_path)
+def _migrate_path_contract_rows(
+    connection: sqlite3.Connection,
+    *,
+    settings: Settings,
+    strict: bool,
+) -> None:
+    vault_root = settings.sample_vault_dir
+    note_path_updates = _rewrite_table_path_column(
+        connection,
+        table="note",
+        row_id_column="note_id",
+        path_column="path",
+        vault_root=vault_root,
+        strict=strict,
+    )
+    _rewrite_table_path_column(
+        connection,
+        table="proposal",
+        row_id_column="proposal_id",
+        path_column="target_note_path",
+        vault_root=vault_root,
+        strict=strict,
+    )
+    _rewrite_table_path_column(
+        connection,
+        table="proposal_evidence",
+        row_id_column="evidence_id",
+        path_column="source_path",
+        vault_root=vault_root,
+        strict=strict,
+    )
+    _rewrite_table_path_column(
+        connection,
+        table="patch_op",
+        row_id_column="patch_op_id",
+        path_column="target_path",
+        vault_root=vault_root,
+        strict=strict,
+    )
+    _rewrite_table_path_column(
+        connection,
+        table="audit_log",
+        row_id_column="audit_event_id",
+        path_column="target_note_path",
+        vault_root=vault_root,
+        nullable=True,
+        strict=strict,
+    )
+    _rewrite_json_column(
+        connection,
+        table="audit_log",
+        row_id_column="audit_event_id",
+        json_column="approval_payload_json",
+        vault_root=vault_root,
+        strict=strict,
+    )
+    _rewrite_json_column(
+        connection,
+        table="audit_log",
+        row_id_column="audit_event_id",
+        json_column="writeback_result_json",
+        vault_root=vault_root,
+        strict=strict,
+    )
+    _rewrite_json_column(
+        connection,
+        table="audit_log",
+        row_id_column="audit_event_id",
+        json_column="applied_patch_ops_json",
+        vault_root=vault_root,
+        strict=strict,
+    )
+    _rewrite_json_column(
+        connection,
+        table="workflow_checkpoint",
+        row_id_column="checkpoint_id",
+        json_column="state_json",
+        vault_root=vault_root,
+        strict=strict,
+    )
+    if note_path_updates and _chunk_fts_exists(connection):
+        rebuild_chunk_fts_index(connection)
+
+
+def _rewrite_table_path_column(
+    connection: sqlite3.Connection,
+    *,
+    table: str,
+    row_id_column: str,
+    path_column: str,
+    vault_root: Path,
+    nullable: bool = False,
+    strict: bool,
+) -> int:
+    rows = connection.execute(
+        f"""
+        SELECT {row_id_column} AS row_id, {path_column} AS path_value
+        FROM {table};
+        """
+    ).fetchall()
+
+    updates: list[tuple[str | None, str]] = []
+    for row in rows:
+        raw_path = row["path_value"]
+        if raw_path is None:
+            if nullable:
+                continue
+            raise RuntimeError(f"{table}.{path_column} cannot be NULL during path migration.")
+        normalized_path = _normalize_legacy_contract_path(
+            str(raw_path),
+            vault_root=vault_root,
+            strict=strict,
+        )
+        if normalized_path == raw_path:
+            continue
+        updates.append((normalized_path, str(row["row_id"])))
+
+    if not updates:
+        return 0
+
+    with connection:
+        connection.executemany(
+            f"""
+            UPDATE {table}
+            SET {path_column} = ?
+            WHERE {row_id_column} = ?;
+            """,
+            updates,
+        )
+    return len(updates)
+
+
+def _rewrite_json_column(
+    connection: sqlite3.Connection,
+    *,
+    table: str,
+    row_id_column: str,
+    json_column: str,
+    vault_root: Path,
+    strict: bool,
+) -> int:
+    rows = connection.execute(
+        f"""
+        SELECT {row_id_column} AS row_id, {json_column} AS json_value
+        FROM {table};
+        """
+    ).fetchall()
+
+    updates: list[tuple[str, str]] = []
+    for row in rows:
+        raw_json = str(row["json_value"] or "")
+        if not raw_json:
+            continue
+        try:
+            payload = json.loads(raw_json)
+        except json.JSONDecodeError as exc:
+            raise RuntimeError(f"{table}.{json_column} contains invalid JSON.") from exc
+
+        migrated_payload = _rewrite_path_values_in_payload(
+            payload,
+            vault_root=vault_root,
+            strict=strict,
+        )
+        if migrated_payload == payload:
+            continue
+        updates.append(
+            (
+                json.dumps(migrated_payload, ensure_ascii=False, sort_keys=True),
+                str(row["row_id"]),
+            )
+        )
+
+    if not updates:
+        return 0
+
+    with connection:
+        connection.executemany(
+            f"""
+            UPDATE {table}
+            SET {json_column} = ?
+            WHERE {row_id_column} = ?;
+            """,
+            updates,
+        )
+    return len(updates)
+
+
+def _rewrite_path_values_in_payload(
+    payload: Any,
+    *,
+    vault_root: Path,
+    strict: bool,
+) -> Any:
+    if isinstance(payload, dict):
+        rewritten: dict[str, Any] = {}
+        for key, value in payload.items():
+            if key in CONTRACT_PATH_SCALAR_KEYS and isinstance(value, str):
+                rewritten[key] = _normalize_legacy_contract_path(
+                    value,
+                    vault_root=vault_root,
+                    strict=strict,
+                )
+                continue
+            if key in CONTRACT_PATH_LIST_KEYS and isinstance(value, list):
+                rewritten[key] = [
+                    _normalize_legacy_contract_path(
+                        item,
+                        vault_root=vault_root,
+                        strict=strict,
+                    )
+                    if isinstance(item, str)
+                    else _rewrite_path_values_in_payload(
+                        item,
+                        vault_root=vault_root,
+                        strict=strict,
+                    )
+                    for item in value
+                ]
+                continue
+            rewritten[key] = _rewrite_path_values_in_payload(
+                value,
+                vault_root=vault_root,
+                strict=strict,
+            )
+        return rewritten
+    if isinstance(payload, list):
+        return [
+            _rewrite_path_values_in_payload(
+                item,
+                vault_root=vault_root,
+                strict=strict,
+            )
+            for item in payload
+        ]
+    return payload
+
+
+def _normalize_legacy_contract_path(
+    raw_path: str,
+    *,
+    vault_root: Path,
+    strict: bool,
+) -> str:
+    try:
+        return normalize_to_vault_relative(
+            raw_path,
+            vault_root=vault_root,
+            legacy_mode=True,
+        )
+    except PathContractError as exc:
+        if not strict:
+            return raw_path
+        raise RuntimeError(f"Unable to migrate legacy path value: {raw_path!r}") from exc
+
+
+CONTRACT_PATH_SCALAR_KEYS = {
+    "linked_note_path",
+    "note_path",
+    "path",
+    "source_path",
+    "target_note_path",
+    "target_path",
+}
+CONTRACT_PATH_LIST_KEYS = {
+    "note_paths",
+    "related_candidate_paths",
+    "requested_note_paths",
+    "source_paths",
+}
+POST_MIGRATION_HOOKS = {
+    8: _migrate_path_contract_rows,
+}
+
+
+def build_note_record(
+    note_path: Path,
+    parsed_note: ParsedNote,
+    *,
+    vault_root: Path,
+) -> NoteRecord:
+    normalized_path = normalize_note_path(note_path, vault_root=vault_root)
     raw_text = note_path.read_text(encoding="utf-8")
     stat = note_path.stat()
     note_id = f"note_{_sha1_hexdigest(normalized_path)[:16]}"
@@ -825,29 +1131,42 @@ def sync_note_and_chunks(
     note_record: NoteRecord,
     chunk_records: list[ChunkRecord],
 ) -> NoteSyncResult:
-    note_exists = (
-        connection.execute(
-            "SELECT 1 FROM note WHERE note_id = ?;",
-            (note_record.note_id,),
-        ).fetchone()
-        is not None
-    )
+    existing_note_row = connection.execute(
+        """
+        SELECT note_id
+        FROM note
+        WHERE note_id = ? OR path = ?
+        ORDER BY CASE WHEN note_id = ? THEN 0 ELSE 1 END
+        LIMIT 1;
+        """,
+        (note_record.note_id, note_record.path, note_record.note_id),
+    ).fetchone()
+    effective_note_record = note_record
+    effective_chunk_records = chunk_records
+    if existing_note_row is not None and existing_note_row["note_id"] != note_record.note_id:
+        effective_note_id = str(existing_note_row["note_id"])
+        effective_note_record = replace(note_record, note_id=effective_note_id)
+        effective_chunk_records = [
+            replace(chunk_record, note_id=effective_note_id)
+            for chunk_record in chunk_records
+        ]
+    note_exists = existing_note_row is not None
 
     # 这里按单 note 事务做“整 note 替换”，是为了先把幂等边界压清楚：
     # 当标题重排、段落改写或 chunk 数量变化时，旧 chunk 不会残留成脏数据。
     with connection:
-        upsert_note(connection, note_record)
+        upsert_note(connection, effective_note_record)
         replaced_chunk_count = replace_chunks_for_note(
             connection=connection,
-            note_id=note_record.note_id,
-            chunk_records=chunk_records,
+            note_id=effective_note_record.note_id,
+            chunk_records=effective_chunk_records,
         )
 
     return NoteSyncResult(
-        note_id=note_record.note_id,
+        note_id=effective_note_record.note_id,
         note_created=not note_exists,
         replaced_chunk_count=replaced_chunk_count,
-        current_chunk_count=len(chunk_records),
+        current_chunk_count=len(effective_chunk_records),
     )
 
 

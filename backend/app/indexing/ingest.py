@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import argparse
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 import sqlite3
 from typing import Sequence
@@ -19,6 +19,7 @@ from app.indexing.store import (
     sync_note_and_chunks,
     upsert_chunk_embeddings,
 )
+from app.path_semantics import PathContractError, normalize_to_vault_relative, resolve_vault_relative
 from app.retrieval.embeddings import (
     EmbeddingProviderTarget,
     embed_texts,
@@ -89,14 +90,18 @@ def ingest_vault(
     note_paths: Sequence[str | Path] = (),
     settings: Settings | None = None,
 ) -> IngestRunStats:
+    normalized_vault_path = _normalize_vault_path(vault_path)
     markdown_notes = resolve_requested_markdown_notes(
-        vault_path,
+        normalized_vault_path,
         note_path=note_path,
         note_paths=note_paths,
     )
     runtime_settings = settings or get_settings()
     embedding_provider_targets = resolve_embedding_provider_targets(settings=runtime_settings)
-    initialized_db_path = initialize_index_db(db_path)
+    initialized_db_path = initialize_index_db(
+        db_path,
+        settings=replace(runtime_settings, sample_vault_dir=normalized_vault_path),
+    )
     connection = connect_sqlite(initialized_db_path)
 
     created_notes = 0
@@ -110,7 +115,11 @@ def ingest_vault(
     try:
         for note_path in markdown_notes:
             parsed_note = parse_markdown_note(note_path)
-            note_record = build_note_record(note_path, parsed_note)
+            note_record = build_note_record(
+                note_path,
+                parsed_note,
+                vault_root=normalized_vault_path,
+            )
             chunk_records = build_chunk_records(note_record.note_id, parsed_note)
             sync_result = sync_note_and_chunks(
                 connection=connection,
@@ -145,7 +154,7 @@ def ingest_vault(
         connection.close()
 
     return IngestRunStats(
-        vault_path=str(vault_path.expanduser().resolve()),
+        vault_path=str(normalized_vault_path),
         db_path=str(initialized_db_path),
         scanned_notes=len(markdown_notes),
         created_notes=created_notes,
@@ -188,16 +197,16 @@ def _resolve_requested_note_path(vault_path: Path, requested_note_path: str | Pa
     if not raw_note_path:
         raise ValueError("Scoped ingest note paths must be non-empty strings.")
 
-    candidate_path = Path(raw_note_path).expanduser()
-    if not candidate_path.is_absolute():
-        candidate_path = vault_path / candidate_path
-    normalized_candidate_path = candidate_path.resolve()
-
-    # 这里强制限制在 vault 根目录内，是为了防止 API 传入任意绝对路径后把本地其他 Markdown
-    # 文件错误吸进知识库，尤其是在后续插件或自动化接入 scoped ingest 时形成越权读取。
     try:
-        normalized_candidate_path.relative_to(vault_path)
-    except ValueError as exc:
+        normalized_note_path = normalize_to_vault_relative(
+            raw_note_path,
+            vault_root=vault_path,
+        )
+        normalized_candidate_path = resolve_vault_relative(
+            normalized_note_path,
+            vault_root=vault_path,
+        )
+    except PathContractError as exc:
         raise ValueError(
             "Scoped ingest note paths must stay within the configured vault."
         ) from exc

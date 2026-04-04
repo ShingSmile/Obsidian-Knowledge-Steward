@@ -71,10 +71,14 @@ def resume_workflow(
     settings: Settings,
     run_id: str,
 ) -> ResumedWorkflowExecution:
-    normalized_db_path = initialize_index_db(settings.index_db_path)
+    normalized_db_path = initialize_index_db(
+        settings.index_db_path,
+        settings=settings,
+    )
     checkpoints = list_graph_checkpoints_for_thread(
         normalized_db_path,
         thread_id=request.thread_id,
+        settings=settings,
     )
     if not checkpoints:
         raise ResumeWorkflowNotFoundError(

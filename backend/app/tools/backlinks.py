@@ -5,6 +5,8 @@ from pathlib import Path
 import json
 import sqlite3
 
+from app.path_semantics import PathContractError, normalize_to_vault_relative, resolve_vault_relative
+
 
 @dataclass(frozen=True)
 class BacklinkRecord:
@@ -43,8 +45,12 @@ def collect_verified_backlinks(
     vault_root: Path,
     target_path: Path,
 ) -> tuple[list[BacklinkRecord], dict[str, object]]:
-    resolved_target = target_path.expanduser().resolve()
-    target_row = _load_note_row(connection, resolved_target)
+    try:
+        normalized_target_path = normalize_to_vault_relative(target_path, vault_root=vault_root)
+        resolved_target = resolve_vault_relative(normalized_target_path, vault_root=vault_root)
+    except PathContractError:
+        return [], {"failure_code": "index_stale", "target_invalid": True}
+    target_row = _load_note_row(connection, normalized_target_path)
     if target_row is None:
         return [], {"failure_code": "index_stale", "target_missing": True}
     if not _is_fresh(resolved_target, int(target_row["source_mtime_ns"])):
@@ -63,13 +69,18 @@ def collect_verified_backlinks(
     stale_candidate_count = 0
 
     for row in candidate_rows:
-        source_path = Path(str(row["source_path"]))
-        if not _is_fresh(source_path, int(row["source_mtime_ns"])):
+        source_path = str(row["source_path"])
+        try:
+            resolved_source_path = resolve_vault_relative(source_path, vault_root=vault_root)
+        except PathContractError:
+            stale_candidate_count += 1
+            continue
+        if not _is_fresh(resolved_source_path, int(row["source_mtime_ns"])):
             stale_candidate_count += 1
             continue
         verified.append(
             BacklinkRecord(
-                source_path=str(source_path),
+                source_path=source_path,
                 chunk_id=str(row["chunk_id"]),
                 heading_path=row["heading_path"],
                 start_line=int(row["start_line"]),
@@ -115,7 +126,7 @@ def normalize_wikilink_target(raw_link_text: str) -> str:
 
 def _load_note_row(
     connection: sqlite3.Connection,
-    resolved_target: Path,
+    normalized_target_path: str,
 ) -> sqlite3.Row | None:
     return connection.execute(
         """
@@ -127,7 +138,7 @@ def _load_note_row(
         WHERE path = ?
         LIMIT 1;
         """,
-        (str(resolved_target),),
+        (normalized_target_path,),
     ).fetchone()
 
 

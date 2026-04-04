@@ -100,9 +100,11 @@ function normalizeWindowsAbsolutePath(app: VaultPathApp, rawPath: string): strin
 
   const vaultRoot = normalizeFilesystemPath(path.win32.resolve(adapter.getBasePath()));
   const absolutePath = normalizeFilesystemPath(path.win32.resolve(rawPath));
+  const comparisonVaultRoot = vaultRoot.toLowerCase();
+  const comparisonAbsolutePath = absolutePath.toLowerCase();
   if (
-    absolutePath !== vaultRoot
-    && !absolutePath.startsWith(`${vaultRoot}/`)
+    comparisonAbsolutePath !== comparisonVaultRoot
+    && !comparisonAbsolutePath.startsWith(`${comparisonVaultRoot}/`)
   ) {
     if (isLegacyVaultPseudoPath(rawPath)) {
       throw new PathContractError("Legacy /vault/ paths are not accepted in normal mode.");

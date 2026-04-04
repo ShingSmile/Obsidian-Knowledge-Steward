@@ -615,7 +615,7 @@ class AskWorkflowTests(unittest.TestCase):
                     retrieval_source="hybrid_rrf",
                     chunk_id="roadmap-alpha",
                     note_id="note_alpha",
-                    path="/vault/alpha/Roadmap.md",
+                    path="alpha/Roadmap.md",
                     title="Roadmap",
                     heading_path="Roadmap",
                     note_type="summary_note",
@@ -632,7 +632,7 @@ class AskWorkflowTests(unittest.TestCase):
                     retrieval_source="hybrid_rrf",
                     chunk_id="roadmap-beta",
                     note_id="note_beta",
-                    path="/vault/beta/Roadmap.md",
+                    path="beta/Roadmap.md",
                     title="Roadmap",
                     heading_path="Roadmap",
                     note_type="summary_note",
@@ -854,7 +854,7 @@ class AskWorkflowTests(unittest.TestCase):
                 retrieval_source="hybrid_rrf",
                 chunk_id="roadmap-main",
                 note_id="note_roadmap",
-                path="/vault/roadmap/Roadmap.md",
+                path="roadmap/Roadmap.md",
                 title="Roadmap",
                 heading_path="Roadmap",
                 note_type="summary_note",
@@ -945,7 +945,7 @@ class AskWorkflowTests(unittest.TestCase):
                     retrieval_source="hybrid_rrf",
                     chunk_id="raw-first",
                     note_id="note_first",
-                    path="/vault/first/First.md",
+                    path="first/First.md",
                     title="First",
                     heading_path="First",
                     note_type="summary_note",
@@ -962,7 +962,7 @@ class AskWorkflowTests(unittest.TestCase):
                     retrieval_source="hybrid_rrf",
                     chunk_id="raw-second",
                     note_id="note_second",
-                    path="/vault/second/Second.md",
+                    path="second/Second.md",
                     title="Second",
                     heading_path="Second",
                     note_type="summary_note",
@@ -979,7 +979,7 @@ class AskWorkflowTests(unittest.TestCase):
                     retrieval_source="hybrid_rrf",
                     chunk_id="raw-filtered",
                     note_id="note_filtered",
-                    path="/vault/filtered/Filtered.md",
+                    path="filtered/Filtered.md",
                     title="Filtered",
                     heading_path="Filtered",
                     note_type="summary_note",
@@ -998,7 +998,7 @@ class AskWorkflowTests(unittest.TestCase):
                 workflow_action=WorkflowAction.ASK_QA,
                 evidence_items=[
                     ContextEvidenceItem(
-                        source_path="/vault/second/Second.md",
+                        source_path="second/Second.md",
                         chunk_id="raw-second",
                         source_note_title="Second",
                         heading_path="Second",
@@ -1008,7 +1008,7 @@ class AskWorkflowTests(unittest.TestCase):
                         source_kind="retrieval",
                     ),
                     ContextEvidenceItem(
-                        source_path="/vault/first/First.md",
+                        source_path="first/First.md",
                         chunk_id="raw-first",
                         source_note_title="First",
                         heading_path="First",
@@ -1048,6 +1048,14 @@ class AskWorkflowTests(unittest.TestCase):
             self.assertEqual(result.mode, AskResultMode.GENERATED_ANSWER)
             self.assertEqual([candidate.chunk_id for candidate in result.retrieved_candidates], ["raw-second", "raw-first"])
             self.assertEqual([citation.chunk_id for citation in result.citations], ["raw-second", "raw-first"])
+            self.assertEqual(
+                [candidate.path for candidate in result.retrieved_candidates],
+                ["second/Second.md", "first/First.md"],
+            )
+            self.assertEqual(
+                [citation.path for citation in result.citations],
+                ["second/Second.md", "first/First.md"],
+            )
             self.assertNotIn("raw-filtered", [citation.chunk_id for citation in result.citations])
 
     def test_ask_workflow_downgrades_when_generated_answer_has_no_citation(self) -> None:

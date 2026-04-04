@@ -210,7 +210,11 @@ tags:
             try:
                 for note_path in (target_path, source_path):
                     parsed_note = parse_markdown_note(note_path)
-                    note_record = build_note_record(note_path, parsed_note)
+                    note_record = build_note_record(
+                        note_path,
+                        parsed_note,
+                        vault_root=vault_path,
+                    )
                     chunk_records = build_chunk_records(note_record.note_id, parsed_note)
                     sync_note_and_chunks(connection, note_record, chunk_records)
             finally:
@@ -277,7 +281,11 @@ tags:
             try:
                 for note_path in (target_path, source_path):
                     parsed_note = parse_markdown_note(note_path)
-                    note_record = build_note_record(note_path, parsed_note)
+                    note_record = build_note_record(
+                        note_path,
+                        parsed_note,
+                        vault_root=vault_path,
+                    )
                     chunk_records = build_chunk_records(note_record.note_id, parsed_note)
                     sync_note_and_chunks(connection, note_record, chunk_records)
             finally:
@@ -300,12 +308,12 @@ tags:
             )
 
             self.assertTrue(result.ok)
-            self.assertEqual(result.data["target_path"], str(target_path.resolve()))
+            self.assertEqual(result.data["target_path"], "Target.md")
             self.assertEqual(
                 result.data["backlinks"],
                 [
                     {
-                        "source_path": str(source_path.resolve()),
+                        "source_path": "Source.md",
                         "chunk_id": result.data["backlinks"][0]["chunk_id"],
                         "heading_path": "Source",
                         "start_line": 1,

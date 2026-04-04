@@ -263,14 +263,20 @@ link to [[Roadmap]]
 body text
 """
         with tempfile.TemporaryDirectory() as temp_dir:
-            note_path = Path(temp_dir) / "2026-03-12 Summary.md"
+            vault_path = Path(temp_dir) / "vault"
+            vault_path.mkdir()
+            note_path = vault_path / "2026-03-12 Summary.md"
             note_path.write_text(markdown, encoding="utf-8")
 
             parsed_note = parse_markdown_note(note_path)
-            note_record = build_note_record(note_path, parsed_note)
+            note_record = build_note_record(
+                note_path,
+                parsed_note,
+                vault_root=vault_path,
+            )
             chunk_records = build_chunk_records(note_record.note_id, parsed_note)
 
-            self.assertEqual(note_record.path, str(note_path.resolve()))
+            self.assertEqual(note_record.path, "2026-03-12 Summary.md")
             self.assertEqual(note_record.task_count, parsed_note.task_count)
             self.assertEqual(note_record.out_links, tuple(parsed_note.wikilinks))
             self.assertTrue(note_record.content_hash)

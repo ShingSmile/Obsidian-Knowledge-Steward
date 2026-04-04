@@ -36,7 +36,10 @@ def search_chunk_vectors(
     if not normalized_query:
         raise ValueError("Vector search query must be a non-empty string.")
 
-    requested_filter = _normalize_metadata_filter(metadata_filter)
+    requested_filter = _normalize_metadata_filter(
+        metadata_filter,
+        vault_root=settings.sample_vault_dir,
+    )
     query_embedding_result = embed_texts(
         [normalized_query],
         settings=settings,
@@ -119,7 +122,10 @@ def search_chunk_vectors_in_db(
     allow_filter_fallback: bool = True,
 ) -> RetrievalSearchResponse:
     runtime_settings = settings or get_settings()
-    initialized_db_path = initialize_index_db(db_path)
+    initialized_db_path = initialize_index_db(
+        db_path,
+        settings=runtime_settings,
+    )
     connection = connect_sqlite(initialized_db_path)
     try:
         return search_chunk_vectors(

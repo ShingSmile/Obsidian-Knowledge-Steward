@@ -57,10 +57,7 @@ export async function applyProposalWriteback(
     }
 
     const normalizedPatchOps = proposal.patch_ops.map((patchOp) => normalizePatchOp(patchOp));
-    const canonicalPatchOps = normalizedPatchOps.map((patchOp) => ({
-      ...patchOp,
-      target_path: normalizeWritebackTargetPath(app, patchOp.target_path)
-    }));
+    const canonicalPatchOps = normalizedPatchOps.map((patchOp) => canonicalizePatchOp(app, patchOp));
     canonicalProposal = {
       ...proposal,
       target_note_path: canonicalTargetNotePath,
@@ -167,6 +164,7 @@ export async function rollbackProposalWriteback(
         ...proposal,
         target_note_path: canonicalTargetNotePath
       }, {
+        targetNotePath: canonicalTargetNotePath,
         beforeHash: currentHash,
         error: (
           `Rollback refused for ${canonicalTargetNotePath ?? "the target note"}. `
@@ -184,6 +182,7 @@ export async function rollbackProposalWriteback(
         ...proposal,
         target_note_path: canonicalTargetNotePath
       }, {
+        targetNotePath: canonicalTargetNotePath,
         beforeHash: currentHash,
         error: (
           `Rollback snapshot for ${canonicalTargetNotePath ?? "the target note"} is inconsistent with `
@@ -378,6 +377,27 @@ function resolveTargetFile(app: App, targetPath: string): TFile {
   return resolveExistingFile(app, targetPath, "Target note");
 }
 
+function canonicalizePatchOp(app: App, patchOp: NormalizedPatchOp): NormalizedPatchOp {
+  const canonicalTargetPath = normalizeWritebackTargetPath(app, patchOp.target_path);
+  if (patchOp.normalizedOp !== "add_wikilink") {
+    return {
+      ...patchOp,
+      target_path: canonicalTargetPath
+    };
+  }
+
+  const wikilinkPayload = extractAddWikilinkPayload(patchOp);
+  return {
+    ...patchOp,
+    target_path: canonicalTargetPath,
+    payload: {
+      ...patchOp.payload,
+      heading: wikilinkPayload.heading,
+      linked_note_path: normalizeWritebackTargetPath(app, wikilinkPayload.linked_note_path)
+    }
+  };
+}
+
 function resolveExistingFile(app: App, targetPath: string, label: string): TFile {
   const vaultPath = normalizeWritebackTargetPath(app, targetPath);
   const abstractFile = app.vault.getAbstractFileByPath(vaultPath);
@@ -470,7 +490,15 @@ function sectionContainsWikilinkTarget(
 }
 
 function isVaultFileLike(value: unknown): value is TFile {
-  return typeof value === "object" && value !== null && typeof (value as { path?: unknown }).path === "string";
+  return (
+    typeof value === "object"
+    && value !== null
+    && typeof (value as { path?: unknown }).path === "string"
+    && typeof (value as { basename?: unknown }).basename === "string"
+    && typeof (value as { extension?: unknown }).extension === "string"
+    && typeof (value as { stat?: unknown }).stat === "object"
+    && (value as { stat?: unknown }).stat !== null
+  );
 }
 
 function findHeadingSectionBounds(

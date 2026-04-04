@@ -452,7 +452,10 @@ def rollback_workflow_endpoint(
 
 @app.get("/workflows/pending-approvals", response_model=WorkflowPendingApprovalsResponse, tags=["workflow"])
 def list_pending_approvals_endpoint() -> WorkflowPendingApprovalsResponse:
-    normalized_db_path = initialize_index_db(settings.index_db_path)
+    normalized_db_path = initialize_index_db(
+        settings.index_db_path,
+        settings=settings,
+    )
     connection = connect_sqlite(normalized_db_path)
     try:
         pending_records = list_pending_approval_records(connection)

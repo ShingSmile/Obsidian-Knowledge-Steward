@@ -7,6 +7,7 @@ from app.config import Settings
 from app.contracts.workflow import ToolExecutionResult
 from app.indexing.store import connect_sqlite, initialize_index_db, list_pending_approval_records
 from app.indexing.parser import parse_markdown_note
+from app.path_semantics import PathContractError, normalize_to_vault_relative, resolve_vault_relative
 from app.retrieval.hybrid import search_hybrid_chunks_in_db
 from app.tools.backlinks import collect_verified_backlinks
 
@@ -67,8 +68,8 @@ def execute_get_note_outline(
             allow_context_reentry=False,
         )
 
-    resolved_note = _resolve_note_path(settings.sample_vault_dir, note_path_arg.strip())
-    if resolved_note is None:
+    note_resolution = _resolve_note_path(settings.sample_vault_dir, note_path_arg.strip())
+    if note_resolution is None:
         return ToolExecutionResult(
             tool_name="get_note_outline",
             ok=False,
@@ -76,6 +77,7 @@ def execute_get_note_outline(
             diagnostics={"failure_code": "note_path_outside_vault"},
             allow_context_reentry=False,
         )
+    canonical_note_path, resolved_note = note_resolution
     if not resolved_note.exists() or not resolved_note.is_file():
         return ToolExecutionResult(
             tool_name="get_note_outline",
@@ -101,7 +103,7 @@ def execute_get_note_outline(
         tool_name="get_note_outline",
         ok=True,
         data={
-            "note_path": note_path_arg.strip(),
+            "note_path": canonical_note_path,
             "title": parsed_note.title,
             "has_frontmatter": parsed_note.has_frontmatter,
             "frontmatter_summary": _summarize_frontmatter(raw_text),
@@ -125,13 +127,14 @@ def execute_load_note_excerpt(
         )
 
     max_chars = _coerce_positive_int(arguments.get("max_chars"), default=600, maximum=4000)
-    resolved_note = _resolve_note_path(settings.sample_vault_dir, note_path_arg.strip())
-    if resolved_note is None:
+    note_resolution = _resolve_note_path(settings.sample_vault_dir, note_path_arg.strip())
+    if note_resolution is None:
         return ToolExecutionResult(
             tool_name="load_note_excerpt",
             ok=False,
             error="note_path_outside_vault",
         )
+    canonical_note_path, resolved_note = note_resolution
     if not resolved_note.exists() or not resolved_note.is_file():
         return ToolExecutionResult(
             tool_name="load_note_excerpt",
@@ -144,7 +147,7 @@ def execute_load_note_excerpt(
         tool_name="load_note_excerpt",
         ok=True,
         data={
-            "note_path": note_path_arg.strip(),
+            "note_path": canonical_note_path,
             "excerpt": content[:max_chars],
             "line_count": content.count("\n") + (1 if content else 0),
         },
@@ -157,7 +160,10 @@ def execute_list_pending_approvals(
     settings: Settings,
 ) -> ToolExecutionResult:
     _ = arguments
-    db_path = initialize_index_db(settings.index_db_path)
+    db_path = initialize_index_db(
+        settings.index_db_path,
+        settings=settings,
+    )
     connection = connect_sqlite(db_path)
     try:
         pending_records = list_pending_approval_records(connection)
@@ -200,8 +206,8 @@ def execute_find_backlinks(
             allow_context_reentry=False,
         )
 
-    resolved_note = _resolve_note_path(settings.sample_vault_dir, note_path_arg.strip())
-    if resolved_note is None:
+    note_resolution = _resolve_note_path(settings.sample_vault_dir, note_path_arg.strip())
+    if note_resolution is None:
         return ToolExecutionResult(
             tool_name="find_backlinks",
             ok=False,
@@ -209,6 +215,7 @@ def execute_find_backlinks(
             diagnostics={"failure_code": "note_path_outside_vault"},
             allow_context_reentry=False,
         )
+    canonical_note_path, resolved_note = note_resolution
     if not resolved_note.exists() or not resolved_note.is_file():
         return ToolExecutionResult(
             tool_name="find_backlinks",
@@ -218,7 +225,10 @@ def execute_find_backlinks(
             allow_context_reentry=False,
         )
 
-    db_path = initialize_index_db(settings.index_db_path)
+    db_path = initialize_index_db(
+        settings.index_db_path,
+        settings=settings,
+    )
     connection = connect_sqlite(db_path)
     try:
         backlinks, diagnostics = collect_verified_backlinks(
@@ -243,7 +253,7 @@ def execute_find_backlinks(
         tool_name="find_backlinks",
         ok=True,
         data={
-            "target_path": str(resolved_note),
+            "target_path": canonical_note_path,
             "backlinks": [
                 {
                     "source_path": backlink.source_path,
@@ -269,12 +279,19 @@ def _coerce_positive_int(value: object, *, default: int, maximum: int) -> int:
     return default
 
 
-def _resolve_note_path(vault_root: Path, note_path: str) -> Path | None:
-    resolved_root = vault_root.expanduser().resolve()
-    resolved_note = (resolved_root / note_path).resolve()
-    if not resolved_note.is_relative_to(resolved_root):
+def _resolve_note_path(vault_root: Path, note_path: str) -> tuple[str, Path] | None:
+    try:
+        canonical_note_path = normalize_to_vault_relative(
+            note_path,
+            vault_root=vault_root,
+        )
+        resolved_note = resolve_vault_relative(
+            canonical_note_path,
+            vault_root=vault_root,
+        )
+    except PathContractError:
         return None
-    return resolved_note
+    return canonical_note_path, resolved_note
 
 def _summarize_frontmatter(text: str) -> dict[str, object]:
     match = FRONTMATTER_RE.match(text)

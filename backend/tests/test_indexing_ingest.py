@@ -155,7 +155,7 @@ class IndexIngestTests(unittest.TestCase):
                         JOIN note ON note.note_id = chunk.note_id
                         WHERE note.path = ?;
                         """,
-                        (str(alpha_path.resolve()),),
+                        ("Alpha.md",),
                     ).fetchall()
                 }
                 beta_texts = {
@@ -167,7 +167,7 @@ class IndexIngestTests(unittest.TestCase):
                         JOIN note ON note.note_id = chunk.note_id
                         WHERE note.path = ?;
                         """,
-                        (str(beta_path.resolve()),),
+                        ("Beta.md",),
                     ).fetchall()
                 }
                 refreshed_hits = connection.execute(
@@ -187,6 +187,33 @@ class IndexIngestTests(unittest.TestCase):
             self.assertEqual(beta_texts, {"# Beta\n\nbetapersist token"})
             self.assertGreater(refreshed_hits, 0)
             self.assertEqual(legacy_hits, 0)
+
+    def test_ingest_vault_canonicalizes_absolute_scoped_note_path_before_persisting(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_root = Path(temp_dir)
+            vault_path = temp_root / "vault"
+            vault_path.mkdir()
+            db_path = temp_root / "knowledge_steward.sqlite3"
+            alpha_path = vault_path / "Alpha.md"
+
+            alpha_path.write_text("# Alpha\n\nalpha body\n", encoding="utf-8")
+
+            scoped_stats = ingest_vault(
+                vault_path=vault_path,
+                db_path=db_path,
+                note_path=str(alpha_path.resolve()),
+            )
+
+            connection = sqlite3.connect(db_path)
+            try:
+                stored_paths = {
+                    row[0] for row in connection.execute("SELECT path FROM note;").fetchall()
+                }
+            finally:
+                connection.close()
+
+            self.assertEqual(scoped_stats.scanned_notes, 1)
+            self.assertEqual(stored_paths, {"Alpha.md"})
 
     def test_ingest_vault_supports_scoped_note_list(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -223,7 +250,7 @@ class IndexIngestTests(unittest.TestCase):
             self.assertEqual(scoped_stats.updated_notes, 0)
             self.assertEqual(
                 stored_paths,
-                {str(alpha_path.resolve()), str(beta_path.resolve())},
+                {"Alpha.md", "nested/Beta.md"},
             )
 
     def test_ingest_vault_writes_chunk_embeddings_when_provider_is_available(self) -> None:

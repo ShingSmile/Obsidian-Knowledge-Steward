@@ -242,10 +242,7 @@ class DigestWorkflowTests(unittest.TestCase):
             self.assertTrue(result.approval_required)
             self.assertIsNotNone(result.proposal)
             self.assertIsNotNone(result.digest_result)
-            self.assertEqual(
-                Path(result.proposal.target_note_path).resolve(),
-                (vault_path / "2026-03-14.md").resolve(),
-            )
+            self.assertEqual(result.proposal.target_note_path, "2026-03-14.md")
 
             checkpoint = load_graph_checkpoint(
                 db_path,

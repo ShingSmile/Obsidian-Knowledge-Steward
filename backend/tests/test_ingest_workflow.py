@@ -63,6 +63,9 @@ class IngestWorkflowTests(unittest.TestCase):
                 settings=settings,
             )
             self.assertIsNotNone(build_result.proposal)
+            self.assertEqual(build_result.proposal.target_note_path, "Alpha.md")
+            self.assertEqual(build_result.note_meta["requested_note_paths"], ["Alpha.md"])
+            self.assertEqual(build_result.note_meta["target_note_path"], "Alpha.md")
             self.assertIn("context_bundle_summary", build_result.note_meta)
             bundle_summary = build_result.note_meta["context_bundle_summary"]
             self.assertIsInstance(bundle_summary, dict)
@@ -338,12 +341,10 @@ class IngestWorkflowTests(unittest.TestCase):
             self.assertIsNotNone(result.proposal)
             self.assertIsNotNone(result.ingest_result)
             self.assertEqual(result.ingest_result.scanned_notes, 1)
-            self.assertEqual(
-                Path(result.proposal.target_note_path).resolve(),
-                (vault_path / "Alpha.md").resolve(),
-            )
+            self.assertEqual(result.proposal.target_note_path, "Alpha.md")
             self.assertEqual(len(result.proposal.patch_ops), 2)
             self.assertIsNotNone(result.analysis_result)
+            self.assertEqual(result.analysis_result.target_note_path, "Alpha.md")
             self.assertIn(
                 "orphan_hint",
                 [finding.finding_type for finding in result.analysis_result.findings],
@@ -351,13 +352,13 @@ class IngestWorkflowTests(unittest.TestCase):
             self.assertTrue(result.analysis_result.related_candidates)
             self.assertTrue(
                 all(
-                    Path(candidate.path).resolve() != (vault_path / "Alpha.md").resolve()
+                    candidate.path != "Alpha.md"
                     for candidate in result.analysis_result.related_candidates
                 )
             )
             self.assertTrue(
                 any(
-                    Path(candidate.path).resolve() == (vault_path / "Beta.md").resolve()
+                    candidate.path == "Beta.md"
                     for candidate in result.analysis_result.related_candidates
                 )
             )
@@ -379,6 +380,15 @@ class IngestWorkflowTests(unittest.TestCase):
                 checkpoint.state["proposal"].proposal_id,
                 result.proposal.proposal_id,
             )
+            self.assertEqual(checkpoint.state["note_paths"], ["Alpha.md"])
+            self.assertEqual(
+                checkpoint.state["note_meta"]["requested_note_paths"],
+                ["Alpha.md"],
+            )
+            self.assertEqual(
+                checkpoint.state["note_meta"]["target_note_path"],
+                "Alpha.md",
+            )
 
             connection = connect_sqlite(db_path)
             try:
@@ -394,7 +404,7 @@ class IngestWorkflowTests(unittest.TestCase):
             self.assertEqual(len(persisted_proposal.proposal.evidence), 3)
             self.assertTrue(
                 any(
-                    Path(evidence.source_path).resolve() == (vault_path / "Beta.md").resolve()
+                    evidence.source_path == "Beta.md"
                     for evidence in persisted_proposal.proposal.evidence
                 )
             )
@@ -527,10 +537,7 @@ class IngestWorkflowTests(unittest.TestCase):
             self.assertEqual(pending_item.graph_name, "ingest_graph")
             self.assertEqual(pending_item.proposal_id, result.proposal.proposal_id)
             self.assertEqual(pending_item.action_type, WorkflowAction.INGEST_STEWARD)
-            self.assertEqual(
-                Path(pending_item.target_note_path).resolve(),
-                (vault_path / "Alpha.md").resolve(),
-            )
+            self.assertEqual(pending_item.target_note_path, "Alpha.md")
 
     def test_ingest_proposal_analysis_can_consume_hybrid_related_candidates(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -595,7 +602,7 @@ class IngestWorkflowTests(unittest.TestCase):
             self.assertTrue(result.analysis_result.related_candidates)
             self.assertTrue(
                 any(
-                    Path(candidate.path).resolve() == (vault_path / "Beta.md").resolve()
+                    candidate.path == "Beta.md"
                     and candidate.retrieval_source == "hybrid_rrf"
                     for candidate in result.analysis_result.related_candidates
                 )

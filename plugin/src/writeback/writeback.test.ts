@@ -19,42 +19,65 @@ import type { App } from "obsidian";
 
 const helperFns = writebackHelpers as unknown as Record<string, (...args: any[]) => any>;
 
-function createFakeApp(
-  basePath: string,
-  files: Record<string, string>
-): App {
-  const fileStore = new Map(Object.entries(files));
-
-  const makeFile = (vaultPath: string) => ({
+function createFakeTFile(vaultPath: string): {
+  path: string;
+  basename: string;
+  extension: string;
+  stat: Record<string, unknown>;
+} {
+  const file: {
+    path: string;
+    basename: string;
+    extension: string;
+    stat: Record<string, unknown>;
+  } = {
     path: vaultPath,
     basename: path.posix.basename(vaultPath).replace(/\.(md|markdown)$/i, ""),
     extension: path.posix.extname(vaultPath).replace(/^\./, ""),
     stat: {}
-  });
+  };
+  return file;
+}
+
+function createFakeAppHarness(
+  basePath: string,
+  files: Record<string, string>
+): {
+  app: App;
+  readFile: (vaultPath: string) => string;
+  writeFile: (vaultPath: string, markdown: string) => void;
+} {
+  const fileStore = new Map(Object.entries(files));
 
   return {
-    vault: {
-      adapter: {
-        getBasePath: () => basePath
-      },
-      getAbstractFileByPath: (vaultPath: string) => {
-        if (!fileStore.has(vaultPath)) {
-          return null;
+    app: {
+      vault: {
+        adapter: {
+          getBasePath: () => basePath
+        },
+        getAbstractFileByPath: (vaultPath: string) => {
+          if (!fileStore.has(vaultPath)) {
+            return null;
+          }
+          return createFakeTFile(vaultPath);
+        },
+        cachedRead: async (file: { path: string }) => fileStore.get(file.path) ?? "",
+        modify: async (file: { path: string }, data: string) => {
+          fileStore.set(file.path, data);
         }
-        return makeFile(vaultPath);
       },
-      cachedRead: async (file: { path: string }) => fileStore.get(file.path) ?? "",
-      modify: async (file: { path: string }, data: string) => {
-        fileStore.set(file.path, data);
+      fileManager: {
+        processFrontMatter: async () => {}
+      },
+      metadataCache: {
+        getFileCache: () => null
       }
-    },
-    fileManager: {
-      processFrontMatter: async () => {}
-    },
-    metadataCache: {
-      getFileCache: () => null
+    } as unknown as App,
+    readFile: (vaultPath: string) => fileStore.get(vaultPath) ?? "",
+    writeFile: (vaultPath: string, markdown: string) => {
+      fileStore.set(vaultPath, markdown);
     }
-  } as unknown as App;
+  };
 }
 
 test("normalizePatchOpName accepts canonical and legacy frontmatter op names", () => {
@@ -304,6 +327,22 @@ test("normalizeWritebackTargetPath converts absolute in-vault paths to canonical
   );
 });
 
+test("normalizeWritebackTargetPath accepts Windows absolute paths case-insensitively inside the vault", () => {
+  assert.equal(
+    normalizeWritebackTargetPath(
+      {
+        vault: {
+          adapter: {
+            getBasePath: () => "C:\\Vault"
+          }
+        }
+      },
+      "c:\\Vault\\Daily\\2026-03-14.md"
+    ),
+    "Daily/2026-03-14.md"
+  );
+});
+
 test("normalizeWritebackTargetPath rejects legacy /vault pseudo-paths outside a real /vault root", () => {
   assert.throws(
     () => normalizeWritebackTargetPath(
@@ -316,7 +355,7 @@ test("normalizeWritebackTargetPath rejects legacy /vault pseudo-paths outside a 
       },
       "/vault/Daily/2026-03-14.md"
     ),
-    /Legacy \/vault\/ paths are not accepted in normal mode|Absolute path must resolve inside the configured vault/
+    /Legacy \/vault\/ paths are not accepted in normal mode/
   );
 });
 
@@ -328,11 +367,11 @@ test("applyProposalWriteback and rollbackProposalWriteback preserve canonical ta
     "",
     "## Notes"
   ].join("\n");
-  const app = createFakeApp(vaultRoot, {
+  const harness = createFakeAppHarness(vaultRoot, {
     "Daily/2026-03-14.md": initialMarkdown
   });
 
-  const applyResult = await applyProposalWriteback(app, {
+  const applyResult = await applyProposalWriteback(harness.app, {
     proposal_id: "proposal-absolute-target",
     action_type: "daily_digest",
     target_note_path: targetPath,
@@ -358,10 +397,11 @@ test("applyProposalWriteback and rollbackProposalWriteback preserve canonical ta
 
   assert.equal(applyResult.writeback_result.applied, true);
   assert.equal(applyResult.writeback_result.target_note_path, "Daily/2026-03-14.md");
+  assert.equal(applyResult.writeback_result.applied_patch_ops[0]?.target_path, "Daily/2026-03-14.md");
   assert.ok(applyResult.rollback_context);
 
   const rollbackResult = await rollbackProposalWriteback(
-    app,
+    harness.app,
     {
       proposal_id: "proposal-absolute-target",
       action_type: "daily_digest",
@@ -381,10 +421,119 @@ test("applyProposalWriteback and rollbackProposalWriteback preserve canonical ta
 
   assert.equal(rollbackResult.applied, true);
   assert.equal(rollbackResult.target_note_path, "Daily/2026-03-14.md");
+  assert.equal(harness.readFile("Daily/2026-03-14.md"), initialMarkdown);
+});
+
+test("rollbackProposalWriteback keeps a canonical target path on hash mismatch failure", async () => {
+  const vaultRoot = "/vault";
+  const targetPath = path.join(vaultRoot, "Daily", "2026-03-14.md");
+  const initialMarkdown = [
+    "# Daily",
+    "",
+    "## Notes"
+  ].join("\n");
+  const harness = createFakeAppHarness(vaultRoot, {
+    "Daily/2026-03-14.md": initialMarkdown
+  });
+
+  const applyResult = await applyProposalWriteback(harness.app, {
+    proposal_id: "proposal-rollback-mismatch",
+    action_type: "daily_digest",
+    target_note_path: targetPath,
+    summary: "Normalize path",
+    risk_level: "low",
+    evidence: [],
+    patch_ops: [
+      {
+        op: "insert_under_heading",
+        target_path: targetPath,
+        payload: {
+          heading: "## Notes",
+          content: "- inserted"
+        }
+      }
+    ],
+    safety_checks: {
+      before_hash: computeSha256Hash(initialMarkdown),
+      max_changed_lines: 10,
+      contains_delete: false
+    }
+  });
+
+  assert.ok(applyResult.rollback_context);
+  harness.writeFile("Daily/2026-03-14.md", `${harness.readFile("Daily/2026-03-14.md")}\n- user edit`);
+
+  const rollbackResult = await rollbackProposalWriteback(
+    harness.app,
+    {
+      proposal_id: "proposal-rollback-mismatch",
+      action_type: "daily_digest",
+      target_note_path: targetPath,
+      summary: "Normalize path",
+      risk_level: "low",
+      evidence: [],
+      patch_ops: [],
+      safety_checks: {
+        before_hash: computeSha256Hash(initialMarkdown),
+        max_changed_lines: 10,
+        contains_delete: false
+      }
+    },
+    applyResult.rollback_context
+  );
+
+  assert.equal(rollbackResult.applied, false);
+  assert.equal(rollbackResult.target_note_path, "Daily/2026-03-14.md");
+  assert.match(rollbackResult.error ?? "", /Rollback refused for Daily\/2026-03-14\.md/);
+});
+
+test("applyProposalWriteback canonicalizes add_wikilink payload note paths before building results", async () => {
+  const vaultRoot = "/vault";
+  const targetPath = path.join(vaultRoot, "Root.md");
+  const linkedNotePath = path.join(vaultRoot, "Notes", "Alpha.md");
+  const initialMarkdown = [
+    "# Root",
+    "",
+    "## Links"
+  ].join("\n");
+  const harness = createFakeAppHarness(vaultRoot, {
+    "Root.md": initialMarkdown,
+    "Notes/Alpha.md": "# Alpha\n"
+  });
+
+  const result = await applyProposalWriteback(harness.app, {
+    proposal_id: "proposal-add-wikilink",
+    action_type: "ingest_steward",
+    target_note_path: targetPath,
+    summary: "Add wikilink",
+    risk_level: "low",
+    evidence: [],
+    patch_ops: [
+      {
+        op: "add_wikilink",
+        target_path: targetPath,
+        payload: {
+          heading: "## Links",
+          linked_note_path: linkedNotePath
+        }
+      }
+    ],
+    safety_checks: {
+      before_hash: computeSha256Hash(initialMarkdown),
+      max_changed_lines: 10,
+      contains_delete: false
+    }
+  });
+
+  assert.equal(result.writeback_result.applied, true);
+  assert.equal(
+    result.writeback_result.applied_patch_ops[0]?.payload.linked_note_path,
+    "Notes/Alpha.md"
+  );
 });
 
 test("applyProposalWriteback rejects a /vault pseudo-path on the execution path without leaking it", async () => {
-  const app = createFakeApp("/tmp/workspace/vault", {
+  const harness = createFakeAppHarness("/tmp/workspace/vault", {
     "Daily/2026-03-14.md": [
       "# Daily",
       "",
@@ -392,7 +541,7 @@ test("applyProposalWriteback rejects a /vault pseudo-path on the execution path 
     ].join("\n")
   });
 
-  const result = await applyProposalWriteback(app, {
+  const result = await applyProposalWriteback(harness.app, {
     proposal_id: "proposal-legacy-target",
     action_type: "daily_digest",
     target_note_path: "/vault/Daily/2026-03-14.md",
@@ -422,5 +571,56 @@ test("applyProposalWriteback rejects a /vault pseudo-path on the execution path 
 
   assert.equal(result.writeback_result.applied, false);
   assert.equal(result.writeback_result.target_note_path, null);
-  assert.match(result.writeback_result.error ?? "", /inside the configured vault|Legacy \/vault\//);
+  assert.match(result.writeback_result.error ?? "", /Legacy \/vault\/ paths are not accepted in normal mode/);
+});
+
+test("applyProposalWriteback rejects folder-like targets before attempting file reads", async () => {
+  const app = {
+    vault: {
+      adapter: {
+        getBasePath: () => "/vault"
+      },
+      getAbstractFileByPath: () => ({
+        path: "Daily",
+        children: []
+      }),
+      cachedRead: async () => {
+        throw new Error("cachedRead should not run for folders");
+      },
+      modify: async () => {}
+    },
+    fileManager: {
+      processFrontMatter: async () => {}
+    },
+    metadataCache: {
+      getFileCache: () => null
+    }
+  } as unknown as App;
+
+  const result = await applyProposalWriteback(app, {
+    proposal_id: "proposal-folder-target",
+    action_type: "daily_digest",
+    target_note_path: "/vault/Daily",
+    summary: "Reject folder target",
+    risk_level: "low",
+    evidence: [],
+    patch_ops: [
+      {
+        op: "insert_under_heading",
+        target_path: "/vault/Daily",
+        payload: {
+          heading: "## Notes",
+          content: "- inserted"
+        }
+      }
+    ],
+    safety_checks: {
+      before_hash: null,
+      max_changed_lines: 10,
+      contains_delete: false
+    }
+  });
+
+  assert.equal(result.writeback_result.applied, false);
+  assert.match(result.writeback_result.error ?? "", /Target note was not found in the current vault/);
 });

@@ -18,6 +18,7 @@ from app.contracts.workflow import (
     WorkflowAction,
 )
 from app.indexing.store import connect_sqlite, initialize_index_db
+from app.path_semantics import resolve_vault_relative
 from app.quality.faithfulness import build_runtime_faithfulness_signal
 
 
@@ -30,6 +31,7 @@ def run_minimal_digest(*, settings: Settings) -> DigestWorkflowResult:
     source_notes, fallback_reason = _select_digest_source_notes(
         settings.index_db_path,
         limit=DIGEST_SOURCE_LIMIT,
+        settings=settings,
     )
     if not source_notes:
         return DigestWorkflowResult(
@@ -82,7 +84,10 @@ def build_digest_approval_proposal(
 
     target_note = _select_digest_target_note(digest_result.source_notes)
     before_hash = _compute_note_before_hash(
-        settings.sample_vault_dir / target_note.path,
+        resolve_vault_relative(
+            target_note.path,
+            vault_root=settings.sample_vault_dir,
+        ),
     )
     digest_heading = "## Knowledge Steward Digest"
     patch_ops = [
@@ -144,8 +149,9 @@ def _select_digest_source_notes(
     db_path: Path,
     *,
     limit: int,
+    settings: Settings,
 ) -> tuple[list[DigestSourceNote], str | None]:
-    normalized_db_path = initialize_index_db(db_path)
+    normalized_db_path = initialize_index_db(db_path, settings=settings)
     connection = connect_sqlite(normalized_db_path)
     try:
         preferred_notes = _query_digest_source_notes(

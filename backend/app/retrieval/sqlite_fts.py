@@ -5,13 +5,14 @@ from pathlib import Path
 import re
 import sqlite3
 
-from app.config import get_settings
+from app.config import Settings, get_settings
 from app.contracts.workflow import (
     RetrievalMetadataFilter,
     RetrievalSearchResponse,
     RetrievedChunkCandidate,
 )
 from app.indexing.store import connect_sqlite, initialize_index_db, rebuild_chunk_fts_index
+from app.path_semantics import PathContractError, normalize_path_separators, normalize_to_vault_relative
 
 
 QUERY_TERM_RE = re.compile(r"[0-9A-Za-z_\u4e00-\u9fff]+")
@@ -58,6 +59,8 @@ def _deduplicate_terms(values: list[str], *, casefold: bool = False) -> list[str
 
 def _normalize_metadata_filter(
     metadata_filter: RetrievalMetadataFilter | None,
+    *,
+    vault_root: Path | None = None,
 ) -> RetrievalMetadataFilter:
     if metadata_filter is None:
         return RetrievalMetadataFilter()
@@ -87,7 +90,10 @@ def _normalize_metadata_filter(
         raise ValueError("daily_note_date_from must be less than or equal to daily_note_date_to.")
 
     return RetrievalMetadataFilter(
-        path_prefixes=_deduplicate_terms(metadata_filter.path_prefixes),
+        path_prefixes=_normalize_path_prefixes(
+            metadata_filter.path_prefixes,
+            vault_root=vault_root,
+        ),
         note_types=_deduplicate_terms(metadata_filter.note_types, casefold=True),
         template_families=_deduplicate_terms(
             metadata_filter.template_families,
@@ -98,6 +104,44 @@ def _normalize_metadata_filter(
         daily_note_date_from=daily_note_date_from,
         daily_note_date_to=daily_note_date_to,
     )
+
+
+def _normalize_path_prefixes(
+    values: list[str],
+    *,
+    vault_root: Path | None,
+) -> list[str]:
+    if vault_root is None:
+        return _deduplicate_terms(values)
+
+    normalized_prefixes: list[str] = []
+    seen: set[str] = set()
+    for value in values:
+        cleaned = value.strip()
+        if not cleaned:
+            continue
+
+        normalized_value = normalize_path_separators(cleaned)
+        has_trailing_separator = normalized_value.endswith("/")
+        prefix_body = normalized_value.rstrip("/")
+        if not prefix_body:
+            continue
+        try:
+            canonical_prefix = normalize_to_vault_relative(
+                prefix_body,
+                vault_root=vault_root,
+            )
+        except PathContractError as exc:
+            raise ValueError("path_prefixes must stay within the configured vault.") from exc
+
+        if has_trailing_separator:
+            canonical_prefix = f"{canonical_prefix}/"
+        if canonical_prefix in seen:
+            continue
+        seen.add(canonical_prefix)
+        normalized_prefixes.append(canonical_prefix)
+
+    return normalized_prefixes
 
 
 def _ensure_chunk_fts_ready(connection: sqlite3.Connection) -> None:
@@ -225,13 +269,17 @@ def search_chunks(
     limit: int = 5,
     metadata_filter: RetrievalMetadataFilter | None = None,
     allow_filter_fallback: bool = True,
+    vault_root: Path | None = None,
 ) -> RetrievalSearchResponse:
     if limit <= 0:
         raise ValueError("Search limit must be greater than 0.")
 
     _ensure_chunk_fts_ready(connection)
     normalized_query = _normalize_query(query)
-    requested_filter = _normalize_metadata_filter(metadata_filter)
+    requested_filter = _normalize_metadata_filter(
+        metadata_filter,
+        vault_root=vault_root,
+    )
     candidates = _query_candidates(
         connection,
         normalized_query,
@@ -268,11 +316,16 @@ def search_chunks_in_db(
     db_path: Path,
     query: str,
     *,
+    settings: Settings | None = None,
     limit: int = 5,
     metadata_filter: RetrievalMetadataFilter | None = None,
     allow_filter_fallback: bool = True,
 ) -> RetrievalSearchResponse:
-    initialized_db_path = initialize_index_db(db_path)
+    runtime_settings = settings or get_settings()
+    initialized_db_path = initialize_index_db(
+        db_path,
+        settings=runtime_settings,
+    )
     connection = connect_sqlite(initialized_db_path)
     try:
         return search_chunks(
@@ -281,6 +334,7 @@ def search_chunks_in_db(
             limit=limit,
             metadata_filter=metadata_filter,
             allow_filter_fallback=allow_filter_fallback,
+            vault_root=runtime_settings.sample_vault_dir,
         )
     finally:
         connection.close()
