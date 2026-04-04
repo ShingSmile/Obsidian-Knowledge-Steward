@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import path from "node:path";
 import test from "node:test";
 
 import {
@@ -11,6 +12,7 @@ import {
   normalizePatchOpName,
   sectionContainsInsertedContent
 } from "./helpers.ts";
+import { normalizeWritebackTargetPath } from "./pathSemantics.ts";
 import * as writebackHelpers from "./helpers.ts";
 
 const helperFns = writebackHelpers as unknown as Record<string, (...args: any[]) => any>;
@@ -226,5 +228,54 @@ test("preparePatchOpsForExecution resolves add_wikilink targets before preflight
       }
     ),
     /Linked note was not found/
+  );
+});
+
+test("normalizeWritebackTargetPath keeps canonical vault-relative paths unchanged", () => {
+  assert.equal(
+    normalizeWritebackTargetPath(
+      {
+        vault: {
+          adapter: {
+            getBasePath: () => "/tmp/workspace/vault"
+          }
+        }
+      },
+      "Daily/2026-03-14.md"
+    ),
+    "Daily/2026-03-14.md"
+  );
+});
+
+test("normalizeWritebackTargetPath converts absolute in-vault paths to canonical vault-relative paths", () => {
+  const vaultRoot = "/tmp/workspace/vault";
+  assert.equal(
+    normalizeWritebackTargetPath(
+      {
+        vault: {
+          adapter: {
+            getBasePath: () => vaultRoot
+          }
+        }
+      },
+      path.join(vaultRoot, "Daily", "2026-03-14.md")
+    ),
+    "Daily/2026-03-14.md"
+  );
+});
+
+test("normalizeWritebackTargetPath rejects legacy /vault pseudo-paths", () => {
+  assert.throws(
+    () => normalizeWritebackTargetPath(
+      {
+        vault: {
+          adapter: {
+            getBasePath: () => "/vault"
+          }
+        }
+      },
+      "/vault/Daily/2026-03-14.md"
+    ),
+    /Legacy \/vault\/ paths are not accepted in normal mode/
   );
 });
