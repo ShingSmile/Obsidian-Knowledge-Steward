@@ -24,10 +24,6 @@ export function normalizeWritebackTargetPath(
     throw new PathContractError("Path value must be non-empty.");
   }
 
-  if (normalizedRawPath === "/vault" || normalizedRawPath.startsWith(LEGACY_VAULT_PREFIX)) {
-    throw new PathContractError("Legacy /vault/ paths are not accepted in normal mode.");
-  }
-
   if (isWindowsAbsolutePath(normalizedRawPath)) {
     return normalizeWindowsAbsolutePath(app, normalizedRawPath);
   }
@@ -83,6 +79,9 @@ function normalizePosixAbsolutePath(app: VaultPathApp, rawPath: string): string 
     absolutePath !== vaultRoot
     && !absolutePath.startsWith(`${vaultRoot}/`)
   ) {
+    if (isLegacyVaultPseudoPath(rawPath)) {
+      throw new PathContractError("Legacy /vault/ paths are not accepted in normal mode.");
+    }
     throw new PathContractError("Absolute path must resolve inside the configured vault.");
   }
 
@@ -105,6 +104,9 @@ function normalizeWindowsAbsolutePath(app: VaultPathApp, rawPath: string): strin
     absolutePath !== vaultRoot
     && !absolutePath.startsWith(`${vaultRoot}/`)
   ) {
+    if (isLegacyVaultPseudoPath(rawPath)) {
+      throw new PathContractError("Legacy /vault/ paths are not accepted in normal mode.");
+    }
     throw new PathContractError("Absolute path must resolve inside the configured vault.");
   }
 
@@ -131,4 +133,8 @@ function rejectEscapeSegments(rawPath: string): void {
 
 function isWindowsAbsolutePath(rawPath: string): boolean {
   return /^[A-Za-z]:\//.test(rawPath) || rawPath.startsWith("//");
+}
+
+function isLegacyVaultPseudoPath(rawPath: string): boolean {
+  return rawPath === "/vault" || rawPath.startsWith(LEGACY_VAULT_PREFIX);
 }

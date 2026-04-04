@@ -1,9 +1,5 @@
 import { createHash } from "crypto";
-
-import {
-  TFile,
-  type App
-} from "obsidian";
+import type { App, TFile } from "obsidian";
 
 import type { Proposal, WritebackResult } from "../contracts";
 import {
@@ -22,7 +18,7 @@ import {
   preparePatchOpsForExecution,
   sectionContainsInsertedContent,
   type NormalizedPatchOp
-} from "./helpers";
+} from "./helpers.ts";
 import { normalizeWritebackTargetPath } from "./pathSemantics.ts";
 
 export interface LocalRollbackContext {
@@ -41,8 +37,9 @@ export async function applyProposalWriteback(
   proposal: Proposal
 ): Promise<LocalWritebackExecution> {
   let canonicalProposal: Proposal | null = null;
+  let canonicalTargetNotePath: string | null = null;
   try {
-    const canonicalTargetNotePath = normalizeWritebackTargetPath(app, proposal.target_note_path);
+    canonicalTargetNotePath = normalizeWritebackTargetPath(app, proposal.target_note_path);
     canonicalProposal = {
       ...proposal,
       target_note_path: canonicalTargetNotePath,
@@ -54,6 +51,7 @@ export async function applyProposalWriteback(
         patch_ops: []
       };
       return buildFailedWritebackExecution(canonicalProposal, {
+        targetNotePath: canonicalTargetNotePath,
         error: "The proposal does not contain any patch ops."
       });
     }
@@ -78,6 +76,7 @@ export async function applyProposalWriteback(
       const patchTarget = normalizeWritebackTargetPath(app, patchOp.target_path);
       if (patchTarget !== canonicalTargetNotePath) {
         return buildFailedWritebackExecution(canonicalProposal ?? proposal, {
+          targetNotePath: canonicalTargetNotePath,
           error: "Current writeback executor only supports patch ops targeting a single note."
         });
       }
@@ -89,6 +88,7 @@ export async function applyProposalWriteback(
     const preflightError = validatePatchPlan(currentMarkdown, preparedPatchOps);
     if (preflightError) {
       return buildFailedWritebackExecution(canonicalProposal ?? proposal, {
+        targetNotePath: canonicalTargetNotePath,
         beforeHash: currentHash,
         error: preflightError
       });
@@ -111,9 +111,10 @@ export async function applyProposalWriteback(
       }
 
       return buildFailedWritebackExecution(canonicalProposal ?? proposal, {
+        targetNotePath: canonicalTargetNotePath,
         beforeHash: currentHash,
         error: (
-          `before_hash mismatch for ${proposal.target_note_path}. `
+          `before_hash mismatch for ${canonicalTargetNotePath ?? "the target note"}. `
           + `expected ${expectedBeforeHash}, got ${currentHash}.`
         )
       });
@@ -144,6 +145,7 @@ export async function applyProposalWriteback(
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     return buildFailedWritebackExecution(canonicalProposal ?? proposal, {
+      targetNotePath: canonicalTargetNotePath,
       error: message
     });
   }
@@ -167,7 +169,7 @@ export async function rollbackProposalWriteback(
       }, {
         beforeHash: currentHash,
         error: (
-          `Rollback refused for ${proposal.target_note_path}. `
+          `Rollback refused for ${canonicalTargetNotePath ?? "the target note"}. `
           + `expected current hash ${expectedAfterHash}, got ${currentHash}.`
         )
       });
@@ -184,7 +186,7 @@ export async function rollbackProposalWriteback(
       }, {
         beforeHash: currentHash,
         error: (
-          `Rollback snapshot for ${proposal.target_note_path} is inconsistent with `
+          `Rollback snapshot for ${canonicalTargetNotePath ?? "the target note"} is inconsistent with `
           + `the original before_hash.`
         )
       });
@@ -204,11 +206,10 @@ export async function rollbackProposalWriteback(
     };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    const fallbackTargetNotePath = canonicalTargetNotePath ?? proposal.target_note_path;
     return buildFailedWritebackResult({
-      ...proposal,
-      target_note_path: fallbackTargetNotePath
+      ...proposal
     }, {
+      targetNotePath: canonicalTargetNotePath,
       error: message
     });
   }
@@ -380,7 +381,7 @@ function resolveTargetFile(app: App, targetPath: string): TFile {
 function resolveExistingFile(app: App, targetPath: string, label: string): TFile {
   const vaultPath = normalizeWritebackTargetPath(app, targetPath);
   const abstractFile = app.vault.getAbstractFileByPath(vaultPath);
-  if (!(abstractFile instanceof TFile)) {
+  if (!isVaultFileLike(abstractFile)) {
     throw new Error(`${label} was not found in the current vault: ${targetPath}`);
   }
   return abstractFile;
@@ -410,11 +411,12 @@ function buildFailedWritebackResult(
   input: {
     beforeHash?: string | null;
     error: string;
+    targetNotePath?: string | null;
   }
 ): WritebackResult {
   return {
     applied: false,
-    target_note_path: proposal.target_note_path,
+    target_note_path: input.targetNotePath ?? null,
     before_hash: input.beforeHash ?? null,
     after_hash: null,
     applied_patch_ops: [],
@@ -427,6 +429,7 @@ function buildFailedWritebackExecution(
   input: {
     beforeHash?: string | null;
     error: string;
+    targetNotePath?: string | null;
   }
 ): LocalWritebackExecution {
   return buildSuccessfulWritebackExecution(
@@ -464,6 +467,10 @@ function sectionContainsWikilinkTarget(
     }
   }
   return false;
+}
+
+function isVaultFileLike(value: unknown): value is TFile {
+  return typeof value === "object" && value !== null && typeof (value as { path?: unknown }).path === "string";
 }
 
 function findHeadingSectionBounds(
