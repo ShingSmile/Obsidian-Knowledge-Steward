@@ -26,11 +26,15 @@
 - `TASK-050` 已在 `SES-20260401-02` 完成：ask runtime 已接入共享 faithfulness snapshot，对明显 `unsupported_claim` 的 generated answer 会保守降级为 `retrieval_only`，离线 eval 也已复用同一判定层。
 - `TASK-051` 已在 `SES-20260401-03` 完成： [backend/app/quality/faithfulness.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/app/quality/faithfulness.py) 已升级为共享 claim-level faithfulness core，可输出 `entailed / contradicted / neutral` verdict，并在 embedding provider 可用时走更强的 semantic backend；[eval/run_eval.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/eval/run_eval.py) 也已让 ask / governance / digest 共用这套判定层，governance / digest 的 faithfulness 不再直接退回 `context_recall` 充当替代指标。
 - `TASK-052` 已在 `SES-20260402-01` 完成：ask / digest runtime 已共用基于 claim-level semantic core 的 `RuntimeFaithfulnessSignal`；ask 对低分 generated answer 会保守降级为 `retrieval_only`，digest 现已输出结构化 `runtime_faithfulness` quality outcome，ask / digest trace 与 checkpoint serializer allowlist 也已对齐新 contract。
+- `TASK-053` 已在 `SES-20260402-02` 完成并合并到 `main`：ask 离线评估现已稳定输出 Faithfulness / Answer Relevancy / Context Precision / Context Recall 四维度，`answer_relevancy` 成为正式 metric key，并保留 `relevancy` 兼容 alias；ask golden 已扩到 5 条以上 quality case，覆盖 grounded / unsupported / partial support。
+- `TASK-055` 已在 `SES-20260402-02` 作为 retroactive completed refactor 回填：backend / plugin / persistence / retrieval 已统一采用 `vault-relative` note path contract，输入层兼容 vault 内真实绝对路径并立即归一化，`/vault/...` 只作为历史迁移格式，普通执行路径拒绝。
 
 ## 最近完成
 
 | task_id | 日期 | 结果 |
 | --- | --- | --- |
+| `TASK-055` | 2026-04-06 | 已完成：跨 backend / plugin / persistence / retrieval 的 note path contract 已收敛为 `vault-relative`，输入层兼容 vault 内真实绝对路径并立即归一化，普通执行路径拒绝新的 `/vault/...`；相关 backend 179 tests 与 plugin 20 tests 通过，随后与 `TASK-053` 合流后的 `main` 继续通过 backend 180 tests |
+| `TASK-053` | 2026-04-06 | 已完成：ask eval 已正式输出 Faithfulness / Answer Relevancy / Context Precision / Context Recall 四维度，`answer_relevancy` 成为正式 metric key 并保留 `relevancy` alias；ask golden 已扩到 5 条以上 quality case，定向 eval runner 7 tests 与 ask eval 5 case 通过 |
 | `TASK-052` | 2026-04-02 | 已完成：ask / digest runtime 已共用 `RuntimeFaithfulnessSignal`，ask 会在低分时保守降级为 `retrieval_only`，digest 新增结构化 `runtime_faithfulness` outcome 与 trace 字段；相关 backend 66 tests 全部通过 |
 | `TASK-051` | 2026-04-02 | 已完成：共享 claim-level semantic faithfulness core 已落到 [backend/app/quality/faithfulness.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/app/quality/faithfulness.py)，`eval/run_eval.py` 已让 ask / governance / digest 共用同一套 claim verdict 层；相关 backend 15 tests 与 4 条 targeted eval case 全部通过 |
 | `TASK-050` | 2026-04-01 | 已完成：共享 ask faithfulness 判定层已抽出到 `backend/app/quality/faithfulness.py`，ask runtime 会对 `unsupported_claim` 保守降级到 `retrieval_only`，相关 backend 45 tests 与 7 条 targeted eval case 全部通过 |
@@ -42,10 +46,12 @@
 
 ## 默认下一任务
 
-- 默认进入 `TASK-053`
-  - 主题：完成 ask 的 Faithfulness / Answer Relevancy / Context Precision / Context Recall 四维度离线评估，并扩充 ask golden cases。
-- 若先把 ingest / digest 评估补齐：`TASK-054`
+- 默认进入 `TASK-054`
   - 主题：完成 ingest 的 Rationale Faithfulness + Patch Safety，以及 digest 的 Faithfulness + Coverage 与对应 golden 基线。
+- 若回溯刚完成的 `TASK-053`
+  - 主题：已完成；仅剩 Context Recall 标注规范与 answer relevancy deterministic fallback 两个 `small` 尾项，不应再单独开一个 `medium`。
+- 若回溯刚完成的 `TASK-055`
+  - 主题：已完成；仅剩历史 `/vault/...` 样例清理与真实旧库覆盖率抽样两个 `small` 尾项，不应再单独开一个 `medium`。
 - 若回溯刚完成的 `TASK-052`
   - 主题：已完成；仅剩 runtime faithfulness score 的插件侧暴露与 digest `low_confidence` 更细粒度 reason code 两个 `small` 尾项，不应再单独开一个 `medium`。
 - 若优先升级工具调用协议：`TASK-049`
@@ -73,7 +79,7 @@
 - `TASK-052` 已完成，但仍留有两个 `small` 尾项：runtime faithfulness score 还没有作为可选质量元数据暴露给插件侧，digest 的 `low_confidence` 文案 reason code 也还较粗。
 - ask 链路的工具调用仍为 prompt-based JSON 约定 + 手动解析，没有使用 API 级别的 Structured Tool Calling，格式合法性不受保证，对应 `TASK-049`。
 - `TASK-051` 已完成，但 claim 拆解的中文停用词 / allowlist 仍未落地；运行时阈值、score 与 low-confidence trace 已由 `TASK-052` 的 shared runtime signal 在 ask / digest 链路先补齐。
-- ask 还没有真正落地 Faithfulness / Answer Relevancy / Context Precision / Context Recall 四维度离线评估与扩充 golden，对应 `TASK-053`。
+- note path contract 已收敛为 `vault-relative`，但历史 `/vault/...` 样例、旧 eval artifact 或外部旧库仍可能残留伪绝对路径；新增 fixture / API payload 不应再重新写回这种格式。
 - ingest / digest 仍缺少各自场景化的内容质量指标与 golden 基线，对应 `TASK-054`。
 - 控制面与副作用面仍有断口：本地写回成功但后端记账失败时，当前还没有跨会话恢复入口，对应 `TASK-031`。
 - scoped ingest 仍会整库重建 `chunk_fts`，一旦 approval 高频触发，成本会持续放大，对应 `TASK-032`。
@@ -162,13 +168,27 @@
 - [backend/tests/test_ask_workflow.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/tests/test_ask_workflow.py)
 - [backend/tests/test_digest_workflow.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/tests/test_digest_workflow.py)
 
-### 若继续 `TASK-053`
+### 若回溯已完成的 `TASK-053`
 
 - [backend/app/quality/faithfulness.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/app/quality/faithfulness.py)
 - [eval/run_eval.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/eval/run_eval.py)
 - [eval/golden/ask_cases.json](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/eval/golden/ask_cases.json)
 - [backend/tests/test_eval_runner.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/tests/test_eval_runner.py)
 - [backend/tests/test_ask_workflow.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/tests/test_ask_workflow.py)
+
+### 若回溯已完成的 `TASK-055`
+
+- [backend/app/path_semantics.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/app/path_semantics.py)
+- [backend/app/services/proposal_validation.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/app/services/proposal_validation.py)
+- [backend/app/indexing/store.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/app/indexing/store.py)
+- [backend/app/indexing/ingest.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/app/indexing/ingest.py)
+- [backend/app/services/ingest_proposal.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/app/services/ingest_proposal.py)
+- [backend/app/services/rollback_workflow.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/app/services/rollback_workflow.py)
+- [backend/app/tools/ask_tools.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/app/tools/ask_tools.py)
+- [backend/app/retrieval/sqlite_fts.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/app/retrieval/sqlite_fts.py)
+- [plugin/src/writeback/pathSemantics.ts](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/plugin/src/writeback/pathSemantics.ts)
+- [plugin/src/writeback/applyProposalWriteback.ts](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/plugin/src/writeback/applyProposalWriteback.ts)
+- [plugin/src/writeback/writeback.test.ts](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/plugin/src/writeback/writeback.test.ts)
 
 ### 若继续 `TASK-054`
 

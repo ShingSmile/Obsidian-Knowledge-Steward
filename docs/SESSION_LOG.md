@@ -12,6 +12,7 @@
 
 | 会话 ID | 日期 | 主题 | 类型 | 状态 | 对应任务 |
 | --- | --- | --- | --- | --- | --- |
+| `SES-20260402-02` | 2026-04-02 ~ 2026-04-06 | 完成 `TASK-053` 并在 scope drift 下收敛 vault-relative 路径 contract | `Eval / Refactor` | `已完成` | `TASK-053` |
 | `SES-20260402-01` | 2026-04-02 | 完成 ask / digest runtime semantic gate 并收口 `TASK-052` | `Eval` | `已完成` | `TASK-052` |
 | `SES-20260401-03` | 2026-04-02 | 完成共享 claim-level faithfulness core 并收口 `TASK-051` | `Eval` | `已完成` | `TASK-051` |
 | `SES-20260401-02` | 2026-04-01 | 完成 ask runtime faithfulness 首刀并拆分 `TASK-048` umbrella | `Eval` | `已完成` | `TASK-050` |
@@ -30,6 +31,119 @@
 - 当前 2026-03 历史快照位于：
   [docs/archive/session_logs/SESSION_LOG_2026-03.md](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/docs/archive/session_logs/SESSION_LOG_2026-03.md)
 - 更早历史会话、旧索引与旧任务阶段记录，请优先查 archive，再按 `task_id` 回溯。
+
+## [SES-20260402-02] 完成 `TASK-053` 并在 scope drift 下收敛 vault-relative 路径 contract
+
+- 日期：2026-04-02 ~ 2026-04-06
+- task_id：`TASK-053`
+- 类型：`Eval / Refactor`
+- 状态：`已完成`
+- 验收结论：`完全满足（伴随一次 retroactive completed refactor）`
+- 对应任务：`TASK-053`
+- 本会话唯一目标：完成 ask 离线四维度评估与 faithfulness golden 扩充；但在 finishing 阶段暴露出 vault 内路径 contract 断口，最终在同一会话里完成路径语义重构，并将该部分回填为 `TASK-055`。
+
+### 1. 本次目标
+
+- 把 ask 离线评估从“已共用 claim-level faithfulness core”推进到真正可回归的四维度基线，而不是继续停留在单指标或旧 overview 命名上。
+- 为 ask golden 增加最小可持续维护的 quality case，覆盖 grounded / unsupported / partial support，而不是只保留少量 proof-of-concept 样本。
+- 在 finishing 阶段确认该分支可安全进入 `main`，而不是把旧的 ask eval 改动长期滞留在 feature branch。
+- 在合并检查过程中处理全量测试暴露出的路径语义断口，防止 `/vault/...` 伪路径继续作为 proposal / writeback / evidence 的事实 contract 存活。
+
+### 2. 本次完成内容
+
+- 在 [eval/run_eval.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/eval/run_eval.py) 中把 ask 质量面板正式补齐为 Faithfulness / Answer Relevancy / Context Precision / Context Recall 四维度，并以 `answer_relevancy` 作为正式 metric key，同时保留 `relevancy` 兼容 alias。
+- 在 [eval/golden/ask_cases.json](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/eval/golden/ask_cases.json) 中新增 ask quality case，使 ask 侧 faithfulness / evidence 标注样本达到 5 条以上，并覆盖 grounded / unsupported / partial support。
+- 在 [backend/tests/test_eval_runner.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/tests/test_eval_runner.py) 中补齐 ask overview 汇总与 alias 回归，确保四维度输出与旧 contract 兼容都可回归。
+- 将原先只存在于 `codex-task-053-ask-eval-metrics` 的 ask eval 改动检查后合并回 `main`；原任务提交为 `760dd38`，最终合流到 `main` 的 merge commit 为 `768754e`。
+- 在 finishing 阶段定位到 `TASK-045` 演进后残留的路径语义断口，新增 [backend/app/path_semantics.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/app/path_semantics.py) 与 [plugin/src/writeback/pathSemantics.ts](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/plugin/src/writeback/pathSemantics.ts)，把后端与插件两侧统一收敛为 canonical `vault-relative` 路径 contract。
+- 在 [backend/app/services/proposal_validation.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/app/services/proposal_validation.py)、[backend/app/indexing/store.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/app/indexing/store.py)、[backend/app/indexing/ingest.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/app/indexing/ingest.py)、[backend/app/services/ingest_proposal.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/app/services/ingest_proposal.py)、[backend/app/services/rollback_workflow.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/app/services/rollback_workflow.py)、[backend/app/tools/ask_tools.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/app/tools/ask_tools.py) 与 [backend/app/retrieval/sqlite_fts.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/app/retrieval/sqlite_fts.py) 中统一做了 vault 内绝对路径兼容与持久化前 canonicalization。
+- 在 [plugin/src/writeback/applyProposalWriteback.ts](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/plugin/src/writeback/applyProposalWriteback.ts) 与 [plugin/src/writeback/writeback.test.ts](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/plugin/src/writeback/writeback.test.ts) 中确保 writeback / rollback 成功和失败路径都维持 canonical `target_note_path`，`add_wikilink` payload 的 note path 也会一并 canonicalize。
+- 为这次重构补齐了设计与执行文档：[2026-04-03-proposal-path-contract-design.md](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/docs/superpowers/specs/2026-04-03-proposal-path-contract-design.md) 与 [2026-04-03-proposal-path-contract-implementation.md](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/docs/superpowers/plans/2026-04-03-proposal-path-contract-implementation.md)；核心代码收敛在 `b7169ef`，计划文档跟踪提交为 `79cccaf`。
+
+### 3. 本次未完成内容
+
+- 没有继续推进 ingest / digest 的场景化内容质量指标；这继续留给 `TASK-054`。
+- 没有推进工具调用协议升级 `TASK-049`，避免把当前会话再扩成第三个 medium。
+- 没有处理插件 `tsc --noEmit` 中既有的 runtime 类型问题；这不是本次路径 contract 改动引入的回归。
+- 没有把 ask proposal 化或重写审批产品边界；路径 contract 收敛只覆盖现有 proposal / writeback / retrieval / API contract。
+
+### 4. 关键决策
+
+- 不把 `TASK-053` 的 ask eval 改动继续滞留在老分支，而是在验证后明确合并回 `main`；原因是该任务已经完成，不应长期游离于主线之外。
+- 不通过“放松 validator 去接受 `/vault/...`”来让旧测试继续通过，而是把正式 contract 明确收敛为 `vault-relative`；原因是 `/vault/...` 既不是真实绝对路径，也不是稳定的业务路径语义。
+- 输入层继续兼容“vault 内真实绝对路径”，但一旦进入持久化、proposal、writeback、retrieval 或 API 边界，就立即归一化为 `vault-relative`；原因是业务 contract 不应绑定当前机器路径。
+- 这次路径重构以 retroactive completed `TASK-055` 记录，而不是硬塞回 `TASK-053` 的 notes 当作小修；原因是它已经跨越 backend / plugin / persistence / retrieval，多处 contract 同时变化，实际粒度已是 medium。
+
+### 5. 修改过的文件
+
+- [eval/run_eval.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/eval/run_eval.py)
+- [eval/golden/ask_cases.json](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/eval/golden/ask_cases.json)
+- [backend/tests/test_eval_runner.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/tests/test_eval_runner.py)
+- [backend/app/path_semantics.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/app/path_semantics.py)
+- [backend/app/services/proposal_validation.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/app/services/proposal_validation.py)
+- [backend/app/indexing/store.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/app/indexing/store.py)
+- [backend/app/indexing/ingest.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/app/indexing/ingest.py)
+- [backend/app/services/ingest_proposal.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/app/services/ingest_proposal.py)
+- [backend/app/services/rollback_workflow.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/app/services/rollback_workflow.py)
+- [backend/app/tools/ask_tools.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/app/tools/ask_tools.py)
+- [backend/app/retrieval/sqlite_fts.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/app/retrieval/sqlite_fts.py)
+- [plugin/src/writeback/pathSemantics.ts](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/plugin/src/writeback/pathSemantics.ts)
+- [plugin/src/writeback/applyProposalWriteback.ts](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/plugin/src/writeback/applyProposalWriteback.ts)
+- [plugin/src/writeback/writeback.test.ts](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/plugin/src/writeback/writeback.test.ts)
+- [docs/superpowers/specs/2026-04-03-proposal-path-contract-design.md](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/docs/superpowers/specs/2026-04-03-proposal-path-contract-design.md)
+- [docs/superpowers/plans/2026-04-03-proposal-path-contract-implementation.md](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/docs/superpowers/plans/2026-04-03-proposal-path-contract-implementation.md)
+
+### 6. 验证与测试
+
+- 跑了什么命令
+  - `./.conda/knowledge-steward/bin/python -m unittest backend.tests.test_eval_runner -v`
+  - `./.conda/knowledge-steward/bin/python eval/run_eval.py --case-id ask_fixture_generated_answer_citation_valid --case-id ask_fixture_semantic_partial_support --case-id ask_fixture_semantic_overclaim_writeback --case-id ask_fixture_semantic_overclaim_governance --case-id ask_fixture_hybrid_retrieval_only`
+  - `cd backend && ../.conda/knowledge-steward/bin/python -m unittest discover -s tests -p 'test_*.py' -v`
+  - `cd plugin && npm test`
+- 结果如何
+  - ask eval runner 定向回归 `7/7` 通过。
+  - ask eval 定向 5 条 case 全部通过。
+  - 路径 contract 重构落地后，backend 全量曾先通过 `179/179`；在 `TASK-053` 合并回 `main` 后继续通过 `180/180`。
+  - plugin writeback 相关测试与全量 plugin tests `20/20` 通过。
+- 哪些没法验证
+  - 没有在真实历史 SQLite 数据上做大规模线下抽样，只完成了代码层 canonical migration 与测试覆盖。
+  - 没有处理 plugin `tsc --noEmit` 中既有的 runtime 类型问题。
+- 哪些只是静态修改
+  - 本次对治理文档的改动均属于 closeout 同步；核心行为变更在代码与测试层已先行验证。
+
+### 7. 范围偏移与原因
+
+- 会话绑定时只有 `TASK-053`，但在 finishing 阶段发现全量测试被旧的 `/vault/...` fixture 与路径语义分叉卡住，实际落地成一项新的跨边界 medium 级 refactor。
+- 这次 scope drift 的直接根因是 `TASK-045` 之后后端生成 proposal、静态校验、持久化、插件执行与旧测试没有对齐到同一 note path contract。
+- 已在 closeout 中把该部分回填为 `TASK-055`，避免让 `TASK-053` 的任务边界在文档里失真。
+
+### 8. 未解决问题
+
+- `TASK-054` 仍未开始，ingest / digest 的场景化内容质量指标与 golden 基线还缺正式收口。
+- 插件 `tsc --noEmit` 的既有 runtime 类型错误仍在，需要独立处理。
+- 历史 eval artifact、旧 fixture 或外部旧库里仍可能残留 `/vault/...` 字符串，需要后续逐步清理。
+
+### 9. 新增风险 / 技术债 / 假设
+
+- 风险：如果后续新增 fixture、API payload 或外部迁移脚本继续写出 `/vault/...`，会重新污染刚收敛的 canonical path contract。
+- 技术债：真实历史 SQLite 数据虽然已有 canonical migration 逻辑，但仍应做抽样观察，确认没有遗漏的 path-bearing JSON blob。
+- 假设：今后所有跨边界、可持久化、可审计的 note path 字段都统一以 `vault-relative` 为唯一正式 contract。
+
+### 10. 下一步最优先任务
+
+- 默认进入 `TASK-054`，为 ingest / digest 补齐场景化内容质量指标与 golden 基线。
+- 若只回看最近完成的 ask eval，则回溯 `TASK-053` 的 `small` 尾项，不再单独新开一个 medium。
+
+### 11. 下一次新会话应该先读哪些文件
+
+- [docs/TASK_QUEUE.md](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/docs/TASK_QUEUE.md)
+- [docs/CURRENT_STATE.md](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/docs/CURRENT_STATE.md)
+- [docs/SESSION_LOG.md](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/docs/SESSION_LOG.md)
+- [docs/PROJECT_MASTER_PLAN.md](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/docs/PROJECT_MASTER_PLAN.md)
+
+### 12. 当前最容易被面试官追问的点
+
+- 为什么一个最初绑定 `TASK-053` 的会话最终会落到路径 contract 重构？如果回答成“顺手修了点测试”，会显得非常业余。正确回答必须落到 contract 漂移：proposal / writeback / evidence / retrieval 同时存在三种路径语义，已经影响全量测试与持久化一致性，所以必须收敛为单一 canonical contract。
 
 ## [SES-20260402-01] 完成 ask / digest runtime semantic gate 并收口 `TASK-052`
 

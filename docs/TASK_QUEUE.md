@@ -183,7 +183,7 @@
   - `medium: TASK-050 抽取共享 ask faithfulness 判定层并接通 ask runtime 启发式 gate（已完成）`
   - `medium: TASK-051 建立共享 claim 拆解 + NLI faithfulness core（已完成）`
   - `medium: TASK-052 用 embedding 相似度接通 ask / digest runtime faithfulness gate（已完成）`
-  - `medium: TASK-053 完成 ask 离线四维度评估与 faithfulness golden 扩充`
+  - `medium: TASK-053 完成 ask 离线四维度评估与 faithfulness golden 扩充（已完成）`
   - `medium: TASK-054 完成 ingest / digest 场景评估指标与 golden 基线`
 - `notes`: `SES-20260401-02` 实际实现后已经证明，这块工作把“共享语义底座、runtime 安全闸门、ask 四维度离线指标、ingest / digest 场景指标、golden 扩充”全部塞进一个 `medium` 会导致执行边界失真。因此从本次起保留 `TASK-048` 作为 umbrella，只负责定义总目标与拆分关系；真实执行改由 `TASK-050` 到 `TASK-054` 承担。`TASK-033` 也随之改为被 `TASK-050` / `TASK-052` 吸收。
 
@@ -304,11 +304,11 @@
 ### TASK-053
 
 - `task_id`: `TASK-053`
-- `session_id`:
+- `session_id`: `SES-20260402-02`
 - `title`: 完成 ask 离线四维度评估与 faithfulness golden 扩充
 - `category`: `Eval`
 - `priority`: `P1`
-- `status`: `planned`
+- `status`: `completed`
 - `scope`: `medium`
 - `goal`: 在共享 faithfulness core 之上，把 ask 离线评估补齐为可回归的四维度基线：Faithfulness、Answer Relevancy、Context Precision、Context Recall，并补足最小可持续维护的 ask golden 标注。
 - `out_of_scope`:
@@ -331,7 +331,7 @@
 - `derived_tasks`:
   - `small: 为 Context Recall 的 golden evidence 标注建立轻量标注规范`
   - `small: 评估是否需要为 answer relevancy 保留 deterministic fallback 算法`
-- `notes`: `TASK-050` 只让 ask 拥有了共享的启发式 snapshot 与 runtime downgrade，还没有把 ask 离线质量评估做成真正的四维度回归面板。本任务负责把 ask 这一条链路先补完整。
+- `notes`: `SES-20260402-02` 已完成本任务，并在 `main` 上合并了原分支 `codex-task-053-ask-eval-metrics`。 [eval/run_eval.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/eval/run_eval.py) 现已把 ask 质量面板正式收敛为 Faithfulness / Answer Relevancy / Context Precision / Context Recall 四维度，并以 `answer_relevancy` 作为正式 metric key，同时保留 `relevancy` 兼容 alias； [eval/golden/ask_cases.json](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/eval/golden/ask_cases.json) 已扩充到至少 5 条 ask quality case，覆盖 grounded / unsupported / partial support； [backend/tests/test_eval_runner.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/tests/test_eval_runner.py) 也已新增对应 overview 汇总与 alias 回归。验收期内先通过 `backend.tests.test_eval_runner` 共 7 个定向 tests 与 5 条 ask eval case，随后在 `main` 上继续通过 backend 全量 180 tests 与 plugin 20 tests，不回退现有 ask 主链路 contract。
 
 ### TASK-054
 
@@ -367,6 +367,46 @@
   - `small: 为 Patch Safety 的违规项输出整理更稳定的分类标签`
   - `small: 为 digest coverage 的关键事实抽取建立最小标注规范`
 - `notes`: ask 之外的两条链路当前还没有真正的内容质量基线。本任务把 ingest / digest 的评估补齐，避免 `TASK-048` 拆分后只剩 ask 质量在进步、其他链路继续停留在合约级断言。
+
+### TASK-055
+
+- `task_id`: `TASK-055`
+- `session_id`: `SES-20260402-02`
+- `title`: 统一 note path contract 为 vault-relative 并收敛跨边界路径语义
+- `category`: `Refactor`
+- `priority`: `P1`
+- `status`: `completed`
+- `scope`: `medium`
+- `goal`: 把 proposal / writeback / retrieval / evidence / API 输出里长期混杂的 `vault-relative`、真实绝对路径与 `/vault/...` 伪根路径收敛为单一正式 contract：所有跨边界、可持久化、可审计的 note path 字段一律使用 `vault-relative`；输入层兼容 vault 内真实绝对路径并立即归一化，`/vault/...` 只视为历史迁移格式。
+- `out_of_scope`:
+  - 不改变 ask proposal 化与审批产品边界
+  - 不引入新的 patch op、读工具或工具调用协议
+  - 不把 `/vault/...` 继续保留为正常执行路径的正式输入格式
+  - 不处理 scoped ingest 增量 FTS、跨会话恢复或 runtime faithfulness 逻辑
+- `acceptance_criteria`:
+  - proposal / patch op / evidence / writeback / retrieval 等跨边界路径字段统一输出 `vault-relative`
+  - 输入层兼容 vault 内真实绝对路径，但持久化与 API 输出前必须完成 canonicalization
+  - 普通执行路径拒绝新的 `/vault/...` 伪根路径，legacy 格式仅保留给迁移/兼容逻辑
+  - backend 与 plugin 的相关回归全部通过，不回退既有 writeback / rollback / pending approvals contract
+- `depends_on`:
+  - `TASK-045`
+- `related_files`:
+  - `backend/app/path_semantics.py`
+  - `backend/app/services/proposal_validation.py`
+  - `backend/app/indexing/store.py`
+  - `backend/app/indexing/ingest.py`
+  - `backend/app/services/ingest_proposal.py`
+  - `backend/app/services/rollback_workflow.py`
+  - `backend/app/tools/ask_tools.py`
+  - `backend/app/retrieval/sqlite_fts.py`
+  - `plugin/src/writeback/pathSemantics.ts`
+  - `plugin/src/writeback/applyProposalWriteback.ts`
+  - `plugin/src/writeback/writeback.test.ts`
+  - `backend/tests/test_indexing_store.py`
+- `derived_tasks`:
+  - `small: 清理历史 eval artifacts 与 fixture 中遗留的 /vault/... 样例，避免新测试继续误用旧格式`
+  - `small: 在真实历史 SQLite 数据上抽样观察 canonical migration 覆盖率，必要时补离线修复脚本`
+- `notes`: 本任务是 `SES-20260402-02` 在 finishing 阶段暴露出的 scope drift，现以 retroactive completed medium 回填，不作为治理示范。根因是 `TASK-045` 之后路径语义在后端生成 proposal、静态校验、持久化、插件执行与旧测试之间长期并存了三种格式，导致全量测试在 `/vault/...` 伪路径上断裂。当前已新增 [backend/app/path_semantics.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/app/path_semantics.py) 作为后端 canonical 路径语义层，在 [backend/app/services/proposal_validation.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/app/services/proposal_validation.py)、[backend/app/indexing/store.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/app/indexing/store.py)、[backend/app/indexing/ingest.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/app/indexing/ingest.py)、[backend/app/services/ingest_proposal.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/app/services/ingest_proposal.py)、[backend/app/services/rollback_workflow.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/app/services/rollback_workflow.py)、[backend/app/tools/ask_tools.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/app/tools/ask_tools.py) 与 [backend/app/retrieval/sqlite_fts.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/app/retrieval/sqlite_fts.py) 中统一做了 canonicalization 与 vault 内绝对路径兼容；插件侧也新增 [plugin/src/writeback/pathSemantics.ts](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/plugin/src/writeback/pathSemantics.ts)，并在 [plugin/src/writeback/applyProposalWriteback.ts](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/plugin/src/writeback/applyProposalWriteback.ts) 中保证 writeback / rollback 结果持续输出 canonical `target_note_path`。验收期内已通过 backend 全量 179 tests，后续与 `TASK-053` 合流后继续通过 backend 全量 180 tests 与 plugin 20 tests。
 
 ### TASK-049
 
