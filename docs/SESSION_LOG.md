@@ -12,6 +12,7 @@
 
 | 会话 ID | 日期 | 主题 | 类型 | 状态 | 对应任务 |
 | --- | --- | --- | --- | --- | --- |
+| `SES-20260406-01` | 2026-04-06 | 完成 `TASK-054` 并收口 `TASK-048` umbrella 的 ingest / digest eval baseline | `Eval` | `已完成` | `TASK-054` |
 | `SES-20260402-02` | 2026-04-02 ~ 2026-04-06 | 完成 `TASK-053` 并在 scope drift 下收敛 vault-relative 路径 contract | `Eval / Refactor` | `已完成` | `TASK-053` |
 | `SES-20260402-01` | 2026-04-02 | 完成 ask / digest runtime semantic gate 并收口 `TASK-052` | `Eval` | `已完成` | `TASK-052` |
 | `SES-20260401-03` | 2026-04-02 | 完成共享 claim-level faithfulness core 并收口 `TASK-051` | `Eval` | `已完成` | `TASK-051` |
@@ -31,6 +32,114 @@
 - 当前 2026-03 历史快照位于：
   [docs/archive/session_logs/SESSION_LOG_2026-03.md](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/docs/archive/session_logs/SESSION_LOG_2026-03.md)
 - 更早历史会话、旧索引与旧任务阶段记录，请优先查 archive，再按 `task_id` 回溯。
+
+## [SES-20260406-01] 完成 `TASK-054` 并收口 `TASK-048` umbrella 的 ingest / digest eval baseline
+
+- 日期：2026-04-06
+- task_id：`TASK-054`
+- 类型：`Eval`
+- 状态：`已完成`
+- 验收结论：`完全满足`
+- 对应任务：`TASK-054`
+- 本会话唯一目标：在 ask 已有四维度离线基线的前提下，为 ingest / digest 补齐场景化 eval 指标与 golden 基线，并把 `TASK-048` umbrella 的最后一段正式收口。
+
+### 1. 本次目标
+
+- 让 governance 场景不再沿用 ask 风格的 `relevancy / context_precision / context_recall` 命名，而是显式输出 `Rationale Faithfulness / Patch Safety`。
+- 让 digest 场景显式输出 `Faithfulness / Coverage`，而不是继续把覆盖信号埋在 ask 风格的通用指标里。
+- 让 mixed ask / governance / digest benchmark overview 能按场景聚合已有 metric key，而不是默认所有 case 都产出 ask 面板。
+- 把 governance golden case 数补到至少 3 条，使 `TASK-054` 的样本覆盖下限达标。
+
+### 2. 本次完成内容
+
+- 在 [eval/run_eval.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/eval/run_eval.py) 中把 `build_quality_metrics_snapshot()` 收敛为按 scenario 分派：ask 保持原四维度，governance 输出 `rationale_faithfulness / patch_safety`，digest 输出 `faithfulness / coverage`。
+- 在同一文件中补齐动态 metric overview 聚合逻辑，不再假设所有场景都产出 ask 的 `answer_relevancy / context_precision / context_recall`。
+- 在 [eval/golden/governance_cases.json](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/eval/golden/governance_cases.json) 中新增 `governance_fixture_waiting_proposal_beta`，并把 governance 侧 metric expectation 改为 `rationale_faithfulness / patch_safety`。
+- 在 [eval/golden/digest_cases.json](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/eval/golden/digest_cases.json) 中把 metric-bearing digest case 改为显式校验 `faithfulness / coverage`。
+- 在 [backend/tests/test_eval_runner.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/tests/test_eval_runner.py) 中新增 mixed ask / governance / digest overview 回归，锁定 scenario-specific metric contract 与 benchmark 级聚合行为。
+- 通过完成 `TASK-054`，将 `TASK-048` umbrella 的 `TASK-050` 到 `TASK-054` 五段拆分全部收口，跨链路内容质量评估主线不再保留未完成的 `medium`。
+
+### 3. 本次未完成内容
+
+- 没有继续做 `TASK-054` 的两个 `small` 尾项：Patch Safety 违规项分类标签稳定化、digest coverage 的关键事实抽取标注规范。
+- 没有把新的 governance / digest 指标再推回 runtime gate；本次仍严格限定在离线 eval 基线。
+- 没有启动 `TASK-049` 的 Structured Tool Calling 改造。
+
+### 4. 关键决策
+
+- 不为 governance / digest 继续保留 ask 风格 metric alias；原因是这会让 `TASK-054` 名义完成但语义仍然失真。
+- 不引入泛化过度的 metric registry；原因是当前只有 ask / governance / digest 三类场景，scenario dispatch 已足够清晰。
+- `patch_safety` 先使用 constrained proposal contract 的保守校验，而不是直接引入新的 semantic patch judge；原因是本任务目标是先补齐稳定可回归的离线基线，而不是开启第二套评估子系统。
+- 新增第三条 governance golden case，而不是只改命名；原因是 `TASK-054` 的 acceptance 明确要求 ingest / digest 至少各有 3 条 golden case。
+
+### 5. 修改过的文件
+
+- [eval/run_eval.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/eval/run_eval.py)
+- [eval/golden/governance_cases.json](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/eval/golden/governance_cases.json)
+- [eval/golden/digest_cases.json](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/eval/golden/digest_cases.json)
+- [backend/tests/test_eval_runner.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/tests/test_eval_runner.py)
+- [docs/superpowers/specs/2026-04-06-task-054-ingest-digest-eval-design.md](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/docs/superpowers/specs/2026-04-06-task-054-ingest-digest-eval-design.md)
+- [docs/superpowers/plans/2026-04-06-task-054-ingest-digest-eval.md](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/docs/superpowers/plans/2026-04-06-task-054-ingest-digest-eval.md)
+
+### 6. 验证与测试
+
+- 跑了什么命令
+  - `cd /Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/.worktrees/task-054-ingest-digest-eval/backend && /Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/.conda/knowledge-steward/bin/python -m unittest tests.test_eval_runner -v`
+  - `cd /Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/.worktrees/task-054-ingest-digest-eval && /Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/.conda/knowledge-steward/bin/python eval/run_eval.py --case-id governance_fixture_waiting_proposal_hybrid --case-id governance_fixture_waiting_proposal_beta --case-id governance_fixture_no_proposal_fallback --case-id digest_fixture_structured_result_metrics --case-id digest_fixture_waiting_proposal_metrics --output /tmp/task054_eval_green.json`
+- 结果如何
+  - `backend.tests.test_eval_runner` 共 `7/7` 通过。
+  - targeted governance / digest eval case 共 `5/5` 通过，`0` 失败。
+- 哪些没法验证
+  - 没有重跑全量 backend / plugin 测试；本次改动限定在离线 eval runner、golden 与其回归测试。
+  - 没有把 digest coverage 从路径覆盖进一步升级为事实级 coverage judge。
+- 哪些只是静态修改
+  - 本次 spec / plan 文档与 closeout 文档属于治理层同步；真实行为变化已由上面的测试和 targeted eval 先验证。
+
+### 7. 范围偏移
+
+- 没有引入第二个 `medium`。
+- 会话中新增第三条 governance golden case 属于服务当前 `TASK-054` acceptance 的必要伴随改动，不构成 scope drift。
+
+### 8. 未解决问题
+
+- `patch_safety` 仍是基于 constrained contract 的保守离线信号，不是语义级 patch judge。
+- digest `coverage` 仍主要依赖 reference context path coverage，尚未升级为关键事实级 coverage 判定。
+- ask 链路的 Structured Tool Calling 仍未开始，对应 `TASK-049`。
+
+### 9. 新增风险 / 技术债 / 假设
+
+- 技术债：`patch_safety` 的 reason 仍偏 contract-oriented，后续若要做更强治理质量叙事，需要更稳定的违规标签分类。
+- 风险：digest `coverage` 如果长期只看 path coverage，可能掩盖“来源笔记选对了但关键事实没覆盖全”的 bad case。
+- 假设：在 `TASK-048` umbrella 收口后，最合理的下一条 `medium` 是 `TASK-049`，因为它仍是未完成的 `P1`，且当前 ask tool calling 协议确实落后于现有图级 ReAct 与 safety 叙事。
+
+### 10. 下一步最优先任务
+
+- 默认进入 `TASK-049`，把 ask 工具调用从 prompt-based JSON 约定迁移到 Structured Tool Calling / Function Calling 协议。
+- 之后再回到已后移的 `TASK-031` 与 `TASK-032`，分别补跨会话 resume 恢复入口与 scoped ingest 的增量 FTS 同步。
+- `TASK-048` 已经闭环，不应再作为单个 `medium` 重新执行。
+
+### 11. 下一次新会话应该先读哪些文件
+
+- [docs/TASK_QUEUE.md](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/docs/TASK_QUEUE.md)
+- [docs/CURRENT_STATE.md](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/docs/CURRENT_STATE.md)
+- [docs/SESSION_LOG.md](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/docs/SESSION_LOG.md)
+- 若继续 `TASK-049`：
+  - [backend/app/services/ask.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/app/services/ask.py)
+  - [backend/app/tools/registry.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/app/tools/registry.py)
+  - [backend/app/context/render.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/app/context/render.py)
+  - [backend/app/graphs/ask_graph.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/app/graphs/ask_graph.py)
+  - [backend/app/contracts/workflow.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/app/contracts/workflow.py)
+- 若回溯刚完成的 `TASK-054`：
+  - [eval/run_eval.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/eval/run_eval.py)
+  - [eval/golden/governance_cases.json](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/eval/golden/governance_cases.json)
+  - [eval/golden/digest_cases.json](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/eval/golden/digest_cases.json)
+  - [backend/tests/test_eval_runner.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/tests/test_eval_runner.py)
+
+### 12. 当前最容易被追问的点
+
+- 为什么 governance / digest 不继续复用 ask 的 `relevancy / context_precision / context_recall` 命名，而要专门引入 `patch_safety / coverage`？
+- 为什么 `patch_safety` 当前只做到 constrained contract 级别，而不是直接用 semantic diff / judge？
+- 为什么 `TASK-048` 可以在 `TASK-054` 完成后就算收口，剩余两个 `small` 不需要继续挂着一个 `medium`？
 
 ## [SES-20260402-02] 完成 `TASK-053` 并在 scope drift 下收敛 vault-relative 路径 contract
 

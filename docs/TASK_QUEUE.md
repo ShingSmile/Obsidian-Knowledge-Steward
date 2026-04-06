@@ -155,7 +155,7 @@
 - `title`: 跨链路内容质量评估与 Runtime Faithfulness 治理 Umbrella
 - `category`: `Eval`
 - `priority`: `P1`
-- `status`: `split_into_TASK-050_to_TASK-054`
+- `status`: `completed_via_TASK-050_to_TASK-054`
 - `scope`: `large`
 - `goal`: 将原本单个 `medium` 里过于拥挤的“跨链路质量评估 + runtime gate”工作重新定义为 umbrella：保留统一目标与验收边界，但把执行切分为多个可独立推进、可单会话收口的 `medium`。整体目标仍是为 ask / ingest / digest 三条链路建立共享 faithfulness 底座、场景特定离线指标，以及可保守降级的 runtime 质量闸门。
 - `out_of_scope`:
@@ -184,8 +184,8 @@
   - `medium: TASK-051 建立共享 claim 拆解 + NLI faithfulness core（已完成）`
   - `medium: TASK-052 用 embedding 相似度接通 ask / digest runtime faithfulness gate（已完成）`
   - `medium: TASK-053 完成 ask 离线四维度评估与 faithfulness golden 扩充（已完成）`
-  - `medium: TASK-054 完成 ingest / digest 场景评估指标与 golden 基线`
-- `notes`: `SES-20260401-02` 实际实现后已经证明，这块工作把“共享语义底座、runtime 安全闸门、ask 四维度离线指标、ingest / digest 场景指标、golden 扩充”全部塞进一个 `medium` 会导致执行边界失真。因此从本次起保留 `TASK-048` 作为 umbrella，只负责定义总目标与拆分关系；真实执行改由 `TASK-050` 到 `TASK-054` 承担。`TASK-033` 也随之改为被 `TASK-050` / `TASK-052` 吸收。
+  - `medium: TASK-054 完成 ingest / digest 场景评估指标与 golden 基线（已完成）`
+- `notes`: `SES-20260401-02` 实际实现后已经证明，这块工作把“共享语义底座、runtime 安全闸门、ask 四维度离线指标、ingest / digest 场景指标、golden 扩充”全部塞进一个 `medium` 会导致执行边界失真。因此保留 `TASK-048` 作为 umbrella，只负责定义总目标与拆分关系；真实执行改由 `TASK-050` 到 `TASK-054` 承担。`SES-20260406-01` 已完成最后一段 `TASK-054`，因此本 umbrella 的验收边界现已由五个拆分任务组合满足，`TASK-033` 也已被 `TASK-050` / `TASK-052` 吸收。
 
 ### TASK-050
 
@@ -336,11 +336,11 @@
 ### TASK-054
 
 - `task_id`: `TASK-054`
-- `session_id`:
+- `session_id`: `SES-20260406-01`
 - `title`: 完成 ingest / digest 场景评估指标与 golden 基线
 - `category`: `Eval`
 - `priority`: `P1`
-- `status`: `planned`
+- `status`: `completed`
 - `scope`: `medium`
 - `goal`: 在共享 faithfulness core 之上，为 ingest 与 digest 补齐各自的场景评估：ingest 关注 rationale 是否忠实且 patch 是否安全，digest 关注摘要是否忠实且覆盖关键事实，从而让跨链路 eval 不再只剩 ask 一条线。
 - `out_of_scope`:
@@ -366,7 +366,7 @@
 - `derived_tasks`:
   - `small: 为 Patch Safety 的违规项输出整理更稳定的分类标签`
   - `small: 为 digest coverage 的关键事实抽取建立最小标注规范`
-- `notes`: ask 之外的两条链路当前还没有真正的内容质量基线。本任务把 ingest / digest 的评估补齐，避免 `TASK-048` 拆分后只剩 ask 质量在进步、其他链路继续停留在合约级断言。
+- `notes`: `SES-20260406-01` 已完成本任务。 [eval/run_eval.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/eval/run_eval.py) 现已按 scenario 分派 quality metrics：ask 保持 Faithfulness / Answer Relevancy / Context Precision / Context Recall 四维度，governance 输出 `rationale_faithfulness / patch_safety`，digest 输出 `faithfulness / coverage`； [eval/golden/governance_cases.json](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/eval/golden/governance_cases.json) 现已补到 3 条 governance golden case， [eval/golden/digest_cases.json](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/eval/golden/digest_cases.json) 的 metric-bearing digest case 也已改为显式校验 `faithfulness / coverage`； [backend/tests/test_eval_runner.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/tests/test_eval_runner.py) 已新增 mixed ask / governance / digest overview 回归，确保全局与 benchmark 级聚合不再把所有场景误算成 ask 指标。验收期内已通过 `backend.tests.test_eval_runner` 共 7 个 tests，以及 5 条 targeted governance / digest eval case。上面的 `derived_tasks` 继续保留为不阻塞收口的 `small` 尾项。
 
 ### TASK-055
 

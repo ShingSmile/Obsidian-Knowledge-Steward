@@ -27,12 +27,15 @@
 - `TASK-051` 已在 `SES-20260401-03` 完成： [backend/app/quality/faithfulness.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/app/quality/faithfulness.py) 已升级为共享 claim-level faithfulness core，可输出 `entailed / contradicted / neutral` verdict，并在 embedding provider 可用时走更强的 semantic backend；[eval/run_eval.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/eval/run_eval.py) 也已让 ask / governance / digest 共用这套判定层，governance / digest 的 faithfulness 不再直接退回 `context_recall` 充当替代指标。
 - `TASK-052` 已在 `SES-20260402-01` 完成：ask / digest runtime 已共用基于 claim-level semantic core 的 `RuntimeFaithfulnessSignal`；ask 对低分 generated answer 会保守降级为 `retrieval_only`，digest 现已输出结构化 `runtime_faithfulness` quality outcome，ask / digest trace 与 checkpoint serializer allowlist 也已对齐新 contract。
 - `TASK-053` 已在 `SES-20260402-02` 完成并合并到 `main`：ask 离线评估现已稳定输出 Faithfulness / Answer Relevancy / Context Precision / Context Recall 四维度，`answer_relevancy` 成为正式 metric key，并保留 `relevancy` 兼容 alias；ask golden 已扩到 5 条以上 quality case，覆盖 grounded / unsupported / partial support。
+- `TASK-054` 已在 `SES-20260406-01` 完成： [eval/run_eval.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/eval/run_eval.py) 现已按 scenario 输出 governance 的 `Rationale Faithfulness / Patch Safety` 与 digest 的 `Faithfulness / Coverage`， [eval/golden/governance_cases.json](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/eval/golden/governance_cases.json) 现已补到 3 条 governance golden case， [backend/tests/test_eval_runner.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/tests/test_eval_runner.py) 也已补齐 mixed ask / governance / digest overview 回归。
+- `TASK-048` 已由 `TASK-050` 到 `TASK-054` 全部收口：跨链路内容质量评估与 runtime faithfulness 治理 umbrella 不再保留未完成的 `medium` 切片。
 - `TASK-055` 已在 `SES-20260402-02` 作为 retroactive completed refactor 回填：backend / plugin / persistence / retrieval 已统一采用 `vault-relative` note path contract，输入层兼容 vault 内真实绝对路径并立即归一化，`/vault/...` 只作为历史迁移格式，普通执行路径拒绝。
 
 ## 最近完成
 
 | task_id | 日期 | 结果 |
 | --- | --- | --- |
+| `TASK-054` | 2026-04-06 | 已完成：eval runner 现已按场景输出 governance 的 `Rationale Faithfulness / Patch Safety` 与 digest 的 `Faithfulness / Coverage`，governance golden 已补到 3 条 case，`backend.tests.test_eval_runner` 7 tests 与 5 条 targeted governance / digest eval case 通过 |
 | `TASK-055` | 2026-04-06 | 已完成：跨 backend / plugin / persistence / retrieval 的 note path contract 已收敛为 `vault-relative`，输入层兼容 vault 内真实绝对路径并立即归一化，普通执行路径拒绝新的 `/vault/...`；相关 backend 179 tests 与 plugin 20 tests 通过，随后与 `TASK-053` 合流后的 `main` 继续通过 backend 180 tests |
 | `TASK-053` | 2026-04-06 | 已完成：ask eval 已正式输出 Faithfulness / Answer Relevancy / Context Precision / Context Recall 四维度，`answer_relevancy` 成为正式 metric key 并保留 `relevancy` alias；ask golden 已扩到 5 条以上 quality case，定向 eval runner 7 tests 与 ask eval 5 case 通过 |
 | `TASK-052` | 2026-04-02 | 已完成：ask / digest runtime 已共用 `RuntimeFaithfulnessSignal`，ask 会在低分时保守降级为 `retrieval_only`，digest 新增结构化 `runtime_faithfulness` outcome 与 trace 字段；相关 backend 66 tests 全部通过 |
@@ -46,8 +49,10 @@
 
 ## 默认下一任务
 
-- 默认进入 `TASK-054`
-  - 主题：完成 ingest 的 Rationale Faithfulness + Patch Safety，以及 digest 的 Faithfulness + Coverage 与对应 golden 基线。
+- 默认进入 `TASK-049`
+  - 主题：将 ask 链路的工具调用从 prompt-based JSON 约定迁移到 OpenAI Function Calling 协议，并为不支持 Function Calling 的 provider 保留结构化 fallback。
+- 若回溯刚完成的 `TASK-054`
+  - 主题：已完成；仅剩 Patch Safety 违规项分类标签稳定化与 digest coverage 关键事实标注规范两个 `small` 尾项，不应再单独开一个 `medium`。
 - 若回溯刚完成的 `TASK-053`
   - 主题：已完成；仅剩 Context Recall 标注规范与 answer relevancy deterministic fallback 两个 `small` 尾项，不应再单独开一个 `medium`。
 - 若回溯刚完成的 `TASK-055`
@@ -57,7 +62,7 @@
 - 若优先升级工具调用协议：`TASK-049`
   - 主题：将工具调用从 prompt-based JSON 约定迁移到 OpenAI Function Calling 协议，ToolSpec schema 直接映射为 `tools` 参数。
 - 若查看原 umbrella：`TASK-048`
-  - 主题：已拆分为 `TASK-050` 到 `TASK-054`，不应再作为单个 `medium` 直接执行。
+  - 主题：已由 `TASK-050` 到 `TASK-054` 全部完成，不应再作为单个 `medium` 直接执行。
 - 若继续业务功能 medium：`TASK-031`
   - 主题：为”本地写回成功但 `/workflows/resume` 失败”补跨会话恢复入口。
 - 若先补检索路径的可持续性：`TASK-032`
@@ -80,7 +85,7 @@
 - ask 链路的工具调用仍为 prompt-based JSON 约定 + 手动解析，没有使用 API 级别的 Structured Tool Calling，格式合法性不受保证，对应 `TASK-049`。
 - `TASK-051` 已完成，但 claim 拆解的中文停用词 / allowlist 仍未落地；运行时阈值、score 与 low-confidence trace 已由 `TASK-052` 的 shared runtime signal 在 ask / digest 链路先补齐。
 - note path contract 已收敛为 `vault-relative`，但历史 `/vault/...` 样例、旧 eval artifact 或外部旧库仍可能残留伪绝对路径；新增 fixture / API payload 不应再重新写回这种格式。
-- ingest / digest 仍缺少各自场景化的内容质量指标与 golden 基线，对应 `TASK-054`。
+- `TASK-054` 已完成，但仍留有两个 `small` 尾项：Patch Safety 的违规项分类标签还不稳定，digest coverage 的关键事实抽取标注规范也还未收敛。
 - 控制面与副作用面仍有断口：本地写回成功但后端记账失败时，当前还没有跨会话恢复入口，对应 `TASK-031`。
 - scoped ingest 仍会整库重建 `chunk_fts`，一旦 approval 高频触发，成本会持续放大，对应 `TASK-032`。
 
@@ -190,7 +195,7 @@
 - [plugin/src/writeback/applyProposalWriteback.ts](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/plugin/src/writeback/applyProposalWriteback.ts)
 - [plugin/src/writeback/writeback.test.ts](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/plugin/src/writeback/writeback.test.ts)
 
-### 若继续 `TASK-054`
+### 若回溯已完成的 `TASK-054`
 
 - [backend/app/services/ingest_proposal.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/app/services/ingest_proposal.py)
 - [backend/app/services/digest.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/app/services/digest.py)
