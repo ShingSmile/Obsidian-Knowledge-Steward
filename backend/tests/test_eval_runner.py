@@ -367,6 +367,85 @@ class EvalRunnerTests(unittest.TestCase):
                 "no_governance_issues_detected",
             )
 
+    def test_run_eval_reports_four_dimension_ask_metrics_with_answer_relevancy_alias(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            output_path = Path(temp_dir) / "ask_quality_eval_result.json"
+            completed = subprocess.run(
+                [
+                    sys.executable,
+                    str(EVAL_SCRIPT),
+                    "--case-id",
+                    "ask_fixture_generated_answer_citation_valid",
+                    "--case-id",
+                    "ask_fixture_semantic_partial_support",
+                    "--case-id",
+                    "ask_fixture_semantic_overclaim_writeback",
+                    "--case-id",
+                    "ask_fixture_semantic_overclaim_governance",
+                    "--case-id",
+                    "ask_fixture_hybrid_retrieval_only",
+                    "--output",
+                    str(output_path),
+                ],
+                cwd=ROOT_DIR,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+
+            if completed.returncode != 0:
+                self.fail(
+                    "run_eval ask quality cases failed unexpectedly.\n"
+                    f"stdout:\n{completed.stdout}\n"
+                    f"stderr:\n{completed.stderr}"
+                )
+
+            payload = json.loads(output_path.read_text(encoding="utf-8"))
+            self.assertEqual(payload["summary"]["selected_case_count"], 5)
+            self.assertEqual(payload["summary"]["passed_case_count"], 5)
+            self.assertEqual(payload["summary"]["failed_case_count"], 0)
+
+            metric_overview = payload["summary"]["metric_overview"]
+            self.assertEqual(metric_overview["faithfulness"]["case_count"], 5)
+            self.assertEqual(metric_overview["answer_relevancy"]["case_count"], 5)
+            self.assertEqual(metric_overview["context_precision"]["case_count"], 5)
+            self.assertEqual(metric_overview["context_recall"]["case_count"], 5)
+            self.assertEqual(
+                metric_overview["answer_relevancy"]["average_score"],
+                metric_overview["relevancy"]["average_score"],
+            )
+
+            ask_overview = payload["summary"]["benchmark_overview"][
+                "question_answering"
+            ]["scenario_overview"]["ask"]
+            self.assertEqual(ask_overview["selected_case_count"], 5)
+            self.assertEqual(
+                ask_overview["metric_overview"]["answer_relevancy"]["case_count"],
+                5,
+            )
+
+            case_map = {case["case_id"]: case for case in payload["cases"]}
+            partial_case = case_map["ask_fixture_semantic_partial_support"]
+            self.assertEqual(partial_case["actual"]["ask_result"]["mode"], "generated_answer")
+            self.assertGreaterEqual(
+                partial_case["actual"]["quality_metrics"]["faithfulness"]["score"],
+                0.7,
+            )
+            self.assertLess(
+                partial_case["actual"]["quality_metrics"]["faithfulness"]["score"],
+                1.0,
+            )
+            self.assertIn(
+                "semantic_claim_report",
+                partial_case["actual"]["quality_metrics"]["faithfulness"]["reason"],
+            )
+            self.assertGreaterEqual(
+                partial_case["actual"]["quality_metrics"]["answer_relevancy"]["score"],
+                1.0,
+            )
+
 
 if __name__ == "__main__":
     unittest.main()
