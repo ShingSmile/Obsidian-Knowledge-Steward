@@ -70,13 +70,7 @@
           "faithfulness": {
             "min": 1.0
           },
-          "relevancy": {
-            "min": 1.0
-          },
-          "context_precision": {
-            "min": 1.0
-          },
-          "context_recall": {
+          "coverage": {
             "min": 1.0
           }
         }
@@ -175,13 +169,7 @@
           "faithfulness": {
             "min": 1.0
           },
-          "relevancy": {
-            "min": 1.0
-          },
-          "context_precision": {
-            "min": 1.0
-          },
-          "context_recall": {
+          "coverage": {
             "min": 1.0
           }
         }

@@ -287,6 +287,8 @@ class EvalRunnerTests(unittest.TestCase):
                     "--case-id",
                     "governance_fixture_waiting_proposal_hybrid",
                     "--case-id",
+                    "governance_fixture_waiting_proposal_beta",
+                    "--case-id",
                     "governance_fixture_no_proposal_fallback",
                     "--case-id",
                     "digest_fixture_structured_result_metrics",
@@ -309,28 +311,35 @@ class EvalRunnerTests(unittest.TestCase):
                 )
 
             payload = json.loads(output_path.read_text(encoding="utf-8"))
-            self.assertEqual(payload["summary"]["selected_case_count"], 5)
-            self.assertEqual(payload["summary"]["passed_case_count"], 5)
+            self.assertEqual(payload["summary"]["selected_case_count"], 6)
+            self.assertEqual(payload["summary"]["passed_case_count"], 6)
             self.assertEqual(payload["summary"]["failed_case_count"], 0)
 
             metric_overview = payload["summary"]["metric_overview"]
-            self.assertGreaterEqual(metric_overview["faithfulness"]["case_count"], 5)
-            self.assertGreaterEqual(metric_overview["relevancy"]["average_score"], 1.0)
-            self.assertGreaterEqual(metric_overview["context_precision"]["average_score"], 0.7)
-            self.assertGreaterEqual(metric_overview["context_recall"]["average_score"], 1.0)
+            self.assertEqual(metric_overview["answer_relevancy"]["case_count"], 1)
+            self.assertEqual(metric_overview["relevancy"]["case_count"], 1)
+            self.assertEqual(metric_overview["context_precision"]["case_count"], 1)
+            self.assertEqual(metric_overview["context_recall"]["case_count"], 1)
+            self.assertEqual(metric_overview["rationale_faithfulness"]["case_count"], 3)
+            self.assertEqual(metric_overview["patch_safety"]["case_count"], 3)
+            self.assertEqual(metric_overview["coverage"]["case_count"], 2)
+            self.assertGreaterEqual(metric_overview["faithfulness"]["average_score"], 1.0)
+            self.assertGreaterEqual(metric_overview["rationale_faithfulness"]["average_score"], 1.0)
+            self.assertGreaterEqual(metric_overview["patch_safety"]["average_score"], 1.0)
+            self.assertGreaterEqual(metric_overview["coverage"]["average_score"], 1.0)
 
             benchmark_overview = payload["summary"]["benchmark_overview"]
             qa_overview = benchmark_overview["question_answering"]
             governance_overview = benchmark_overview["governance"]
             self.assertEqual(qa_overview["selected_case_count"], 1)
-            self.assertEqual(governance_overview["selected_case_count"], 4)
+            self.assertEqual(governance_overview["selected_case_count"], 5)
             self.assertEqual(
                 qa_overview["scenario_overview"]["ask"]["core_metrics"]["retrieval_only_rate"],
                 1.0,
             )
             self.assertEqual(
                 governance_overview["scenario_overview"]["governance"]["core_metrics"]["proposal_generation_rate"],
-                0.5,
+                0.6667,
             )
             self.assertEqual(
                 governance_overview["scenario_overview"]["digest"]["core_metrics"]["proposal_generation_rate"],
@@ -351,16 +360,36 @@ class EvalRunnerTests(unittest.TestCase):
                 case_map["ask_fixture_hybrid_retrieval_only"]["actual"]["ask_result"]["retrieved_candidate_retrieval_sources"],
             )
             self.assertIn(
+                "answer_relevancy",
+                case_map["ask_fixture_hybrid_retrieval_only"]["actual"]["quality_metrics"],
+            )
+            self.assertIn(
+                "context_precision",
+                case_map["ask_fixture_hybrid_retrieval_only"]["actual"]["quality_metrics"],
+            )
+            self.assertIn(
                 "semantic_claim_report",
-                case_map["governance_fixture_waiting_proposal_hybrid"]["actual"]["quality_metrics"]["faithfulness"]["reason"],
+                case_map["governance_fixture_waiting_proposal_hybrid"]["actual"]["quality_metrics"]["rationale_faithfulness"]["reason"],
+            )
+            self.assertGreaterEqual(
+                case_map["governance_fixture_waiting_proposal_hybrid"]["actual"]["quality_metrics"]["patch_safety"]["score"],
+                1.0,
             )
             self.assertIn(
                 "semantic_claim_report",
                 case_map["digest_fixture_structured_result_metrics"]["actual"]["quality_metrics"]["faithfulness"]["reason"],
             )
+            self.assertGreaterEqual(
+                case_map["digest_fixture_structured_result_metrics"]["actual"]["quality_metrics"]["coverage"]["score"],
+                1.0,
+            )
             self.assertIn(
                 "hybrid_rrf",
                 case_map["governance_fixture_waiting_proposal_hybrid"]["actual"]["analysis_result"]["related_candidate_retrieval_sources"],
+            )
+            self.assertEqual(
+                case_map["governance_fixture_waiting_proposal_beta"]["actual"]["proposal"]["present"],
+                True,
             )
             self.assertEqual(
                 case_map["governance_fixture_no_proposal_fallback"]["actual"]["analysis_result"]["fallback_reason"],

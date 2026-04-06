@@ -69,16 +69,85 @@
           ]
         },
         "quality_metrics": {
-          "faithfulness": {
+          "rationale_faithfulness": {
             "min": 1.0
           },
-          "relevancy": {
+          "patch_safety": {
+            "min": 1.0
+          }
+        }
+      }
+    },
+    {
+      "case_id": "governance_fixture_waiting_proposal_beta",
+      "scenario": "governance",
+      "fixture": "governance_basic",
+      "description": "第二条 generic note 在 proposal 模式下也应产出受限治理 proposal，避免 ingest golden 只有单一路径。",
+      "quality_reference": {
+        "reference_context_path_suffixes": [
+          "Beta.md",
+          "Alpha.md"
+        ]
+      },
+      "request": {
+        "thread_id": "thread_eval_governance_waiting_beta",
+        "action_type": "ingest_steward",
+        "note_path": "Beta.md",
+        "require_approval": true,
+        "metadata": {
+          "approval_mode": "proposal"
+        }
+      },
+      "setup": {
+        "provider_mode": "none",
+        "mock_embedding_profile": "alpha_beta_hybrid",
+        "prewarm_requests": [
+          {
+            "thread_id": "thread_eval_governance_waiting_beta_prewarm",
+            "action_type": "ingest_steward"
+          }
+        ]
+      },
+      "expected": {
+        "http_status": 202,
+        "workflow_status": "waiting_for_approval",
+        "message_contains": "waiting for approval",
+        "approval_required": true,
+        "ingest_result": {
+          "scanned_notes": 1
+        },
+        "analysis_result": {
+          "fallback_used": false,
+          "min_related_candidate_count": 1,
+          "finding_types_contains": [
+            "missing_frontmatter",
+            "unclassified_note_type"
+          ],
+          "related_candidate_path_suffixes": [
+            "Alpha.md"
+          ],
+          "related_candidate_sources_contains": [
+            "sqlite_vector"
+          ]
+        },
+        "proposal": {
+          "present": true,
+          "patch_ops": [
+            "merge_frontmatter",
+            "insert_under_heading"
+          ],
+          "target_note_path_suffix": "Beta.md",
+          "summary_contains": "Beta",
+          "min_evidence_count": 2,
+          "evidence_path_suffixes": [
+            "Beta.md"
+          ]
+        },
+        "quality_metrics": {
+          "rationale_faithfulness": {
             "min": 1.0
           },
-          "context_precision": {
-            "min": 0.6
-          },
-          "context_recall": {
+          "patch_safety": {
             "min": 1.0
           }
         }
@@ -133,16 +202,10 @@
           ]
         },
         "quality_metrics": {
-          "faithfulness": {
+          "rationale_faithfulness": {
             "min": 1.0
           },
-          "relevancy": {
-            "min": 1.0
-          },
-          "context_precision": {
-            "min": 0.5
-          },
-          "context_recall": {
+          "patch_safety": {
             "min": 1.0
           }
         }

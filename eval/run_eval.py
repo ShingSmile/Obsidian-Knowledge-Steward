@@ -949,6 +949,7 @@ def build_quality_metrics_snapshot(
     actual: dict[str, Any],
     settings: Settings,
 ) -> dict[str, Any]:
+    scenario_name = str(case_payload.get("scenario", ""))
     expected = dict(case_payload.get("expected", {}))
     quality_reference = dict(case_payload.get("quality_reference", {}))
     output_hints = _collect_output_hints(expected)
@@ -964,7 +965,7 @@ def build_quality_metrics_snapshot(
         for output_hint in output_hints
         if output_hint in combined_output_text
     )
-    relevancy_score = _safe_ratio(matched_output_hint_count, len(output_hints))
+    output_hint_score = _safe_ratio(matched_output_hint_count, len(output_hints))
     matched_actual_context_count = _count_matched_actual_paths(
         actual_context_paths=actual_context_paths,
         reference_context_paths=reference_context_paths,
@@ -981,18 +982,63 @@ def build_quality_metrics_snapshot(
         matched_reference_context_count,
         len(reference_context_paths),
     )
+
+    if scenario_name in {"ask", "tool_and_guardrail"}:
+        return _build_ask_quality_metrics_snapshot(
+            actual=actual,
+            context_precision_score=context_precision_score,
+            context_recall_score=context_recall_score,
+            matched_actual_context_count=matched_actual_context_count,
+            matched_output_hint_count=matched_output_hint_count,
+            matched_reference_context_count=matched_reference_context_count,
+            output_hint_count=len(output_hints),
+            output_hint_score=output_hint_score,
+            actual_context_count=len(actual_context_paths),
+            reference_context_count=len(reference_context_paths),
+            settings=settings,
+        )
+    if scenario_name == "governance":
+        return _build_governance_quality_metrics_snapshot(
+            expected=expected,
+            actual=actual,
+            context_recall_score=context_recall_score,
+            settings=settings,
+        )
+    if scenario_name == "digest":
+        return _build_digest_quality_metrics_snapshot(
+            actual=actual,
+            coverage_score=context_recall_score,
+            matched_reference_context_count=matched_reference_context_count,
+            reference_context_count=len(reference_context_paths),
+            settings=settings,
+        )
+    return {}
+
+
+def _build_ask_quality_metrics_snapshot(
+    *,
+    actual: dict[str, Any],
+    context_precision_score: float | None,
+    context_recall_score: float | None,
+    matched_actual_context_count: int,
+    matched_output_hint_count: int,
+    matched_reference_context_count: int,
+    output_hint_count: int,
+    output_hint_score: float | None,
+    actual_context_count: int,
+    reference_context_count: int,
+    settings: Settings,
+) -> dict[str, Any]:
     faithfulness_score, faithfulness_reason = _compute_faithfulness_score(
         actual=actual,
         context_recall_score=context_recall_score,
         settings=settings,
     )
-
     answer_relevancy_payload = {
-        "score": relevancy_score,
+        "score": output_hint_score,
         "matched_output_hint_count": matched_output_hint_count,
-        "expected_output_hint_count": len(output_hints),
+        "expected_output_hint_count": output_hint_count,
     }
-
     return {
         "faithfulness": {
             "score": faithfulness_score,
@@ -1003,14 +1049,139 @@ def build_quality_metrics_snapshot(
         "context_precision": {
             "score": context_precision_score,
             "matched_context_count": matched_actual_context_count,
-            "actual_context_count": len(actual_context_paths),
+            "actual_context_count": actual_context_count,
         },
         "context_recall": {
             "score": context_recall_score,
             "matched_context_count": matched_reference_context_count,
-            "reference_context_count": len(reference_context_paths),
+            "reference_context_count": reference_context_count,
         },
     }
+
+
+def _build_governance_quality_metrics_snapshot(
+    *,
+    expected: dict[str, Any],
+    actual: dict[str, Any],
+    context_recall_score: float | None,
+    settings: Settings,
+) -> dict[str, Any]:
+    faithfulness_score, faithfulness_reason = _compute_faithfulness_score(
+        actual=actual,
+        context_recall_score=context_recall_score,
+        settings=settings,
+    )
+    patch_safety_score, patch_safety_reason = _compute_patch_safety_score(
+        expected=expected,
+        actual=actual,
+    )
+    return {
+        "rationale_faithfulness": {
+            "score": faithfulness_score,
+            "reason": faithfulness_reason,
+        },
+        "patch_safety": {
+            "score": patch_safety_score,
+            "reason": patch_safety_reason,
+        },
+    }
+
+
+def _build_digest_quality_metrics_snapshot(
+    *,
+    actual: dict[str, Any],
+    coverage_score: float | None,
+    matched_reference_context_count: int,
+    reference_context_count: int,
+    settings: Settings,
+) -> dict[str, Any]:
+    faithfulness_score, faithfulness_reason = _compute_faithfulness_score(
+        actual=actual,
+        context_recall_score=coverage_score,
+        settings=settings,
+    )
+    return {
+        "faithfulness": {
+            "score": faithfulness_score,
+            "reason": faithfulness_reason,
+        },
+        "coverage": {
+            "score": coverage_score,
+            "matched_context_count": matched_reference_context_count,
+            "reference_context_count": reference_context_count,
+        },
+    }
+
+
+def _compute_patch_safety_score(
+    *,
+    expected: dict[str, Any],
+    actual: dict[str, Any],
+) -> tuple[float | None, str]:
+    expected_proposal = expected.get("proposal")
+    actual_proposal = actual.get("proposal")
+    expected_present = bool(
+        isinstance(expected_proposal, dict) and expected_proposal.get("present")
+    )
+    actual_present = bool(
+        isinstance(actual_proposal, dict) and actual_proposal.get("present")
+    )
+
+    if not expected_present and not actual_present:
+        return 1.0, "proposal_absent_as_expected"
+    if expected_present != actual_present:
+        return 0.0, "proposal_presence_mismatch"
+    if not isinstance(expected_proposal, dict) or not isinstance(actual_proposal, dict):
+        return None, "not_applicable"
+
+    checks: list[tuple[str, bool]] = [("proposal_present", actual_present)]
+    expected_patch_ops = normalize_expected_strings(expected_proposal.get("patch_ops"))
+    if expected_patch_ops:
+        actual_patch_ops = [
+            str(patch_op)
+            for patch_op in actual_proposal.get("patch_ops", [])
+            if str(patch_op).strip()
+        ]
+        checks.append(
+            (
+                "patch_ops_match",
+                sorted(actual_patch_ops) == sorted(expected_patch_ops),
+            )
+        )
+
+    target_path_suffix = expected_proposal.get("target_note_path_suffix")
+    if target_path_suffix is not None:
+        checks.append(
+            (
+                "target_note_path_match",
+                str(actual_proposal.get("target_note_path") or "").endswith(
+                    str(target_path_suffix)
+                ),
+            )
+        )
+
+    min_evidence_count = expected_proposal.get("min_evidence_count")
+    if min_evidence_count is not None:
+        checks.append(
+            (
+                "evidence_count_ok",
+                int(actual_proposal.get("evidence_count") or 0) >= int(min_evidence_count),
+            )
+        )
+
+    checks.append(
+        (
+            "evidence_present",
+            bool(actual_proposal.get("evidence_paths")),
+        )
+    )
+
+    passed_checks = [label for label, passed in checks if passed]
+    failed_checks = [label for label, passed in checks if not passed]
+    score = _safe_ratio(len(passed_checks), len(checks))
+    if not failed_checks:
+        return score, "patch_contract_verified"
+    return score, f"patch_contract_mismatch:{','.join(failed_checks)}"
 
 
 def _collect_output_hints(expected: dict[str, Any]) -> list[str]:
@@ -1894,17 +2065,7 @@ def assert_quality_metrics_matches(
     if actual is None:
         raise EvalAssertionError("Expected quality_metrics to be present, but it was missing.")
 
-    for metric_name in (
-        "faithfulness",
-        "answer_relevancy",
-        "relevancy",
-        "context_precision",
-        "context_recall",
-    ):
-        metric_expectation = expected.get(metric_name)
-        if metric_expectation is None:
-            continue
-
+    for metric_name, metric_expectation in expected.items():
         metric_actual = actual.get(metric_name)
         if not isinstance(metric_actual, dict):
             raise EvalAssertionError(f"Expected quality_metrics.{metric_name} to be present.")
@@ -2395,37 +2556,32 @@ def _build_resume_core_metrics(case_results: list[dict[str, Any]]) -> dict[str, 
 
 
 def _build_metric_overview(case_results: list[dict[str, Any]]) -> dict[str, Any]:
-    overview: dict[str, Any] = {}
-    for metric_name in (
-        "faithfulness",
-        "answer_relevancy",
-        "context_precision",
-        "context_recall",
-    ):
-        scores: list[float] = []
-        for case_result in case_results:
-            actual_snapshot = case_result.get("actual")
-            if not isinstance(actual_snapshot, dict):
-                continue
-            quality_metrics = actual_snapshot.get("quality_metrics")
-            if not isinstance(quality_metrics, dict):
-                continue
-            metric_payload = quality_metrics.get(metric_name)
+    scores_by_metric: dict[str, list[float]] = {}
+
+    for case_result in case_results:
+        actual_snapshot = case_result.get("actual")
+        if not isinstance(actual_snapshot, dict):
+            continue
+        quality_metrics = actual_snapshot.get("quality_metrics")
+        if not isinstance(quality_metrics, dict):
+            continue
+        for metric_name, metric_payload in quality_metrics.items():
             if not isinstance(metric_payload, dict):
                 continue
             metric_score = metric_payload.get("score")
             if metric_score is None:
                 continue
-            scores.append(float(metric_score))
+            scores_by_metric.setdefault(str(metric_name), []).append(float(metric_score))
 
+    overview: dict[str, Any] = {}
+    for metric_name in sorted(scores_by_metric):
+        scores = scores_by_metric[metric_name]
         overview[metric_name] = {
             "case_count": len(scores),
             "average_score": round(sum(scores) / len(scores), 4) if scores else None,
             "min_score": min(scores) if scores else None,
             "max_score": max(scores) if scores else None,
         }
-
-    overview["relevancy"] = dict(overview["answer_relevancy"])
     return overview
 
 
