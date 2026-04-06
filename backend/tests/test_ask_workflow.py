@@ -89,6 +89,97 @@ class AskWorkflowTests(unittest.TestCase):
             self.assertIn("[1]", result.answer)
             mocked_request.assert_called_once()
 
+    def test_parse_structured_tool_call_decision_reads_first_tool_call(self) -> None:
+        decision = ask_service._parse_structured_tool_call_decision(
+            {
+                "choices": [
+                    {
+                        "message": {
+                            "tool_calls": [
+                                {
+                                    "id": "call_1",
+                                    "type": "function",
+                                    "function": {
+                                        "name": "load_note_excerpt",
+                                        "arguments": json.dumps(
+                                            {
+                                                "note_path": "Roadmap.md",
+                                                "max_chars": 200,
+                                            },
+                                            ensure_ascii=False,
+                                        ),
+                                    },
+                                }
+                            ]
+                        }
+                    }
+                ]
+            }
+        )
+
+        self.assertEqual(
+            decision,
+            ToolCallDecision(
+                requested=True,
+                tool_name="load_note_excerpt",
+                arguments={"note_path": "Roadmap.md", "max_chars": 200},
+            ),
+        )
+
+    def test_request_tool_call_decision_falls_back_to_prompt_when_structured_path_is_unusable(self) -> None:
+        settings = replace(
+            get_settings(),
+            cloud_base_url="https://example.com",
+            cloud_chat_model="gpt-test",
+            local_chat_model="",
+        )
+        bundle = ContextBundle(
+            user_intent="Roadmap",
+            workflow_action=WorkflowAction.ASK_QA,
+            evidence_items=[
+                ContextEvidenceItem(
+                    source_path="Roadmap.md",
+                    chunk_id="chunk_roadmap",
+                    text="Roadmap 已拆成检索与 ask 两段实现。",
+                    source_kind="retrieval",
+                )
+            ],
+            allowed_tool_names=["load_note_excerpt"],
+            token_budget=400,
+        )
+
+        with patch(
+            "app.services.ask._request_structured_tool_call_decision",
+            return_value=None,
+        ) as mocked_structured:
+            with patch(
+                "app.services.ask._request_prompt_tool_call_decision",
+                return_value=ToolCallDecision(
+                    requested=True,
+                    tool_name="load_note_excerpt",
+                    arguments={"note_path": "Roadmap.md", "max_chars": 200},
+                    rationale="fallback",
+                ),
+            ) as mocked_prompt:
+                decision = ask_service._request_tool_call_decision(
+                    query="Roadmap",
+                    bundle=bundle,
+                    settings=settings,
+                    provider_preference=None,
+                )
+
+        self.assertEqual(
+            decision,
+            ToolCallDecision(
+                requested=True,
+                tool_name="load_note_excerpt",
+                arguments={"note_path": "Roadmap.md", "max_chars": 200},
+                rationale="fallback",
+            ),
+        )
+        mocked_structured.assert_called_once()
+        mocked_prompt.assert_called_once()
+
     def test_ask_workflow_executes_registered_tool_and_reassembles_context(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             db_path = self._build_index_fixture(Path(temp_dir))

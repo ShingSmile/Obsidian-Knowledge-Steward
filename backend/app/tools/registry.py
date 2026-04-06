@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from copy import deepcopy
+
 from app.config import Settings
 from app.contracts.workflow import (
     GuardrailAction,
@@ -195,6 +197,22 @@ def get_allowed_tools_for_workflow(workflow_action: WorkflowAction) -> list[Tool
         spec
         for spec in TOOL_REGISTRY.values()
         if workflow_action in spec.allowed_workflows
+    ]
+
+
+def build_chat_completion_tools_for_workflow(
+    workflow_action: WorkflowAction,
+) -> list[dict[str, object]]:
+    return [
+        {
+            "type": "function",
+            "function": {
+                "name": spec.name,
+                "description": spec.purpose,
+                "parameters": deepcopy(spec.input_schema),
+            },
+        }
+        for spec in get_allowed_tools_for_workflow(workflow_action)
     ]
 
 

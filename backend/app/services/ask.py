@@ -32,7 +32,11 @@ from app.guardrails.ask import (
 )
 from app.quality.faithfulness import build_runtime_ask_faithfulness_signal
 from app.retrieval.hybrid import search_hybrid_chunks_in_db
-from app.tools.registry import execute_tool_call, get_allowed_tools_for_workflow
+from app.tools.registry import (
+    build_chat_completion_tools_for_workflow,
+    execute_tool_call,
+    get_allowed_tools_for_workflow,
+)
 
 
 ASK_RETRIEVAL_LIMIT = 4
@@ -576,39 +580,21 @@ def _request_tool_call_decision(
         return ToolCallDecision(requested=False)
 
     for provider_target in provider_targets:
-        try:
-            payload = {
-                "model": provider_target.model_name,
-                "temperature": 0,
-                "messages": _build_tool_selection_messages(query=query, bundle=bundle),
-            }
-            headers = {
-                "Content-Type": "application/json",
-            }
-            if provider_target.api_key:
-                headers["Authorization"] = f"Bearer {provider_target.api_key}"
+        structured_decision = _request_structured_tool_call_decision(
+            provider_target=provider_target,
+            query=query,
+            bundle=bundle,
+        )
+        if structured_decision is not None:
+            return structured_decision
 
-            request = urllib_request.Request(
-                _build_chat_completions_url(provider_target.base_url),
-                data=json.dumps(payload, ensure_ascii=False).encode("utf-8"),
-                headers=headers,
-                method="POST",
-            )
-            with urllib_request.urlopen(request, timeout=MODEL_TIMEOUT_SECONDS) as response:
-                response_payload = json.loads(response.read().decode("utf-8"))
-        except (
-            urllib_error.HTTPError,
-            urllib_error.URLError,
-            TimeoutError,
-            json.JSONDecodeError,
-            OSError,
-        ):
-            continue
-
-        raw_text = _extract_chat_completion_text(response_payload)
-        if not raw_text:
-            continue
-        return _parse_tool_call_decision(raw_text)
+        prompt_decision = _request_prompt_tool_call_decision(
+            provider_target=provider_target,
+            query=query,
+            bundle=bundle,
+        )
+        if prompt_decision is not None:
+            return prompt_decision
 
     return ToolCallDecision(requested=False)
 
@@ -627,6 +613,27 @@ def _build_tool_selection_messages(
                 "Return strict JSON only with keys requested, tool_name, arguments, rationale. "
                 "If no tool is needed, return "
                 "{\"requested\": false, \"tool_name\": null, \"arguments\": {}, \"rationale\": \"\"}."
+            ),
+        },
+        {
+            "role": "user",
+            "content": render_tool_selection_prompt(bundle),
+        },
+    ]
+
+
+def _build_structured_tool_selection_messages(
+    *,
+    query: str,
+    bundle: ContextBundle,
+) -> list[dict[str, str]]:
+    _ = query
+    return [
+        {
+            "role": "system",
+            "content": (
+                "You decide whether exactly one read-only tool call is needed before answering. "
+                "Use at most one tool. If no tool is needed, respond without calling a tool."
             ),
         },
         {
@@ -658,6 +665,112 @@ def _parse_tool_call_decision(raw_text: str) -> ToolCallDecision:
         arguments=arguments if isinstance(arguments, dict) else {},
         rationale=rationale if isinstance(rationale, str) else None,
     )
+
+
+def _parse_structured_tool_call_decision(
+    response_payload: dict[str, object],
+) -> ToolCallDecision | None:
+    choices = response_payload.get("choices")
+    if not isinstance(choices, list) or not choices:
+        return None
+
+    first_choice = choices[0]
+    if not isinstance(first_choice, dict):
+        return None
+
+    message = first_choice.get("message")
+    if not isinstance(message, dict):
+        return None
+
+    tool_calls = message.get("tool_calls")
+    if tool_calls is None:
+        return ToolCallDecision(requested=False)
+    if not isinstance(tool_calls, list):
+        return None
+    if not tool_calls:
+        return ToolCallDecision(requested=False)
+
+    first_tool_call = tool_calls[0]
+    if not isinstance(first_tool_call, dict):
+        return None
+    if first_tool_call.get("type") != "function":
+        return None
+
+    function_payload = first_tool_call.get("function")
+    if not isinstance(function_payload, dict):
+        return None
+
+    tool_name = function_payload.get("name")
+    if not isinstance(tool_name, str) or not tool_name.strip():
+        return None
+
+    raw_arguments = function_payload.get("arguments")
+    if raw_arguments in (None, ""):
+        arguments: dict[str, object] = {}
+    elif isinstance(raw_arguments, str):
+        try:
+            parsed_arguments = json.loads(raw_arguments)
+        except json.JSONDecodeError:
+            return None
+        if not isinstance(parsed_arguments, dict):
+            return None
+        arguments = parsed_arguments
+    else:
+        return None
+
+    return ToolCallDecision(
+        requested=True,
+        tool_name=tool_name,
+        arguments=arguments,
+    )
+
+
+def _request_structured_tool_call_decision(
+    *,
+    provider_target: ChatProviderTarget,
+    query: str,
+    bundle: ContextBundle,
+) -> ToolCallDecision | None:
+    payload = {
+        "model": provider_target.model_name,
+        "temperature": 0,
+        "messages": _build_structured_tool_selection_messages(query=query, bundle=bundle),
+        "tools": build_chat_completion_tools_for_workflow(bundle.workflow_action),
+        "tool_choice": "auto",
+    }
+    try:
+        response_payload = _request_chat_completion_payload(
+            provider_target=provider_target,
+            payload=payload,
+        )
+    except ChatProviderError:
+        return None
+    return _parse_structured_tool_call_decision(response_payload)
+
+
+def _request_prompt_tool_call_decision(
+    *,
+    provider_target: ChatProviderTarget,
+    query: str,
+    bundle: ContextBundle,
+) -> ToolCallDecision | None:
+    payload = {
+        "model": provider_target.model_name,
+        "temperature": 0,
+        "messages": _build_tool_selection_messages(query=query, bundle=bundle),
+    }
+    try:
+        response_payload = _request_chat_completion_payload(
+            provider_target=provider_target,
+            payload=payload,
+        )
+    except ChatProviderError:
+        return None
+
+    raw_text = _extract_chat_completion_text(response_payload)
+    if not raw_text:
+        return None
+    return _parse_tool_call_decision(raw_text)
 
 
 def _validate_generated_answer_citations(
@@ -791,23 +904,13 @@ def _request_grounded_answer(
         "temperature": 0,
         "messages": _build_grounded_messages(query=query, bundle=bundle),
     }
-    headers = {
-        "Content-Type": "application/json",
-    }
-    if provider_target.api_key:
-        headers["Authorization"] = f"Bearer {provider_target.api_key}"
-
-    request = urllib_request.Request(
-        _build_chat_completions_url(provider_target.base_url),
-        data=json.dumps(payload, ensure_ascii=False).encode("utf-8"),
-        headers=headers,
-        method="POST",
-    )
     try:
-        with urllib_request.urlopen(request, timeout=MODEL_TIMEOUT_SECONDS) as response:
-            response_payload = json.loads(response.read().decode("utf-8"))
-    except (urllib_error.HTTPError, urllib_error.URLError, TimeoutError, json.JSONDecodeError) as exc:
-        raise ChatProviderError(str(exc)) from exc
+        response_payload = _request_chat_completion_payload(
+            provider_target=provider_target,
+            payload=payload,
+        )
+    except ChatProviderError:
+        raise
 
     answer = _extract_chat_completion_text(response_payload)
     if not answer:
@@ -845,6 +948,40 @@ def _build_chat_completions_url(base_url: str) -> str:
     if normalized_base_url.endswith("/v1"):
         return f"{normalized_base_url}/chat/completions"
     return f"{normalized_base_url}/v1/chat/completions"
+
+
+def _request_chat_completion_payload(
+    *,
+    provider_target: ChatProviderTarget,
+    payload: dict[str, object],
+) -> dict[str, object]:
+    headers = {
+        "Content-Type": "application/json",
+    }
+    if provider_target.api_key:
+        headers["Authorization"] = f"Bearer {provider_target.api_key}"
+
+    request = urllib_request.Request(
+        _build_chat_completions_url(provider_target.base_url),
+        data=json.dumps(payload, ensure_ascii=False).encode("utf-8"),
+        headers=headers,
+        method="POST",
+    )
+    try:
+        with urllib_request.urlopen(request, timeout=MODEL_TIMEOUT_SECONDS) as response:
+            response_payload = json.loads(response.read().decode("utf-8"))
+    except (
+        urllib_error.HTTPError,
+        urllib_error.URLError,
+        TimeoutError,
+        json.JSONDecodeError,
+        OSError,
+    ) as exc:
+        raise ChatProviderError(str(exc)) from exc
+
+    if not isinstance(response_payload, dict):
+        raise ChatProviderError("invalid_chat_completion_response")
+    return response_payload
 
 
 def _extract_chat_completion_text(response_payload: dict[str, object]) -> str:

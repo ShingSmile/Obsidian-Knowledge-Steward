@@ -20,7 +20,12 @@ from app.indexing.store import (
     initialize_index_db,
     sync_note_and_chunks,
 )
-from app.tools.registry import execute_tool_call, get_allowed_tools_for_workflow, validate_tool_call
+from app.tools.registry import (
+    build_chat_completion_tools_for_workflow,
+    execute_tool_call,
+    get_allowed_tools_for_workflow,
+    validate_tool_call,
+)
 
 
 class ToolContractTests(unittest.TestCase):
@@ -51,6 +56,30 @@ class ToolRegistryTests(unittest.TestCase):
             ],
         )
         self.assertTrue(all(spec.read_only for spec in specs))
+
+    def test_build_chat_completion_tools_for_ask_maps_tool_specs_to_openai_descriptors(self) -> None:
+        descriptors = build_chat_completion_tools_for_workflow(WorkflowAction.ASK_QA)
+
+        self.assertEqual(len(descriptors), 5)
+        search_descriptor = descriptors[0]
+        self.assertEqual(search_descriptor["type"], "function")
+        self.assertEqual(search_descriptor["function"]["name"], "search_notes")
+        self.assertEqual(
+            search_descriptor["function"]["description"],
+            "Search indexed notes for relevant excerpts.",
+        )
+        self.assertEqual(
+            search_descriptor["function"]["parameters"],
+            {
+                "type": "object",
+                "properties": {
+                    "query": {"type": "string"},
+                    "limit": {"type": "integer", "minimum": 1, "maximum": 20},
+                },
+                "required": ["query"],
+                "additionalProperties": False,
+            },
+        )
 
     def test_validate_tool_call_rejects_unknown_tool_and_wrong_workflow(self) -> None:
         outcome = validate_tool_call(
