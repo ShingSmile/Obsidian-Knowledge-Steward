@@ -135,6 +135,8 @@ class AskBenchmarkCase:
 
     @classmethod
     def from_dict(cls, payload: dict[str, Any]) -> "AskBenchmarkCase":
+        if "review_status" not in payload:
+            raise ValueError("review_status is required for formal dataset cases")
         return cls(
             case_id=payload["case_id"],
             bucket=payload["bucket"],
@@ -150,7 +152,7 @@ class AskBenchmarkCase:
             expected_tool_names=list(payload.get("expected_tool_names", [])),
             allow_retrieval_only=payload["allow_retrieval_only"],
             should_generate_answer=payload["should_generate_answer"],
-            review_status=payload.get("review_status", _APPROVED_REVIEW_STATUS),
+            review_status=payload["review_status"],
             review_notes=payload.get("review_notes", ""),
         )
 

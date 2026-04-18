@@ -20,55 +20,76 @@ from app.benchmark.ask_dataset import (
 
 
 class AskBenchmarkDatasetTests(unittest.TestCase):
+    def _build_case(self, bucket: str, review_status: str = "approved") -> AskBenchmarkCase:
+        return AskBenchmarkCase(
+            case_id=f"ask_case_{bucket}",
+            bucket=bucket,
+            user_query="总结这篇笔记",
+            source_origin="sample_vault",
+            expected_relevant_paths=["日常/2024-03-14_星期四.md"],
+            expected_relevant_locators=[
+                AskBenchmarkLocator(
+                    note_path="日常/2024-03-14_星期四.md",
+                    heading_path="一、工作任务",
+                    excerpt_anchor="完成 digest graph",
+                )
+            ],
+            expected_facts=["今天接通了 DAILY_DIGEST。"],
+            forbidden_claims=[],
+            allow_tool=False,
+            expected_tool_names=[],
+            allow_retrieval_only=False,
+            should_generate_answer=True,
+            review_status=review_status,
+            review_notes="seed",
+        )
+
+    def test_case_accepts_only_allowed_buckets(self) -> None:
+        allowed_buckets = (
+            "single_hop",
+            "multi_hop",
+            "metadata_filter",
+            "abstain_or_no_hit",
+            "tool_allowed",
+        )
+
+        for bucket in allowed_buckets:
+            case = self._build_case(bucket)
+            self.assertEqual(case.bucket, bucket)
+
     def test_case_rejects_unknown_bucket(self) -> None:
         with self.assertRaisesRegex(ValueError, "bucket"):
-            AskBenchmarkCase(
-                case_id="ask_case_001",
-                bucket="bad_bucket",
-                user_query="总结这篇笔记",
-                source_origin="sample_vault",
-                expected_relevant_paths=["日常/2024-03-14_星期四.md"],
-                expected_relevant_locators=[
-                    AskBenchmarkLocator(
-                        note_path="日常/2024-03-14_星期四.md",
-                        heading_path="一、工作任务",
-                        excerpt_anchor="完成 digest graph",
-                    )
-                ],
-                expected_facts=["今天接通了 DAILY_DIGEST。"],
-                forbidden_claims=[],
-                allow_tool=False,
-                expected_tool_names=[],
-                allow_retrieval_only=False,
-                should_generate_answer=True,
-                review_status="approved",
-                review_notes="seed",
-            )
+            self._build_case("bad_bucket")
 
     def test_case_rejects_non_approved_review_status(self) -> None:
         with self.assertRaisesRegex(ValueError, "review_status"):
-            AskBenchmarkCase(
-                case_id="ask_case_002",
-                bucket="single_hop",
-                user_query="总结这篇笔记",
-                source_origin="sample_vault",
-                expected_relevant_paths=["日常/2024-03-14_星期四.md"],
-                expected_relevant_locators=[
-                    AskBenchmarkLocator(
-                        note_path="日常/2024-03-14_星期四.md",
-                        heading_path="一、工作任务",
-                        excerpt_anchor="完成 digest graph",
-                    )
-                ],
-                expected_facts=["今天接通了 DAILY_DIGEST。"],
-                forbidden_claims=[],
-                allow_tool=False,
-                expected_tool_names=[],
-                allow_retrieval_only=False,
-                should_generate_answer=True,
-                review_status="draft",
-                review_notes="seed",
-            )
+            self._build_case("single_hop", review_status="draft")
+
+    def test_formal_dataset_rejects_missing_review_status(self) -> None:
+        payload = {
+            "case_id": "ask_case_missing_review_status",
+            "bucket": "single_hop",
+            "user_query": "总结这篇笔记",
+            "source_origin": "sample_vault",
+            "expected_relevant_paths": ["日常/2024-03-14_星期四.md"],
+            "expected_relevant_locators": [
+                {
+                    "note_path": "日常/2024-03-14_星期四.md",
+                    "heading_path": "一、工作任务",
+                    "excerpt_anchor": "完成 digest graph",
+                }
+            ],
+            "expected_facts": ["今天接通了 DAILY_DIGEST。"],
+            "forbidden_claims": [],
+            "allow_tool": False,
+            "expected_tool_names": [],
+            "allow_retrieval_only": False,
+            "should_generate_answer": True,
+            "review_notes": "seed",
+        }
+
+        with self.assertRaisesRegex(ValueError, "review_status"):
+            AskBenchmarkCase.from_dict(payload)
 
     def test_locator_requires_core_fields(self) -> None:
         with self.assertRaisesRegex(ValueError, "note_path"):
