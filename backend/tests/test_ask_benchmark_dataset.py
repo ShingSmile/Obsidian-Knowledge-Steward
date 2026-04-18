@@ -7,6 +7,7 @@ from pathlib import Path
 
 from app.benchmark.ask_dataset import (
     ASK_BENCHMARK_DIR,
+    _ALLOWED_BUCKETS,
     AskBenchmarkBacklogItem,
     AskBenchmarkCase,
     AskBenchmarkDataset,
@@ -56,6 +57,18 @@ class AskBenchmarkDatasetTests(unittest.TestCase):
         for bucket in allowed_buckets:
             case = self._build_case(bucket)
             self.assertEqual(case.bucket, bucket)
+
+    def test_case_allowed_bucket_set_matches_contract(self) -> None:
+        self.assertEqual(
+            set(_ALLOWED_BUCKETS),
+            {
+                "single_hop",
+                "multi_hop",
+                "metadata_filter",
+                "abstain_or_no_hit",
+                "tool_allowed",
+            },
+        )
 
     def test_case_rejects_unknown_bucket(self) -> None:
         with self.assertRaisesRegex(ValueError, "bucket"):
