@@ -254,6 +254,158 @@ Ship the benchmark.
                 {item.user_query for item in batch},
             )
 
+    def test_build_candidate_batch_skips_sparse_heading_only_notes_without_crashing(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            vault_root = Path(temp_dir)
+            sparse_note_path = "日常/2024-03-01_星期五.md"
+            self._write_note(
+                vault_root,
+                sparse_note_path,
+                """# 仅标题
+
+## 空节
+""",
+            )
+            self._write_note(
+                vault_root,
+                "日常/2024-03-14_星期四.md",
+                """# 一、工作任务
+
+- [x] 完成 digest graph
+- [ ] 清理 backlog
+
+# 二、今日总结
+
+今天接通了 DAILY_DIGEST。
+补充说明：今天先整理再收口。
+""",
+            )
+            self._write_note(
+                vault_root,
+                "日常/2024-03-15_星期五.md",
+                """# Summary
+
+## Highlights
+
+Ship the benchmark.
+""",
+            )
+
+            batch = build_candidate_batch(
+                vault_root=vault_root,
+                approved_dataset=self._empty_dataset(),
+                backlog=self._empty_backlog(),
+                count=5,
+            )
+
+            self.assertEqual(len(batch), 5)
+            self.assertFalse(
+                any(
+                    locator.note_path == sparse_note_path
+                    for item in batch
+                    for locator in item.expected_relevant_locators
+                ),
+                msg=[item.user_query for item in batch],
+            )
+
+    def test_build_candidate_batch_skips_same_source_location_even_when_historical_query_was_worded_differently(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            vault_root = Path(temp_dir)
+            source_note_path = "日常/2024-03-14_星期四.md"
+            self._write_note(
+                vault_root,
+                source_note_path,
+                """# 一、工作任务
+
+- [x] 完成 digest graph
+- [ ] 清理 backlog
+
+# 二、今日总结
+
+今天接通了 DAILY_DIGEST。
+补充说明：今天先整理再收口。
+""",
+            )
+            self._write_note(
+                vault_root,
+                "日常/2024-03-15_星期五.md",
+                """# Summary
+
+## Highlights
+
+Ship the benchmark.
+""",
+            )
+            approved = AskBenchmarkDataset(
+                schema_version=1,
+                cases=[
+                    self._make_case(
+                        case_id="ask_case_001",
+                        user_query="这篇笔记都安排了什么？",
+                        note_path=source_note_path,
+                        heading_path="一、工作任务",
+                        excerpt_anchor="完成 digest graph",
+                    )
+                ],
+            )
+
+            batch = build_candidate_batch(
+                vault_root=vault_root,
+                approved_dataset=approved,
+                backlog=self._empty_backlog(),
+                count=5,
+            )
+
+            self.assertEqual(len(batch), 5)
+            self.assertFalse(
+                any(
+                    locator.note_path == source_note_path
+                    and locator.heading_path == "一、工作任务"
+                    for item in batch
+                    for locator in item.expected_relevant_locators
+                ),
+                msg=[item.user_query for item in batch],
+            )
+
+    def test_task_query_expected_facts_are_task_relevant(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            vault_root = Path(temp_dir)
+            self._write_note(
+                vault_root,
+                "日常/2024-03-14_星期四.md",
+                """# 一、工作任务
+
+- [x] 完成 digest graph
+- [ ] 清理 backlog
+
+# 二、今日总结
+
+今天接通了 DAILY_DIGEST。
+补充说明：今天先整理再收口。
+""",
+            )
+            self._write_note(
+                vault_root,
+                "日常/2024-03-15_星期五.md",
+                """# Summary
+
+## Highlights
+
+Ship the benchmark.
+""",
+            )
+
+            batch = build_candidate_batch(
+                vault_root=vault_root,
+                approved_dataset=self._empty_dataset(),
+                backlog=self._empty_backlog(),
+                count=5,
+            )
+
+            task_candidate = next(item for item in batch if item.user_query == "这篇笔记列了哪些待办？")
+
+            self.assertEqual(task_candidate.expected_facts, ["清理 backlog"])
+
     def test_build_candidate_batch_orders_conservative_queries_before_freer_paraphrase(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             vault_root = Path(temp_dir)
@@ -299,5 +451,3 @@ Ship the benchmark.
                     "这篇笔记主要讲了什么？",
                 ],
             )
-
-
