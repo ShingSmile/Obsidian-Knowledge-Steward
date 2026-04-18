@@ -56,18 +56,35 @@ def validate_ask_benchmark_case(case: AskBenchmarkCase, vault_root: Path) -> Val
             result.errors.append(f"{locator_prefix}: {exc}")
             continue
 
-        line_range_error = check_line_range_within_heading(
-            locator.line_range,
+        if not isinstance(locator.excerpt_anchor, str) or not locator.excerpt_anchor.strip():
+            result.errors.append(f"{locator_prefix}.excerpt_anchor must be a non-empty string.")
+            continue
+
+        selected_chunk, line_range_warning, line_range_error = _assess_locator_scope(
             heading_chunks,
+            locator.line_range,
         )
         if line_range_error is not None:
             result.errors.append(f"{locator_prefix}.line_range: {line_range_error}")
             continue
 
+        if line_range_warning is not None:
+            anchor_error = check_excerpt_anchor(
+                locator.excerpt_anchor,
+                heading_chunks,
+            )
+            if anchor_error is None:
+                result.warnings.append(f"{locator_prefix}.line_range: {line_range_warning}")
+                continue
+            result.warnings.append(f"{locator_prefix}.line_range: {line_range_warning}")
+            result.errors.append(
+                f"{locator_prefix}.line_range: {line_range_warning} {anchor_error}"
+            )
+            continue
+
         anchor_error = check_excerpt_anchor(
             locator.excerpt_anchor,
-            heading_chunks,
-            line_range=locator.line_range,
+            [selected_chunk] if selected_chunk is not None else heading_chunks,
         )
         if anchor_error is not None:
             result.errors.append(f"{locator_prefix}.excerpt_anchor: {anchor_error}")
@@ -145,46 +162,50 @@ def resolve_heading_locator(
 def check_line_range_within_heading(
     line_range: dict[str, int] | None,
     heading_chunks: Sequence[NoteChunk],
-) -> str | None:
+) -> tuple[NoteChunk | None, str | None, str | None]:
+    return _assess_locator_scope(heading_chunks, line_range)
+
+
+def _assess_locator_scope(
+    heading_chunks: Sequence[NoteChunk],
+    line_range: dict[str, int] | None,
+) -> tuple[NoteChunk | None, str | None, str | None]:
     if line_range is None:
         if len(heading_chunks) == 1:
-            return None
+            return heading_chunks[0], None, None
         if len(heading_chunks) > 1:
-            return "heading_path is ambiguous; line_range is required."
-        return "heading_path does not resolve to a unique section."
+            return None, None, "heading_path is ambiguous; line_range is required."
+        return None, None, "heading_path does not resolve to a unique section."
 
     start_line = line_range.get("start_line")
     end_line = line_range.get("end_line")
     if not isinstance(start_line, int) or not isinstance(end_line, int):
-        return "line_range must include integer start_line and end_line values."
+        return None, None, "line_range must include integer start_line and end_line values."
     if start_line > end_line:
-        return "line_range.start_line must be less than or equal to line_range.end_line."
+        return None, None, "line_range.start_line must be less than or equal to line_range.end_line."
 
     matching_chunks = [
         chunk
         for chunk in heading_chunks
         if chunk.start_line <= start_line and end_line <= chunk.end_line
     ]
-    if not matching_chunks:
-        return (
-            "line_range must stay inside the matched heading scope when present."
-        )
-    if len(matching_chunks) > 1:
-        return "line_range is ambiguous for the resolved heading_path."
-    return None
+    if len(matching_chunks) == 1:
+        return matching_chunks[0], None, None
+    if len(matching_chunks) == 0:
+        return None, "line_range drifted outside the resolved heading scope.", None
+    return None, None, "line_range is ambiguous for the resolved heading_path."
 
 
 def check_excerpt_anchor(
     excerpt_anchor: str,
     heading_chunks: Sequence[NoteChunk],
     *,
-    line_range: dict[str, int] | None = None,
+    selected_chunk: NoteChunk | None = None,
 ) -> str | None:
-    selected_chunk = _select_heading_chunk(heading_chunks, line_range)
     if selected_chunk is None:
-        if len(heading_chunks) > 1 and line_range is None:
-            return "heading_path is ambiguous; line_range is required."
-        return "heading_path could not be resolved to a unique section."
+        if any(excerpt_anchor in chunk.text for chunk in heading_chunks):
+            return None
+        return "excerpt_anchor no longer matches the resolved heading content."
     if excerpt_anchor not in selected_chunk.text:
         return "excerpt_anchor no longer matches the resolved heading content."
     return None
@@ -207,32 +228,6 @@ def _validate_expected_paths(
             result.errors.append(
                 f"{case.case_id}.expected_relevant_paths[{path_index}]={raw_path!r} does not exist."
             )
-
-
-def _select_heading_chunk(
-    heading_chunks: Sequence[NoteChunk],
-    line_range: dict[str, int] | None,
-) -> NoteChunk | None:
-    if not heading_chunks:
-        return None
-    if line_range is None:
-        if len(heading_chunks) == 1:
-            return heading_chunks[0]
-        return None
-
-    start_line = line_range.get("start_line")
-    end_line = line_range.get("end_line")
-    if not isinstance(start_line, int) or not isinstance(end_line, int):
-        return None
-
-    matching_chunks = [
-        chunk
-        for chunk in heading_chunks
-        if chunk.start_line <= start_line and end_line <= chunk.end_line
-    ]
-    if len(matching_chunks) != 1:
-        return None
-    return matching_chunks[0]
 
 
 def _validate_progressive_distribution(

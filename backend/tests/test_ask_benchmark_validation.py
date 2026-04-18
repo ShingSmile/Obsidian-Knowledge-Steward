@@ -28,6 +28,14 @@ class AskBenchmarkValidationTests(unittest.TestCase):
         )
         return note_path
 
+    def _write_repeated_heading_note(self, vault_root: Path) -> Path:
+        note_path = vault_root / "Repeated.md"
+        note_path.write_text(
+            "# Summary\n\n## Highlights\n\nFirst section.\n\n## Highlights\n\nSecond section.\n",
+            encoding="utf-8",
+        )
+        return note_path
+
     def _make_locator(
         self,
         *,
@@ -52,15 +60,17 @@ class AskBenchmarkValidationTests(unittest.TestCase):
         source_origin: str = "sample_vault",
         case_id: str = "ask_case_validation",
         locator: AskBenchmarkLocator | None = None,
+        expected_relevant_paths: list[str] | None = None,
+        expected_facts: list[str] | None = None,
     ) -> AskBenchmarkCase:
         return AskBenchmarkCase.model_construct(
             case_id=case_id,
             bucket=bucket,
             user_query="Summarize the note.",
             source_origin=source_origin,
-            expected_relevant_paths=["Summary.md"],
+            expected_relevant_paths=expected_relevant_paths or ["Summary.md"],
             expected_relevant_locators=[locator or self._make_locator()],
-            expected_facts=["Ship the benchmark."],
+            expected_facts=expected_facts or ["Ship the benchmark."],
             forbidden_claims=[],
             allow_tool=False,
             expected_tool_names=[],
@@ -155,7 +165,7 @@ class AskBenchmarkValidationTests(unittest.TestCase):
             self.assertTrue(result.errors)
             self.assertIn("heading_path", result.errors[0])
 
-    def test_validate_locator_rejects_line_range_outside_heading_scope(self) -> None:
+    def test_validate_locator_warns_on_drifted_line_range_when_excerpt_matches(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             vault_root = Path(temp_dir)
             self._write_note(vault_root)
@@ -167,8 +177,62 @@ class AskBenchmarkValidationTests(unittest.TestCase):
 
             result = validate_ask_benchmark_case(case=case, vault_root=vault_root)
 
+            self.assertEqual(result.errors, [])
+            self.assertTrue(any("line_range" in warning for warning in result.warnings), msg=result.warnings)
+
+    def test_validate_locator_errors_when_drifted_line_range_and_excerpt_is_stale(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            vault_root = Path(temp_dir)
+            self._write_note(vault_root)
+            case = self._make_case(
+                locator=self._make_locator(
+                    line_range={"start_line": 1, "end_line": 2},
+                    excerpt_anchor="Old content no longer present",
+                )
+            )
+
+            result = validate_ask_benchmark_case(case=case, vault_root=vault_root)
+
             self.assertTrue(result.errors)
-            self.assertIn("line_range", result.errors[0])
+            self.assertTrue(any("line_range" in error for error in result.errors), msg=result.errors)
+            self.assertTrue(any("excerpt_anchor" in error for error in result.errors), msg=result.errors)
+            self.assertTrue(any("line_range" in warning for warning in result.warnings), msg=result.warnings)
+
+    def test_validate_locator_rejects_blank_excerpt_anchor_even_when_bypassed(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            vault_root = Path(temp_dir)
+            self._write_note(vault_root)
+            case = self._make_case(
+                locator=AskBenchmarkLocator.model_construct(
+                    note_path="Summary.md",
+                    heading_path="Summary > Highlights",
+                    excerpt_anchor="",
+                )
+            )
+
+            result = validate_ask_benchmark_case(case=case, vault_root=vault_root)
+
+            self.assertTrue(result.errors)
+            self.assertIn("excerpt_anchor", result.errors[0])
+
+    def test_validate_locator_uses_line_range_to_disambiguate_repeated_heading_path(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            vault_root = Path(temp_dir)
+            self._write_repeated_heading_note(vault_root)
+            case = self._make_case(
+                locator=self._make_locator(
+                    note_path="Repeated.md",
+                    heading_path="Summary > Highlights",
+                    excerpt_anchor="Second section.",
+                    line_range={"start_line": 7, "end_line": 8},
+                ),
+                expected_relevant_paths=["Repeated.md"],
+            )
+
+            result = validate_ask_benchmark_case(case=case, vault_root=vault_root)
+
+            self.assertEqual(result.errors, [])
+            self.assertEqual(result.warnings, [])
 
     def test_validate_in_progress_dataset_allows_smaller_case_count(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
