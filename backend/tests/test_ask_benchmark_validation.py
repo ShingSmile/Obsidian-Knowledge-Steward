@@ -112,12 +112,38 @@ class AskBenchmarkValidationTests(unittest.TestCase):
             self.assertTrue(result.errors)
             self.assertIn("note_path", result.errors[0])
 
+    def test_validate_locator_rejects_nonexistent_note_path(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            vault_root = Path(temp_dir)
+            self._write_note(vault_root)
+            case = self._make_case(
+                locator=self._make_locator(note_path="Missing.md"),
+            )
+
+            result = validate_ask_benchmark_case(case=case, vault_root=vault_root)
+
+            self.assertTrue(result.errors)
+            self.assertIn("does not exist", result.errors[0])
+
     def test_validate_locator_rejects_missing_heading_path(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             vault_root = Path(temp_dir)
             self._write_note(vault_root)
             case = self._make_case(
                 locator=self._make_locator(heading_path=""),
+            )
+
+            result = validate_ask_benchmark_case(case=case, vault_root=vault_root)
+
+            self.assertTrue(result.errors)
+            self.assertIn("heading_path", result.errors[0])
+
+    def test_validate_locator_rejects_unresolved_heading_path(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            vault_root = Path(temp_dir)
+            self._write_note(vault_root)
+            case = self._make_case(
+                locator=self._make_locator(heading_path="Summary > Missing"),
             )
 
             result = validate_ask_benchmark_case(case=case, vault_root=vault_root)
@@ -172,6 +198,26 @@ class AskBenchmarkValidationTests(unittest.TestCase):
 
             self.assertEqual(result.errors, [])
 
+    def test_validate_in_progress_dataset_rejects_final_bucket_cap_overflow(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            vault_root = Path(temp_dir)
+            self._write_note(vault_root)
+            cases = [
+                self._make_case(
+                    bucket="single_hop",
+                    case_id=f"ask_case_cap_overflow_{index:02d}",
+                )
+                for index in range(21)
+            ]
+
+            result = validate_ask_benchmark_dataset(
+                dataset=self._make_dataset(cases),
+                vault_root=vault_root,
+            )
+
+            self.assertTrue(result.errors)
+            self.assertIn("cap", result.errors[0])
+
     def test_validate_in_progress_dataset_rejects_more_than_ten_fixture_cases(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             vault_root = Path(temp_dir)
@@ -192,6 +238,78 @@ class AskBenchmarkValidationTests(unittest.TestCase):
 
             self.assertTrue(result.errors)
             self.assertIn("fixture", result.errors[0])
+
+    def test_validate_full_dataset_rejects_incorrect_bucket_counts(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            vault_root = Path(temp_dir)
+            self._write_note(vault_root)
+            cases: list[AskBenchmarkCase] = []
+            bucket_plan = (
+                ("single_hop", 19),
+                ("multi_hop", 10),
+                ("metadata_filter", 8),
+                ("abstain_or_no_hit", 6),
+                ("tool_allowed", 7),
+            )
+            case_index = 0
+            for bucket, count in bucket_plan:
+                for _ in range(count):
+                    source_origin = "sample_vault" if case_index < 40 else "fixture"
+                    cases.append(
+                        self._make_case(
+                            bucket=bucket,
+                            source_origin=source_origin,
+                            case_id=f"ask_case_bad_bucket_{case_index:02d}",
+                        )
+                    )
+                    case_index += 1
+
+            result = validate_ask_benchmark_dataset(
+                dataset=self._make_dataset(cases),
+                vault_root=vault_root,
+            )
+
+            self.assertTrue(result.errors)
+            self.assertTrue(
+                any("final dataset requires" in error for error in result.errors),
+                msg=result.errors,
+            )
+
+    def test_validate_full_dataset_rejects_sample_vault_shortfall(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            vault_root = Path(temp_dir)
+            self._write_note(vault_root)
+            cases: list[AskBenchmarkCase] = []
+            bucket_plan = (
+                ("single_hop", 20),
+                ("multi_hop", 10),
+                ("metadata_filter", 8),
+                ("abstain_or_no_hit", 6),
+                ("tool_allowed", 6),
+            )
+            case_index = 0
+            for bucket, count in bucket_plan:
+                for _ in range(count):
+                    source_origin = "sample_vault" if case_index < 39 else "fixture"
+                    cases.append(
+                        self._make_case(
+                            bucket=bucket,
+                            source_origin=source_origin,
+                            case_id=f"ask_case_sample_shortfall_{case_index:02d}",
+                        )
+                    )
+                    case_index += 1
+
+            result = validate_ask_benchmark_dataset(
+                dataset=self._make_dataset(cases),
+                vault_root=vault_root,
+            )
+
+            self.assertTrue(result.errors)
+            self.assertTrue(
+                any("sample_vault cases" in error for error in result.errors),
+                msg=result.errors,
+            )
 
     def test_validate_full_dataset_accepts_final_distribution(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -224,3 +342,10 @@ class AskBenchmarkValidationTests(unittest.TestCase):
             )
 
             self.assertEqual(result.errors, [])
+
+    def test_locator_to_dict_omits_none_line_range(self) -> None:
+        locator = self._make_locator()
+
+        payload = locator.to_dict()
+
+        self.assertNotIn("line_range", payload)
