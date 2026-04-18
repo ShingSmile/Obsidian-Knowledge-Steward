@@ -4,7 +4,7 @@ import json
 from pathlib import Path
 from typing import Annotated, Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, StringConstraints
 
 from app.config import ROOT_DIR
 
@@ -23,14 +23,7 @@ AskBenchmarkBucket = Literal[
 AskBenchmarkSourceOrigin = Literal["sample_vault", "fixture"]
 AskBenchmarkApprovedReviewStatus = Literal["approved"]
 AskBenchmarkBacklogReviewStatus = Literal["revise", "reject"]
-NonEmptyStr = Annotated[str, Field(min_length=1)]
-
-
-def _read_json_file(path: Path) -> dict[str, Any]:
-    payload = json.loads(path.read_text(encoding="utf-8"))
-    if not isinstance(payload, dict):
-        raise ValueError("top-level payload must be a JSON object")
-    return payload
+NonEmptyStr = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
 
 
 def _write_json_file(path: Path, payload: dict[str, Any]) -> None:

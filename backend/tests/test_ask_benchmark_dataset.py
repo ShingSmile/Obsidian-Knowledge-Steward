@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 import json
 import tempfile
 import unittest
@@ -240,6 +241,59 @@ class AskBenchmarkDatasetTests(unittest.TestCase):
             with self.assertRaises(ValidationError):
                 load_ask_benchmark_dataset(path)
 
+    def test_load_dataset_rejects_whitespace_only_required_string_fields(self) -> None:
+        base_case = {
+            "case_id": "ask_case_whitespace",
+            "bucket": "single_hop",
+            "user_query": "总结这篇笔记",
+            "source_origin": "sample_vault",
+            "expected_relevant_paths": ["日常/2024-03-14_星期四.md"],
+            "expected_relevant_locators": [
+                {
+                    "note_path": "日常/2024-03-14_星期四.md",
+                    "heading_path": "一、工作任务",
+                    "excerpt_anchor": "完成 digest graph",
+                }
+            ],
+            "expected_facts": ["今天接通了 DAILY_DIGEST。"],
+            "forbidden_claims": ["do not claim"],
+            "allow_tool": False,
+            "expected_tool_names": ["ask_tool"],
+            "allow_retrieval_only": False,
+            "should_generate_answer": True,
+            "review_status": "approved",
+            "review_notes": "seed",
+        }
+
+        field_paths = (
+            ("case_id",),
+            ("user_query",),
+            ("expected_relevant_paths", 0),
+            ("expected_facts", 0),
+            ("forbidden_claims", 0),
+            ("expected_tool_names", 0),
+            ("expected_relevant_locators", 0, "note_path"),
+            ("expected_relevant_locators", 0, "heading_path"),
+            ("expected_relevant_locators", 0, "excerpt_anchor"),
+        )
+
+        for field_path in field_paths:
+            with self.subTest(field_path=field_path):
+                with tempfile.TemporaryDirectory() as temp_dir:
+                    path = Path(temp_dir) / "ask_benchmark_cases.json"
+                    payload = {
+                        "schema_version": 1,
+                        "cases": [copy.deepcopy(base_case)],
+                    }
+                    target = payload["cases"][0]
+                    for key in field_path[:-1]:
+                        target = target[key]
+                    target[field_path[-1]] = "   "
+                    path.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
+
+                    with self.assertRaises(ValidationError):
+                        load_ask_benchmark_dataset(path)
+
     def test_load_backlog_rejects_extra_item_keys(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             path = Path(temp_dir) / "ask_benchmark_review_backlog.json"
@@ -275,6 +329,59 @@ class AskBenchmarkDatasetTests(unittest.TestCase):
 
             with self.assertRaises(ValidationError):
                 load_ask_benchmark_backlog(path)
+
+    def test_load_backlog_rejects_whitespace_only_required_string_fields(self) -> None:
+        base_item = {
+            "case_id": "ask_case_backlog_whitespace",
+            "bucket": "multi_hop",
+            "user_query": "补充这条线索来自哪两篇笔记",
+            "source_origin": "fixture",
+            "expected_relevant_paths": ["A.md", "B.md"],
+            "expected_relevant_locators": [
+                {
+                    "note_path": "A.md",
+                    "heading_path": "Background",
+                    "excerpt_anchor": "alpha",
+                }
+            ],
+            "expected_facts": ["A 和 B 共同说明了这件事。"],
+            "forbidden_claims": ["avoid"],
+            "allow_tool": False,
+            "expected_tool_names": ["fixture_tool"],
+            "allow_retrieval_only": True,
+            "should_generate_answer": True,
+            "review_status": "revise",
+            "review_notes": "needs tightening",
+        }
+
+        field_paths = (
+            ("case_id",),
+            ("user_query",),
+            ("expected_relevant_paths", 0),
+            ("expected_facts", 0),
+            ("forbidden_claims", 0),
+            ("expected_tool_names", 0),
+            ("expected_relevant_locators", 0, "note_path"),
+            ("expected_relevant_locators", 0, "heading_path"),
+            ("expected_relevant_locators", 0, "excerpt_anchor"),
+        )
+
+        for field_path in field_paths:
+            with self.subTest(field_path=field_path):
+                with tempfile.TemporaryDirectory() as temp_dir:
+                    path = Path(temp_dir) / "ask_benchmark_review_backlog.json"
+                    payload = {
+                        "schema_version": 1,
+                        "items": [copy.deepcopy(base_item)],
+                    }
+                    target = payload["items"][0]
+                    for key in field_path[:-1]:
+                        target = target[key]
+                    target[field_path[-1]] = "   "
+                    path.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
+
+                    with self.assertRaises(ValidationError):
+                        load_ask_benchmark_backlog(path)
 
     def test_load_backlog_rejects_missing_review_status(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
