@@ -36,6 +36,7 @@ class AskBenchmarkLocator(BaseModel):
 
     note_path: NonEmptyStr
     heading_path: NonEmptyStr
+    line_range: dict[str, int] | None = None
     excerpt_anchor: NonEmptyStr
 
     def to_dict(self) -> dict[str, Any]:
