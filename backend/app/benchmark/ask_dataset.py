@@ -116,7 +116,6 @@ class AskBenchmarkCase:
         _require_bool(self.should_generate_answer, "should_generate_answer")
         if self.review_status != _APPROVED_REVIEW_STATUS:
             raise ValueError("review_status must be approved for the formal dataset")
-        _require_non_empty_text(self.review_notes, "review_notes")
 
     def _validate_lists(self) -> None:
         _require_string_list(self.expected_relevant_paths, "expected_relevant_paths")
@@ -187,7 +186,6 @@ class AskBenchmarkBacklogItem:
         _require_bool(self.should_generate_answer, "should_generate_answer")
         if self.review_status not in _BACKLOG_REVIEW_STATUSES:
             raise ValueError("review_status must be revise or reject for backlog items")
-        _require_non_empty_text(self.review_notes, "review_notes")
 
     def _validate_lists(self) -> None:
         _require_string_list(self.expected_relevant_paths, "expected_relevant_paths")
