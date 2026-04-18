@@ -5,9 +5,13 @@ import unittest
 from pathlib import Path
 
 from app.benchmark.ask_dataset import (
+    AskBenchmarkBacklogItem,
     AskBenchmarkCase,
     AskBenchmarkDataset,
     AskBenchmarkLocator,
+    AskBenchmarkReviewBacklog,
+    write_ask_benchmark_backlog,
+    write_ask_benchmark_dataset,
 )
 from app.benchmark.ask_dataset_validation import (
     validate_ask_benchmark_case,
@@ -349,3 +353,45 @@ class AskBenchmarkValidationTests(unittest.TestCase):
         payload = locator.to_dict()
 
         self.assertNotIn("line_range", payload)
+
+    def test_persisted_dataset_and_backlog_omit_legacy_locator_line_range(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_root = Path(temp_dir)
+            dataset_path = temp_root / "ask_benchmark_cases.json"
+            backlog_path = temp_root / "ask_benchmark_review_backlog.json"
+            legacy_locator = self._make_locator()
+
+            dataset = AskBenchmarkDataset.model_construct(
+                schema_version=1,
+                cases=[self._make_case(locator=legacy_locator, case_id="ask_case_dataset")],
+            )
+            backlog = AskBenchmarkReviewBacklog.model_construct(
+                schema_version=1,
+                items=[
+                    AskBenchmarkBacklogItem.model_construct(
+                        case_id="ask_case_backlog",
+                        bucket="single_hop",
+                        user_query="Summarize the note.",
+                        source_origin="fixture",
+                        expected_relevant_paths=["Summary.md"],
+                        expected_relevant_locators=[legacy_locator],
+                        expected_facts=["Ship the benchmark."],
+                        forbidden_claims=[],
+                        allow_tool=False,
+                        expected_tool_names=[],
+                        allow_retrieval_only=False,
+                        should_generate_answer=True,
+                        review_status="revise",
+                        review_notes="seed",
+                    )
+                ],
+            )
+
+            write_ask_benchmark_dataset(dataset, dataset_path)
+            write_ask_benchmark_backlog(backlog, backlog_path)
+
+            dataset_payload = dataset_path.read_text(encoding="utf-8")
+            backlog_payload = backlog_path.read_text(encoding="utf-8")
+
+            self.assertNotIn('"line_range": null', dataset_payload)
+            self.assertNotIn('"line_range": null', backlog_payload)

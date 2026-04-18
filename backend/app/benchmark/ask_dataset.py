@@ -106,7 +106,7 @@ class AskBenchmarkDataset(BaseModel):
     cases: list[AskBenchmarkCase]
 
     def to_dict(self) -> dict[str, Any]:
-        return self.model_dump(mode="json")
+        return self.model_dump(mode="json", exclude_none=True)
 
     @classmethod
     def from_dict(cls, payload: dict[str, Any]) -> "AskBenchmarkDataset":
@@ -120,7 +120,7 @@ class AskBenchmarkReviewBacklog(BaseModel):
     items: list[AskBenchmarkBacklogItem]
 
     def to_dict(self) -> dict[str, Any]:
-        return self.model_dump(mode="json")
+        return self.model_dump(mode="json", exclude_none=True)
 
     @classmethod
     def from_dict(cls, payload: dict[str, Any]) -> "AskBenchmarkReviewBacklog":
