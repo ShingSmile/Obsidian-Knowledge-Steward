@@ -67,7 +67,8 @@ runtime responsibilities separate:
 
 1. select a fixed v1 headline subset from the formal ask benchmark dataset
 2. run that subset against `fts_only`, `vector_only`, and `hybrid_rrf`
-3. evaluate each mode with strict locator-level matching
+3. evaluate each mode with strict locator-level matching over a fixed top-10
+   cutoff
 4. aggregate only `Recall@5`, `Recall@10`, and `NDCG@10`
 5. write results into a dedicated retrieval benchmark artifact under
    `eval/results/`
@@ -125,6 +126,25 @@ is part of `TASK-058` v1.
 This strict contract also keeps the benchmark aligned with later answer-level
 evaluation: if retrieval does not surface the correct evidence region, answer
 quality numbers cannot honestly claim that retrieval succeeded.
+
+Because the current retrieval candidate contract does not carry an explicit
+`excerpt_anchor` field, `TASK-058` v1 must compare anchors against the full
+retrieved candidate text, not against snippets or a derived projection.
+
+The exact v1 matching rule is:
+
+- `note_path` must equal `candidate.path`
+- `heading_path` must equal `candidate.heading_path`
+- `excerpt_anchor` must appear as an exact substring inside `candidate.text`
+
+Allowed normalization is intentionally minimal:
+
+- normalize line endings to `\n`
+- trim leading and trailing whitespace on the stored anchor before substring
+  comparison
+
+No additional fuzzy matching, case folding, punctuation normalization, or
+snippet-based fallback is allowed.
 
 ## 3. Component Layout
 
@@ -210,6 +230,12 @@ The benchmark run should be linear and explicit:
 The benchmark does not modify the dataset, backlog, or existing regression
 artifacts.
 
+For v1, all three modes must be executed with a fixed `top_k=10` retrieval
+cutoff. `Recall@5` is computed from the top-5 prefix of that same returned
+ranking. No per-mode custom cutoff, overfetch rule, or dynamic top-k policy is
+allowed in `TASK-058` v1, because the benchmark needs one stable comparison
+surface.
+
 ## 5. Result Contract
 
 The retrieval benchmark should write a dedicated result file under
@@ -221,6 +247,7 @@ The top-level result payload should include at least:
 
 - `schema_version`
 - `benchmark_kind`
+- `run_status`
 - `dataset_schema_version`
 - `selected_case_count`
 - `selected_case_ids`
@@ -228,11 +255,55 @@ The top-level result payload should include at least:
 - `modes`
 - `cases`
 
+The v1 result shape should stay concrete enough for one implementation path:
+
+- `excluded_cases`
+  - array of objects with at least:
+    - `case_id`
+    - `bucket`
+    - `exclusion_reason`
+- `modes`
+  - object keyed by mode name (`fts_only`, `vector_only`, `hybrid_rrf`)
+  - each value contains:
+    - `status`
+    - `selected_case_count`
+    - `summary_metrics` when `status="passed"`
+    - `failure_reason` when `status!="passed"`
+- `cases`
+  - array of per-case objects
+  - each case object includes:
+    - `case_id`
+    - `bucket`
+    - `user_query`
+    - `expected_locators`
+    - `mode_results`
+
 The per-mode summary should contain only the v1 headline metrics:
 
 - `Recall@5`
 - `Recall@10`
 - `NDCG@10`
+
+For `TASK-058` v1, these metrics are defined as follows:
+
+- `Recall@5`
+  - case-level hit rate: a case counts as recovered at 5 when at least one
+    expected locator appears in ranks `1..5`
+- `Recall@10`
+  - case-level hit rate: a case counts as recovered at 10 when at least one
+    expected locator appears in ranks `1..10`
+- `NDCG@10`
+  - binary-gain ranking quality computed over ranks `1..10`
+  - each retrieved candidate contributes gain `1` only if its
+    `note_path + heading_path + excerpt_anchor` triple matches an expected
+    locator not already counted earlier in the same ranked list
+  - `DCG@10 = sum((2^rel_i - 1) / log2(i + 1))` for `i = 1..10`, where
+    `rel_i` is binary and rank is 1-based
+  - `IDCG@10` uses the same formula on the ideal ranking of distinct expected
+    locators, capped at `10`
+  - `NDCG@10 = DCG@10 / IDCG@10`, and equals `0` when `IDCG@10 = 0`
+  - ideal DCG is computed from a perfect ranking of the case's expected
+    locators, capped at `10`
 
 Each case result should keep enough structure to explain those aggregates:
 
@@ -279,11 +350,17 @@ Examples:
 - vector mode disabled because the embedding index is not ready
 - a retrieval backend raises an exception
 
-In that situation, the benchmark should not silently drop the mode. It should
-record the mode as failed or disabled in a way that keeps the result artifact
-interpretable. The implementation may choose whether to continue other modes or
-terminate the run, but the final behavior must be explicit and must not produce
-partial headline numbers that look complete.
+`TASK-058` v1 should use a single fail-closed policy:
+
+- if any required mode is unavailable or fails for any selected case, the run is
+  marked failed
+- the CLI exits non-zero
+- the artifact, if written, must carry `run_status="failed"` and explicit mode
+  failure details
+- no headline summary metrics are emitted for a failed run
+
+This keeps the benchmark from producing incomplete three-way comparisons that
+look like valid resume-grade numbers.
 
 ### 6.3 No Fuzzy Relevance Recovery
 
@@ -335,7 +412,9 @@ Verify that the result artifact:
 
 - contains the three headline metrics only
 - preserves case-level rank details needed to explain those metrics
-- handles mode failures explicitly rather than silently omitting them
+- uses fixed `top_k=10` semantics for every mode
+- handles mode failures with the fail-closed contract rather than silently
+  omitting them
 
 ## 8. Risks And Mitigations
 
