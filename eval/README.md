@@ -5,6 +5,8 @@
 - `golden/`：golden set 样本
 - `results/`：每次评估输出
 
+其中 `eval/golden/` 仍然是回归层，负责固定的 eval 回归样本；`eval/benchmark/` 是新的 benchmark 数据层，负责维护可增量扩展的 ask benchmark 数据集和 review backlog。
+
 当前已落地的是“interview-first P0 baseline”，而不是先凑满固定 30 条样本再开始回归。
 
 当前 baseline 的关键事实：
@@ -36,6 +38,34 @@
 - 不依赖在线 judge 或外部评测平台
 - 不把本轮扩成分场景 benchmark 或 dashboard
 - 不把离线指标直接接进 ask runtime gate
+
+## Ask Benchmark Dataset Workflow
+
+`eval/benchmark/` 目录下的 operator 入口是：
+
+```bash
+/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/.conda/knowledge-steward/bin/python eval/benchmark/manage_ask_benchmark.py validate
+```
+
+生成候选批次：
+
+```bash
+/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/.conda/knowledge-steward/bin/python eval/benchmark/manage_ask_benchmark.py generate-batch --count 5 --output /tmp/ask_batch.json
+```
+
+应用 review 结果：
+
+```bash
+/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/.conda/knowledge-steward/bin/python eval/benchmark/manage_ask_benchmark.py apply-review --batch /tmp/ask_batch.json --review /tmp/ask_review.json
+```
+
+`apply-review` 支持 partial review 文件：只会处理 `--review` 中出现的 case，其余 batch 条目会被跳过，并在成功输出里显式报告 skipped 数量。
+
+review 文件的校验是严格的：每个被 review 的 candidate 或 backlog item 都必须提供非空的
+`expected_relevant_paths`、`expected_relevant_locators` 和 `expected_facts`，并且每个 locator 的
+`note_path` 必须出现在 `expected_relevant_paths` 中。
+
+路径覆盖参数 `--dataset`、`--backlog`、`--vault-root` 都可用于临时副本或 smoke test，不会强制写入正式文件。
 
 后续如需继续扩样本，优先补齐：
 
