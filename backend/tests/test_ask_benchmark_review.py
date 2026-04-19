@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import io
+import json
 import tempfile
 import unittest
 from pathlib import Path
+from contextlib import redirect_stdout
 from contextlib import redirect_stderr
 
 from app.benchmark.ask_dataset import (
@@ -662,3 +664,68 @@ class AskBenchmarkReviewTests(unittest.TestCase):
             self.assertEqual(exit_code, 1)
             self.assertIn("ERROR:", stderr.getvalue())
             self.assertNotIn("Traceback", stderr.getvalue())
+
+    def test_main_reports_skipped_count_for_partial_apply_review(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_root = Path(temp_dir)
+            dataset_path = temp_root / "ask_benchmark_cases.json"
+            backlog_path = temp_root / "ask_benchmark_review_backlog.json"
+            vault_root = temp_root / "vault"
+            vault_root.mkdir()
+            (vault_root / "Summary.md").write_text(
+                "# Summary\n\n## Highlights\n\nShip the benchmark.\n",
+                encoding="utf-8",
+            )
+            self._seed_dataset(dataset_path)
+            self._seed_backlog(backlog_path, [])
+
+            batch_path = temp_root / "ask_batch.json"
+            review_path = temp_root / "ask_review.json"
+            batch = {
+                "schema_version": 1,
+                "candidates": [
+                    self._make_candidate(case_id="ask_case_200").model_dump(mode="json"),
+                    self._make_candidate(
+                        case_id="ask_case_201",
+                        user_query="Summarize the other note.",
+                    ).model_dump(mode="json"),
+                    self._make_candidate(
+                        case_id="ask_case_202",
+                        user_query="Summarize a third note.",
+                    ).model_dump(mode="json"),
+                ],
+            }
+            batch_path.write_text(json.dumps(batch, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+            review_path.write_text(
+                json.dumps(
+                    [
+                        {"case_id": "ask_case_200", "decision": "reject", "review_notes": "out of scope"}
+                    ],
+                    ensure_ascii=False,
+                    indent=2,
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            stdout = io.StringIO()
+            with redirect_stdout(stdout):
+                exit_code = main(
+                    [
+                        "apply-review",
+                        "--batch",
+                        str(batch_path),
+                        "--review",
+                        str(review_path),
+                        "--dataset",
+                        str(dataset_path),
+                        "--backlog",
+                        str(backlog_path),
+                        "--vault-root",
+                        str(vault_root),
+                    ]
+                )
+
+            self.assertEqual(exit_code, 0)
+            self.assertIn("1 routed to backlog", stdout.getvalue())
+            self.assertIn("2 skipped from batch", stdout.getvalue())

@@ -59,6 +59,8 @@
 /Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/.conda/knowledge-steward/bin/python eval/benchmark/manage_ask_benchmark.py apply-review --batch /tmp/ask_batch.json --review /tmp/ask_review.json
 ```
 
+`apply-review` 支持 partial review 文件：只会处理 `--review` 中出现的 case，其余 batch 条目会被跳过，并在成功输出里显式报告 skipped 数量。
+
 路径覆盖参数 `--dataset`、`--backlog`、`--vault-root` 都可用于临时副本或 smoke test，不会强制写入正式文件。
 
 后续如需继续扩样本，优先补齐：

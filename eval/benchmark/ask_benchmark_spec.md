@@ -69,6 +69,10 @@ or `reject`. Backlog items also persist the original candidate `fingerprint` so 
 review backlog can preserve the full incoming payload and reject fingerprint collisions
 during apply-review.
 
+`apply-review` accepts partial review files. Only the case_ids present in the review
+file are applied; unreviewed candidates from the batch are skipped and reported in the
+operator success output.
+
 ## Commands
 
 Load the formal dataset:

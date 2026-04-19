@@ -51,6 +51,7 @@ class AskBenchmarkCandidateBatch(BaseModel):
 class ReviewApplyResult:
     approved_count: int
     backlog_count: int
+    skipped_count: int
     approved_case_ids: list[str]
     backlog_case_ids: list[str]
 
@@ -150,6 +151,7 @@ def apply_review_outcomes(
         return ReviewApplyResult(
             approved_count=0,
             backlog_count=0,
+            skipped_count=0,
             approved_case_ids=[],
             backlog_case_ids=[],
         )
@@ -173,6 +175,7 @@ def apply_review_outcomes(
         return ReviewApplyResult(
             approved_count=0,
             backlog_count=0,
+            skipped_count=len(candidate_batch),
             approved_case_ids=[],
             backlog_case_ids=[],
         )
@@ -220,6 +223,7 @@ def apply_review_outcomes(
     return ReviewApplyResult(
         approved_count=len(approved_case_ids),
         backlog_count=len(backlog_case_ids),
+        skipped_count=len(candidate_batch) - len(review_decisions),
         approved_case_ids=approved_case_ids,
         backlog_case_ids=backlog_case_ids,
     )
@@ -479,7 +483,8 @@ def _run_apply_review(args: argparse.Namespace) -> int:
     )
     print(
         "applied review outcomes: "
-        f"{result.approved_count} approved, {result.backlog_count} routed to backlog"
+        f"{result.approved_count} approved, {result.backlog_count} routed to backlog, "
+        f"{result.skipped_count} skipped from batch"
     )
     return 0
 
