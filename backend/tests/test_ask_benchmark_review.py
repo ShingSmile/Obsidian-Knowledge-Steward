@@ -225,6 +225,57 @@ class AskBenchmarkReviewTests(unittest.TestCase):
             self.assertEqual(backlog.items[0].review_notes, "out of scope")
             self.assertEqual(backlog.items[0].fingerprint, "fingerprint-012")
 
+    def test_apply_review_outcomes_ignores_unreviewed_candidates(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_root = Path(temp_dir)
+            dataset_path = temp_root / "ask_benchmark_cases.json"
+            backlog_path = temp_root / "ask_benchmark_review_backlog.json"
+            vault_root = temp_root / "vault"
+            vault_root.mkdir()
+            (vault_root / "Summary.md").write_text(
+                "# Summary\n\n## Highlights\n\nShip the benchmark.\n",
+                encoding="utf-8",
+            )
+            self._seed_dataset(dataset_path)
+            self._seed_backlog(backlog_path, [])
+
+            candidate_batch = [
+                self._make_candidate(case_id="ask_case_100", fingerprint="fingerprint-100"),
+                self._make_candidate(
+                    case_id="ask_case_101",
+                    fingerprint="fingerprint-101",
+                    user_query="Summarize the other note.",
+                ),
+                self._make_candidate(
+                    case_id="ask_case_102",
+                    fingerprint="fingerprint-102",
+                    user_query="Summarize a third note.",
+                ),
+            ]
+            review_decisions = [
+                ReviewDecision.model_validate(
+                    {"case_id": "ask_case_100", "decision": "reject", "review_notes": "out of scope"}
+                )
+            ]
+
+            result = apply_review_outcomes(
+                candidate_batch=candidate_batch,
+                review_decisions=review_decisions,
+                dataset_path=dataset_path,
+                backlog_path=backlog_path,
+                vault_root=vault_root,
+            )
+
+            dataset = load_ask_benchmark_dataset(dataset_path)
+            backlog = load_ask_benchmark_backlog(backlog_path)
+
+            self.assertEqual(result.approved_count, 0)
+            self.assertEqual(result.backlog_count, 1)
+            self.assertEqual(dataset.cases, [])
+            self.assertEqual([item.case_id for item in backlog.items], ["ask_case_100"])
+            self.assertEqual(backlog.items[0].review_status, "reject")
+            self.assertEqual(backlog.items[0].review_notes, "out of scope")
+
     def test_apply_review_outcomes_revalidates_approved_cases_before_commit(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_root = Path(temp_dir)

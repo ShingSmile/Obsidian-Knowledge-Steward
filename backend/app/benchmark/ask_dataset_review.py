@@ -143,33 +143,42 @@ def apply_review_outcomes(
 
     approved_dataset = _load_dataset_or_empty(dataset_path)
     review_backlog = _load_backlog_or_empty(backlog_path)
-    candidate_by_case_id = _index_candidates(candidate_batch)
+    candidates_by_case_id = _group_candidates_by_case_id(candidate_batch)
     decision_by_case_id = _index_decisions(review_decisions)
 
-    missing_decisions = sorted(set(candidate_by_case_id) - set(decision_by_case_id))
-    if missing_decisions:
-        raise ValueError(f"missing review decisions for: {', '.join(missing_decisions)}")
-
-    unexpected_decisions = sorted(set(decision_by_case_id) - set(candidate_by_case_id))
+    unexpected_decisions = sorted(set(decision_by_case_id) - set(candidates_by_case_id))
     if unexpected_decisions:
         raise ValueError(f"review decisions include unknown case_ids: {', '.join(unexpected_decisions)}")
 
-    _reject_duplicate_candidates(candidate_batch)
-    _reject_persisted_collisions(candidate_batch, approved_dataset, review_backlog)
+    reviewed_candidates: list[AskBenchmarkCandidate] = []
+    for decision in review_decisions:
+        matched_candidates = candidates_by_case_id[decision.case_id]
+        if len(matched_candidates) != 1:
+            raise ValueError(f"duplicate case_id {decision.case_id!r} in candidate batch.")
+        reviewed_candidates.append(matched_candidates[0])
+    if not reviewed_candidates:
+        return ReviewApplyResult(
+            approved_count=0,
+            backlog_count=0,
+            approved_case_ids=[],
+            backlog_case_ids=[],
+        )
+
+    _reject_duplicate_candidates(reviewed_candidates)
+    _reject_persisted_collisions(reviewed_candidates, approved_dataset, review_backlog)
 
     approved_cases: list[AskBenchmarkCase] = []
     backlog_items: list[AskBenchmarkBacklogItem] = []
     approved_case_ids: list[str] = []
     backlog_case_ids: list[str] = []
 
-    for case_id, candidate in candidate_by_case_id.items():
-        decision = decision_by_case_id[case_id]
+    for candidate, decision in zip(reviewed_candidates, review_decisions, strict=True):
         if decision.decision == "approve":
             approved_cases.append(_candidate_to_case(candidate, decision))
-            approved_case_ids.append(case_id)
+            approved_case_ids.append(decision.case_id)
             continue
         backlog_items.append(_candidate_to_backlog_item(candidate, decision))
-        backlog_case_ids.append(case_id)
+        backlog_case_ids.append(decision.case_id)
 
     prospective_dataset = AskBenchmarkDataset.model_construct(
         schema_version=1,
@@ -262,11 +271,11 @@ def _load_backlog_or_empty(path: Path) -> AskBenchmarkReviewBacklog:
     return AskBenchmarkReviewBacklog.model_construct(schema_version=1, items=[])
 
 
-def _index_candidates(candidates: list[AskBenchmarkCandidate]) -> dict[str, AskBenchmarkCandidate]:
-    indexed: dict[str, AskBenchmarkCandidate] = {}
+def _group_candidates_by_case_id(candidates: list[AskBenchmarkCandidate]) -> dict[str, list[AskBenchmarkCandidate]]:
+    grouped: dict[str, list[AskBenchmarkCandidate]] = {}
     for candidate in candidates:
-        indexed[candidate.case_id] = candidate
-    return indexed
+        grouped.setdefault(candidate.case_id, []).append(candidate)
+    return grouped
 
 
 def _index_decisions(decisions: list[ReviewDecision]) -> dict[str, ReviewDecision]:
