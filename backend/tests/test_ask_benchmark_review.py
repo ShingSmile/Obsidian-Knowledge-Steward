@@ -29,12 +29,13 @@ class AskBenchmarkReviewTests(unittest.TestCase):
         note_path: str = "Summary.md",
         heading_path: str = "Summary > Highlights",
         excerpt_anchor: str = "Ship the benchmark.",
+        user_query: str = "Summarize the note.",
     ) -> AskBenchmarkCandidate:
         return AskBenchmarkCandidate.model_construct(
             case_id=case_id,
             fingerprint=fingerprint,
             bucket=bucket,
-            user_query="Summarize the note.",
+            user_query=user_query,
             source_origin="sample_vault",
             expected_relevant_paths=["Summary.md"],
             expected_relevant_locators=[
@@ -155,9 +156,7 @@ class AskBenchmarkReviewTests(unittest.TestCase):
                 self._make_candidate(
                     case_id="ask_case_011",
                     fingerprint="fingerprint-011",
-                    note_path="Other.md",
-                    heading_path="Other > Highlights",
-                    excerpt_anchor="Different payload.",
+                    user_query="Summarize the other note.",
                 ),
             ]
             review_input = [
@@ -389,6 +388,46 @@ class AskBenchmarkReviewTests(unittest.TestCase):
             review_decisions = [
                 ReviewDecision.model_validate(
                     {"case_id": "ask_case_new", "decision": "approve", "review_notes": "keep"}
+                )
+            ]
+
+            with self.assertRaises(ValueError):
+                apply_review_outcomes(
+                    candidate_batch=candidate_batch,
+                    review_decisions=review_decisions,
+                    dataset_path=dataset_path,
+                    backlog_path=backlog_path,
+                    vault_root=vault_root,
+                )
+
+    def test_apply_review_outcomes_rejects_case_id_collision_with_approved_dataset_case(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_root = Path(temp_dir)
+            dataset_path = temp_root / "ask_benchmark_cases.json"
+            backlog_path = temp_root / "ask_benchmark_review_backlog.json"
+            vault_root = temp_root / "vault"
+            vault_root.mkdir()
+            (vault_root / "Summary.md").write_text(
+                "# Summary\n\n## Highlights\n\nShip the benchmark.\n",
+                encoding="utf-8",
+            )
+            self._seed_dataset(dataset_path, [self._make_case(case_id="ask_case_dup")])
+            self._seed_backlog(backlog_path, [])
+
+            candidate_batch = [
+                self._make_candidate(
+                    case_id="ask_case_dup",
+                    fingerprint="different-fingerprint",
+                    note_path="Other.md",
+                    heading_path="Other > Highlights",
+                    excerpt_anchor="Different payload.",
+                )
+            ]
+            review_decisions = [
+                ReviewDecision.model_validate(
+                    {"case_id": "ask_case_dup", "decision": "reject", "review_notes": "duplicate"}
                 )
             ]
 

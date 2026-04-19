@@ -184,6 +184,14 @@ def apply_review_outcomes(
         items=[*review_backlog.items, *backlog_items],
     )
 
+    backlog_validation = validate_ask_benchmark_review_backlog(
+        prospective_backlog,
+        vault_root,
+        known_case_ids={case.case_id for case in approved_dataset.cases},
+    )
+    if backlog_validation.errors:
+        raise ValueError("; ".join(backlog_validation.errors))
+
     write_ask_benchmark_dataset(prospective_dataset, dataset_path)
     write_ask_benchmark_backlog(prospective_backlog, backlog_path)
 
