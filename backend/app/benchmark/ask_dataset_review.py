@@ -20,7 +20,11 @@ from app.benchmark.ask_dataset import (
     write_ask_benchmark_backlog,
     write_ask_benchmark_dataset,
 )
-from app.benchmark.ask_dataset_candidates import AskBenchmarkCandidate, build_candidate_batch
+from app.benchmark.ask_dataset_candidates import (
+    AskBenchmarkCandidate,
+    _candidate_fingerprint,
+    build_candidate_batch,
+)
 from app.benchmark.ask_dataset_validation import ValidationResult, validate_ask_benchmark_dataset
 from app.config import get_settings
 
@@ -151,7 +155,7 @@ def apply_review_outcomes(
         raise ValueError(f"review decisions include unknown case_ids: {', '.join(unexpected_decisions)}")
 
     _reject_duplicate_candidates(candidate_batch)
-    _reject_persisted_collisions(candidate_batch, review_backlog)
+    _reject_persisted_collisions(candidate_batch, approved_dataset, review_backlog)
 
     approved_cases: list[AskBenchmarkCase] = []
     backlog_items: list[AskBenchmarkBacklogItem] = []
@@ -272,25 +276,58 @@ def _reject_duplicate_candidates(candidates: list[AskBenchmarkCandidate]) -> Non
     for candidate in candidates:
         if candidate.case_id in case_ids:
             raise ValueError(f"duplicate case_id {candidate.case_id!r} in candidate batch.")
-        if candidate.fingerprint in fingerprints:
-            raise ValueError(f"duplicate fingerprint {candidate.fingerprint!r} in candidate batch.")
+        for fingerprint in _candidate_effective_fingerprints(candidate):
+            if fingerprint in fingerprints:
+                raise ValueError(f"duplicate fingerprint {fingerprint!r} in candidate batch.")
+            fingerprints.add(fingerprint)
         case_ids.add(candidate.case_id)
-        fingerprints.add(candidate.fingerprint)
 
 
 def _reject_persisted_collisions(
     candidates: list[AskBenchmarkCandidate],
+    dataset: AskBenchmarkDataset,
     backlog: AskBenchmarkReviewBacklog,
 ) -> None:
+    existing_fingerprints = _collect_persisted_fingerprints(dataset, backlog)
     existing_case_ids = {item.case_id for item in backlog.items}
-    existing_fingerprints = {item.fingerprint for item in backlog.items}
     for candidate in candidates:
         if candidate.case_id in existing_case_ids:
             raise ValueError(f"case_id {candidate.case_id!r} already exists in benchmark data.")
-        if candidate.fingerprint in existing_fingerprints:
-            raise ValueError(
-                f"fingerprint {candidate.fingerprint!r} already exists in benchmark data."
+        for fingerprint in _candidate_effective_fingerprints(candidate):
+            if fingerprint in existing_fingerprints:
+                raise ValueError(f"fingerprint {fingerprint!r} already exists in benchmark data.")
+
+
+def _collect_persisted_fingerprints(
+    dataset: AskBenchmarkDataset,
+    backlog: AskBenchmarkReviewBacklog,
+) -> set[str]:
+    fingerprints: set[str] = set()
+    for case in dataset.cases:
+        for locator in case.expected_relevant_locators:
+            fingerprints.add(
+                _candidate_fingerprint(
+                    note_path=locator.note_path,
+                    heading_path=locator.heading_path,
+                    user_query=case.user_query,
+                )
             )
+    for item in backlog.items:
+        fingerprints.add(item.fingerprint)
+    return fingerprints
+
+
+def _candidate_effective_fingerprints(candidate: AskBenchmarkCandidate) -> set[str]:
+    fingerprints: set[str] = set()
+    for locator in candidate.expected_relevant_locators:
+        fingerprints.add(
+            _candidate_fingerprint(
+                note_path=locator.note_path,
+                heading_path=locator.heading_path,
+                user_query=candidate.user_query,
+            )
+        )
+    return fingerprints
 
 
 def _build_arg_parser() -> argparse.ArgumentParser:
