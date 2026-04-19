@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict, StringConstraints
+from pydantic import BaseModel, ConfigDict, StringConstraints, ValidationError
 
 from app.benchmark.ask_dataset import (
     ASK_BENCHMARK_DIR,
@@ -84,7 +84,8 @@ def validate_ask_benchmark_review_backlog(
 ) -> ValidationResult:
     result = ValidationResult()
     case_ids: set[str] = set(known_case_ids or set())
-    fingerprints: set[str] = set()
+    stored_fingerprints: set[str] = set()
+    effective_fingerprints: set[str] = set()
 
     for item_index, item in enumerate(backlog.items):
         item_prefix = f"items[{item_index}]"
@@ -98,10 +99,22 @@ def validate_ask_benchmark_review_backlog(
         else:
             case_ids.add(item.case_id)
 
-        if item.fingerprint in fingerprints:
+        item_effective_fingerprints = _backlog_item_effective_fingerprints(item)
+        if item.fingerprint in stored_fingerprints:
             result.errors.append(f"{item_prefix}.fingerprint={item.fingerprint!r} is duplicated.")
         else:
-            fingerprints.add(item.fingerprint)
+            stored_fingerprints.add(item.fingerprint)
+
+        if item.fingerprint not in item_effective_fingerprints:
+            result.errors.append(
+                f"{item_prefix}.fingerprint does not match the content-derived fingerprint."
+            )
+
+        if effective_fingerprints.intersection(item_effective_fingerprints):
+            result.errors.append(
+                f"{item_prefix}.fingerprint overlaps with another backlog item."
+            )
+        effective_fingerprints.update(item_effective_fingerprints)
 
         case_result = validate_ask_benchmark_dataset(
             AskBenchmarkDataset.model_construct(
@@ -233,6 +246,14 @@ def validate_ask_benchmark_review_files(
     result.errors.extend(backlog_result.errors)
     result.warnings.extend(dataset_result.warnings)
     result.warnings.extend(backlog_result.warnings)
+
+    dataset_fingerprints = _collect_case_fingerprints(dataset)
+    backlog_fingerprints = _collect_backlog_fingerprints(backlog)
+    overlap = sorted(dataset_fingerprints.intersection(backlog_fingerprints))
+    if overlap:
+        result.errors.append(
+            f"backlog fingerprint content overlaps with approved dataset: {', '.join(overlap)}"
+        )
     return result
 
 
@@ -289,15 +310,26 @@ def _index_decisions(decisions: list[ReviewDecision]) -> dict[str, ReviewDecisio
 
 def _reject_duplicate_candidates(candidates: list[AskBenchmarkCandidate]) -> None:
     case_ids: set[str] = set()
-    fingerprints: set[str] = set()
+    stored_fingerprints: set[str] = set()
+    effective_fingerprints: set[str] = set()
     for candidate in candidates:
         if candidate.case_id in case_ids:
             raise ValueError(f"duplicate case_id {candidate.case_id!r} in candidate batch.")
-        for fingerprint in _candidate_effective_fingerprints(candidate):
-            if fingerprint in fingerprints:
-                raise ValueError(f"duplicate fingerprint {fingerprint!r} in candidate batch.")
-            fingerprints.add(fingerprint)
+        candidate_effective_fingerprints = _candidate_effective_fingerprints(candidate)
+        if candidate.fingerprint not in candidate_effective_fingerprints:
+            raise ValueError(
+                f"fingerprint {candidate.fingerprint!r} does not match the content-derived fingerprint."
+            )
+        if candidate.fingerprint in stored_fingerprints:
+            raise ValueError(f"duplicate fingerprint {candidate.fingerprint!r} in candidate batch.")
+        if effective_fingerprints.intersection(candidate_effective_fingerprints):
+            duplicate_fingerprint = sorted(
+                effective_fingerprints.intersection(candidate_effective_fingerprints)
+            )[0]
+            raise ValueError(f"duplicate fingerprint {duplicate_fingerprint!r} in candidate batch.")
         case_ids.add(candidate.case_id)
+        stored_fingerprints.add(candidate.fingerprint)
+        effective_fingerprints.update(candidate_effective_fingerprints)
 
 
 def _reject_persisted_collisions(
@@ -321,16 +353,9 @@ def _collect_persisted_fingerprints(
 ) -> set[str]:
     fingerprints: set[str] = set()
     for case in dataset.cases:
-        for locator in case.expected_relevant_locators:
-            fingerprints.add(
-                _candidate_fingerprint(
-                    note_path=locator.note_path,
-                    heading_path=locator.heading_path,
-                    user_query=case.user_query,
-                )
-            )
+        fingerprints.update(_case_effective_fingerprints(case))
     for item in backlog.items:
-        fingerprints.add(item.fingerprint)
+        fingerprints.update(_backlog_item_effective_fingerprints(item))
     return fingerprints
 
 
@@ -344,6 +369,46 @@ def _candidate_effective_fingerprints(candidate: AskBenchmarkCandidate) -> set[s
                 user_query=candidate.user_query,
             )
         )
+    return fingerprints
+
+
+def _case_effective_fingerprints(case: AskBenchmarkCase) -> set[str]:
+    fingerprints: set[str] = set()
+    for locator in case.expected_relevant_locators:
+        fingerprints.add(
+            _candidate_fingerprint(
+                note_path=locator.note_path,
+                heading_path=locator.heading_path,
+                user_query=case.user_query,
+            )
+        )
+    return fingerprints
+
+
+def _backlog_item_effective_fingerprints(item: AskBenchmarkBacklogItem) -> set[str]:
+    fingerprints: set[str] = set()
+    for locator in item.expected_relevant_locators:
+        fingerprints.add(
+            _candidate_fingerprint(
+                note_path=locator.note_path,
+                heading_path=locator.heading_path,
+                user_query=item.user_query,
+            )
+        )
+    return fingerprints
+
+
+def _collect_case_fingerprints(dataset: AskBenchmarkDataset) -> set[str]:
+    fingerprints: set[str] = set()
+    for case in dataset.cases:
+        fingerprints.update(_case_effective_fingerprints(case))
+    return fingerprints
+
+
+def _collect_backlog_fingerprints(backlog: AskBenchmarkReviewBacklog) -> set[str]:
+    fingerprints: set[str] = set()
+    for item in backlog.items:
+        fingerprints.update(_backlog_item_effective_fingerprints(item))
     return fingerprints
 
 
@@ -438,8 +503,12 @@ def _run_validate(args: argparse.Namespace) -> int:
 
 def main(argv: list[str] | None = None) -> int:
     parser = _build_arg_parser()
-    args = parser.parse_args(argv)
-    return args.func(args)
+    try:
+        args = parser.parse_args(argv)
+        return args.func(args)
+    except (FileNotFoundError, json.JSONDecodeError, ValidationError, ValueError) as exc:
+        print(f"ERROR: {exc}", file=sys.stderr)
+        return 1
 
 
 if __name__ == "__main__":

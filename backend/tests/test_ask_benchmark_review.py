@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import io
 import tempfile
 import unittest
 from pathlib import Path
+from contextlib import redirect_stderr
 
 from app.benchmark.ask_dataset import (
     AskBenchmarkBacklogItem,
@@ -16,7 +18,7 @@ from app.benchmark.ask_dataset import (
     write_ask_benchmark_dataset,
 )
 from app.benchmark.ask_dataset_candidates import AskBenchmarkCandidate, _candidate_fingerprint
-from app.benchmark.ask_dataset_review import ReviewDecision, apply_review_outcomes
+from app.benchmark.ask_dataset_review import ReviewDecision, apply_review_outcomes, main
 
 
 class AskBenchmarkReviewTests(unittest.TestCase):
@@ -24,13 +26,19 @@ class AskBenchmarkReviewTests(unittest.TestCase):
         self,
         *,
         case_id: str,
-        fingerprint: str,
+        fingerprint: str | None = None,
         bucket: str = "single_hop",
         note_path: str = "Summary.md",
         heading_path: str = "Summary > Highlights",
         excerpt_anchor: str = "Ship the benchmark.",
         user_query: str = "Summarize the note.",
     ) -> AskBenchmarkCandidate:
+        if fingerprint is None:
+            fingerprint = _candidate_fingerprint(
+                note_path=note_path,
+                heading_path=heading_path,
+                user_query=user_query,
+            )
         return AskBenchmarkCandidate.model_construct(
             case_id=case_id,
             fingerprint=fingerprint,
@@ -152,10 +160,9 @@ class AskBenchmarkReviewTests(unittest.TestCase):
             self._seed_backlog(backlog_path, [])
 
             candidate_batch = [
-                self._make_candidate(case_id="ask_case_010", fingerprint="fingerprint-010"),
+                self._make_candidate(case_id="ask_case_010"),
                 self._make_candidate(
                     case_id="ask_case_011",
-                    fingerprint="fingerprint-011",
                     user_query="Summarize the other note.",
                 ),
             ]
@@ -183,7 +190,14 @@ class AskBenchmarkReviewTests(unittest.TestCase):
             self.assertEqual(dataset.cases[0].review_notes, "keep")
             self.assertEqual(backlog.items[0].review_status, "revise")
             self.assertEqual(backlog.items[0].review_notes, "bucket wrong")
-            self.assertEqual(backlog.items[0].fingerprint, "fingerprint-011")
+            self.assertEqual(
+                backlog.items[0].fingerprint,
+                _candidate_fingerprint(
+                    note_path="Summary.md",
+                    heading_path="Summary > Highlights",
+                    user_query="Summarize the other note.",
+                ),
+            )
 
     def test_apply_review_outcomes_routes_reject_to_backlog_only(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -199,7 +213,7 @@ class AskBenchmarkReviewTests(unittest.TestCase):
             self._seed_dataset(dataset_path)
             self._seed_backlog(backlog_path, [])
 
-            candidate_batch = [self._make_candidate(case_id="ask_case_012", fingerprint="fingerprint-012")]
+            candidate_batch = [self._make_candidate(case_id="ask_case_012")]
             review_decisions = [
                 ReviewDecision.model_validate(
                     {"case_id": "ask_case_012", "decision": "reject", "review_notes": "out of scope"}
@@ -223,7 +237,14 @@ class AskBenchmarkReviewTests(unittest.TestCase):
             self.assertEqual([item.case_id for item in backlog.items], ["ask_case_012"])
             self.assertEqual(backlog.items[0].review_status, "reject")
             self.assertEqual(backlog.items[0].review_notes, "out of scope")
-            self.assertEqual(backlog.items[0].fingerprint, "fingerprint-012")
+            self.assertEqual(
+                backlog.items[0].fingerprint,
+                _candidate_fingerprint(
+                    note_path="Summary.md",
+                    heading_path="Summary > Highlights",
+                    user_query="Summarize the note.",
+                ),
+            )
 
     def test_apply_review_outcomes_ignores_unreviewed_candidates(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -240,15 +261,13 @@ class AskBenchmarkReviewTests(unittest.TestCase):
             self._seed_backlog(backlog_path, [])
 
             candidate_batch = [
-                self._make_candidate(case_id="ask_case_100", fingerprint="fingerprint-100"),
+                self._make_candidate(case_id="ask_case_100"),
                 self._make_candidate(
                     case_id="ask_case_101",
-                    fingerprint="fingerprint-101",
                     user_query="Summarize the other note.",
                 ),
                 self._make_candidate(
                     case_id="ask_case_102",
-                    fingerprint="fingerprint-102",
                     user_query="Summarize a third note.",
                 ),
             ]
@@ -293,7 +312,6 @@ class AskBenchmarkReviewTests(unittest.TestCase):
             candidate_batch = [
                 self._make_candidate(
                     case_id="ask_case_020",
-                    fingerprint="fingerprint-020",
                     note_path="Missing.md",
                 )
             ]
@@ -332,8 +350,8 @@ class AskBenchmarkReviewTests(unittest.TestCase):
             self._seed_backlog(backlog_path, [])
 
             duplicate_case_batch = [
-                self._make_candidate(case_id="ask_case_030", fingerprint="fingerprint-030"),
-                self._make_candidate(case_id="ask_case_030", fingerprint="fingerprint-031"),
+                self._make_candidate(case_id="ask_case_030"),
+                self._make_candidate(case_id="ask_case_030"),
             ]
             review_decisions = [
                 ReviewDecision.model_validate(
@@ -351,8 +369,8 @@ class AskBenchmarkReviewTests(unittest.TestCase):
                 )
 
             duplicate_fingerprint_batch = [
-                self._make_candidate(case_id="ask_case_031", fingerprint="fingerprint-032"),
-                self._make_candidate(case_id="ask_case_032", fingerprint="fingerprint-032"),
+                self._make_candidate(case_id="ask_case_031"),
+                self._make_candidate(case_id="ask_case_032"),
             ]
             review_decisions = [
                 ReviewDecision.model_validate(
@@ -366,6 +384,50 @@ class AskBenchmarkReviewTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 apply_review_outcomes(
                     candidate_batch=duplicate_fingerprint_batch,
+                    review_decisions=review_decisions,
+                    dataset_path=dataset_path,
+                    backlog_path=backlog_path,
+                    vault_root=vault_root,
+                )
+
+    def test_apply_review_outcomes_rejects_duplicate_stored_candidate_fingerprints(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_root = Path(temp_dir)
+            dataset_path = temp_root / "ask_benchmark_cases.json"
+            backlog_path = temp_root / "ask_benchmark_review_backlog.json"
+            vault_root = temp_root / "vault"
+            vault_root.mkdir()
+            (vault_root / "Summary.md").write_text(
+                "# Summary\n\n## Highlights\n\nShip the benchmark.\n",
+                encoding="utf-8",
+            )
+            self._seed_dataset(dataset_path)
+            self._seed_backlog(backlog_path, [])
+
+            candidate_batch = [
+                self._make_candidate(
+                    case_id="ask_case_a",
+                    fingerprint="shared-fp",
+                    user_query="Summarize the note.",
+                ),
+                self._make_candidate(
+                    case_id="ask_case_b",
+                    fingerprint="shared-fp",
+                    user_query="Summarize the other note.",
+                ),
+            ]
+            review_decisions = [
+                ReviewDecision.model_validate(
+                    {"case_id": "ask_case_a", "decision": "reject", "review_notes": "keep"}
+                ),
+                ReviewDecision.model_validate(
+                    {"case_id": "ask_case_b", "decision": "reject", "review_notes": "keep"}
+                ),
+            ]
+
+            with self.assertRaises(ValueError):
+                apply_review_outcomes(
+                    candidate_batch=candidate_batch,
                     review_decisions=review_decisions,
                     dataset_path=dataset_path,
                     backlog_path=backlog_path,
@@ -400,7 +462,7 @@ class AskBenchmarkReviewTests(unittest.TestCase):
             )
 
             candidate_batch = [
-                self._make_candidate(case_id="ask_case_new", fingerprint="fingerprint-shared"),
+                self._make_candidate(case_id="ask_case_new"),
             ]
             review_decisions = [
                 ReviewDecision.model_validate(
@@ -416,6 +478,79 @@ class AskBenchmarkReviewTests(unittest.TestCase):
                     backlog_path=backlog_path,
                     vault_root=vault_root,
                 )
+
+    def test_validate_review_files_rejects_tampered_backlog_fingerprint(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_root = Path(temp_dir)
+            dataset_path = temp_root / "ask_benchmark_cases.json"
+            backlog_path = temp_root / "ask_benchmark_review_backlog.json"
+            vault_root = temp_root / "vault"
+            vault_root.mkdir()
+            (vault_root / "Summary.md").write_text(
+                "# Summary\n\n## Highlights\n\nShip the benchmark.\n",
+                encoding="utf-8",
+            )
+            self._seed_dataset(dataset_path)
+            self._seed_backlog(
+                backlog_path,
+                [
+                    self._make_backlog_item(
+                        case_id="ask_case_backlog_tampered",
+                        fingerprint="tampered-fp",
+                    )
+                ],
+            )
+
+            from app.benchmark.ask_dataset_review import validate_ask_benchmark_review_files
+
+            result = validate_ask_benchmark_review_files(
+                dataset_path=dataset_path,
+                backlog_path=backlog_path,
+                vault_root=vault_root,
+            )
+
+            self.assertTrue(result.errors)
+            self.assertTrue(any("fingerprint" in error for error in result.errors), msg=result.errors)
+
+    def test_validate_review_files_rejects_backlog_overlap_with_approved_dataset(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_root = Path(temp_dir)
+            dataset_path = temp_root / "ask_benchmark_cases.json"
+            backlog_path = temp_root / "ask_benchmark_review_backlog.json"
+            vault_root = temp_root / "vault"
+            vault_root.mkdir()
+            (vault_root / "Summary.md").write_text(
+                "# Summary\n\n## Highlights\n\nShip the benchmark.\n",
+                encoding="utf-8",
+            )
+            self._seed_dataset(dataset_path, [self._make_case(case_id="ask_case_existing")])
+            self._seed_backlog(
+                backlog_path,
+                [
+                    self._make_backlog_item(
+                        case_id="ask_case_backlog_overlap",
+                        fingerprint=_candidate_fingerprint(
+                            note_path="Summary.md",
+                            heading_path="Summary > Highlights",
+                            user_query="Summarize the note.",
+                        ),
+                    )
+                ],
+            )
+
+            from app.benchmark.ask_dataset_review import validate_ask_benchmark_review_files
+
+            result = validate_ask_benchmark_review_files(
+                dataset_path=dataset_path,
+                backlog_path=backlog_path,
+                vault_root=vault_root,
+            )
+
+            self.assertTrue(result.errors)
+            self.assertTrue(
+                any("overlap" in error or "fingerprint" in error for error in result.errors),
+                msg=result.errors,
+            )
 
     def test_apply_review_outcomes_rejects_fingerprint_collision_with_approved_dataset_case(
         self,
@@ -434,7 +569,7 @@ class AskBenchmarkReviewTests(unittest.TestCase):
             self._seed_backlog(backlog_path, [])
 
             candidate_batch = [
-                self._make_candidate(case_id="ask_case_new", fingerprint="candidate-fingerprint")
+                self._make_candidate(case_id="ask_case_new")
             ]
             review_decisions = [
                 ReviewDecision.model_validate(
@@ -470,7 +605,6 @@ class AskBenchmarkReviewTests(unittest.TestCase):
             candidate_batch = [
                 self._make_candidate(
                     case_id="ask_case_dup",
-                    fingerprint="different-fingerprint",
                     note_path="Other.md",
                     heading_path="Other > Highlights",
                     excerpt_anchor="Different payload.",
@@ -490,3 +624,41 @@ class AskBenchmarkReviewTests(unittest.TestCase):
                     backlog_path=backlog_path,
                     vault_root=vault_root,
                 )
+
+    def test_main_reports_clean_error_for_missing_batch_file(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_root = Path(temp_dir)
+            dataset_path = temp_root / "ask_benchmark_cases.json"
+            backlog_path = temp_root / "ask_benchmark_review_backlog.json"
+            vault_root = temp_root / "vault"
+            vault_root.mkdir()
+            (vault_root / "Summary.md").write_text(
+                "# Summary\n\n## Highlights\n\nShip the benchmark.\n",
+                encoding="utf-8",
+            )
+            self._seed_dataset(dataset_path)
+            self._seed_backlog(backlog_path, [])
+            review_path = temp_root / "ask_review.json"
+            review_path.write_text("[]\n", encoding="utf-8")
+
+            stderr = io.StringIO()
+            with redirect_stderr(stderr):
+                exit_code = main(
+                    [
+                        "apply-review",
+                        "--batch",
+                        str(temp_root / "missing_batch.json"),
+                        "--review",
+                        str(review_path),
+                        "--dataset",
+                        str(dataset_path),
+                        "--backlog",
+                        str(backlog_path),
+                        "--vault-root",
+                        str(vault_root),
+                    ]
+                )
+
+            self.assertEqual(exit_code, 1)
+            self.assertIn("ERROR:", stderr.getvalue())
+            self.assertNotIn("Traceback", stderr.getvalue())
