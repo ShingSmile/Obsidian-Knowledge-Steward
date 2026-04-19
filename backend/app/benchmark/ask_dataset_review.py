@@ -539,8 +539,8 @@ def _build_arg_parser() -> argparse.ArgumentParser:
 
 
 def _run_generate_batch(args: argparse.Namespace) -> int:
-    approved_dataset = _load_dataset_or_empty(args.dataset)
-    review_backlog = _load_backlog_or_empty(args.backlog)
+    approved_dataset = _load_dataset_required(args.dataset)
+    review_backlog = _load_backlog_required(args.backlog)
     candidates = build_candidate_batch(
         vault_root=args.vault_root,
         approved_dataset=approved_dataset,

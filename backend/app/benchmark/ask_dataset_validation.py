@@ -43,6 +43,14 @@ def validate_ask_benchmark_case(case: AskBenchmarkCase, vault_root: Path) -> Val
         result.errors.append(f"{case.case_id}.expected_relevant_locators must not be empty.")
     if not case.expected_facts:
         result.errors.append(f"{case.case_id}.expected_facts must not be empty.")
+    if case.allow_tool and not case.expected_tool_names:
+        result.errors.append(
+            f"{case.case_id}.expected_tool_names must not be empty when allow_tool is true."
+        )
+    if not case.allow_tool and case.expected_tool_names:
+        result.errors.append(
+            f"{case.case_id}.expected_tool_names must be empty when allow_tool is false."
+        )
 
     expected_paths = {path for path in case.expected_relevant_paths if isinstance(path, str) and path.strip()}
 

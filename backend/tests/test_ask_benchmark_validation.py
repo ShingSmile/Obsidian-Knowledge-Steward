@@ -286,6 +286,64 @@ class AskBenchmarkValidationTests(unittest.TestCase):
                 msg=result.errors,
             )
 
+    def test_validate_case_rejects_tool_names_when_tool_usage_is_disabled(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            vault_root = Path(temp_dir)
+            self._write_note(vault_root)
+            case = AskBenchmarkCase.model_construct(
+                case_id="ask_case_tool_disabled",
+                bucket="single_hop",
+                user_query="Summarize the note.",
+                source_origin="sample_vault",
+                expected_relevant_paths=["Summary.md"],
+                expected_relevant_locators=[self._make_locator()],
+                expected_facts=["Ship the benchmark."],
+                forbidden_claims=[],
+                allow_tool=False,
+                expected_tool_names=["web_search"],
+                allow_retrieval_only=False,
+                should_generate_answer=True,
+                review_status="approved",
+                review_notes="seed",
+            )
+
+            result = validate_ask_benchmark_case(case=case, vault_root=vault_root)
+
+            self.assertTrue(result.errors)
+            self.assertTrue(
+                any("expected_tool_names" in error for error in result.errors),
+                msg=result.errors,
+            )
+
+    def test_validate_case_rejects_missing_tool_names_when_tool_usage_is_enabled(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            vault_root = Path(temp_dir)
+            self._write_note(vault_root)
+            case = AskBenchmarkCase.model_construct(
+                case_id="ask_case_tool_enabled",
+                bucket="tool_allowed",
+                user_query="Summarize the note.",
+                source_origin="sample_vault",
+                expected_relevant_paths=["Summary.md"],
+                expected_relevant_locators=[self._make_locator()],
+                expected_facts=["Ship the benchmark."],
+                forbidden_claims=[],
+                allow_tool=True,
+                expected_tool_names=[],
+                allow_retrieval_only=False,
+                should_generate_answer=True,
+                review_status="approved",
+                review_notes="seed",
+            )
+
+            result = validate_ask_benchmark_case(case=case, vault_root=vault_root)
+
+            self.assertTrue(result.errors)
+            self.assertTrue(
+                any("expected_tool_names" in error for error in result.errors),
+                msg=result.errors,
+            )
+
     def test_validate_backlog_rejects_empty_grounding_collections(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             vault_root = Path(temp_dir)

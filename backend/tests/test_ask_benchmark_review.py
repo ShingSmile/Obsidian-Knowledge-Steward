@@ -778,6 +778,32 @@ class AskBenchmarkReviewTests(unittest.TestCase):
             self.assertIn("ERROR:", stderr.getvalue())
             self.assertNotIn("Traceback", stderr.getvalue())
 
+    def test_main_reports_clean_error_for_missing_generate_batch_inputs(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_root = Path(temp_dir)
+            output_path = temp_root / "ask_batch.json"
+            stderr = io.StringIO()
+            with redirect_stderr(stderr):
+                exit_code = main(
+                    [
+                        "generate-batch",
+                        "--count",
+                        "1",
+                        "--output",
+                        str(output_path),
+                        "--dataset",
+                        str(temp_root / "missing_dataset.json"),
+                        "--backlog",
+                        str(temp_root / "missing_backlog.json"),
+                        "--vault-root",
+                        str(temp_root / "vault"),
+                    ]
+                )
+
+            self.assertEqual(exit_code, 1)
+            self.assertIn("ERROR:", stderr.getvalue())
+            self.assertNotIn("Traceback", stderr.getvalue())
+
     def test_main_reports_skipped_count_for_partial_apply_review(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_root = Path(temp_dir)
