@@ -319,6 +319,7 @@ class AskBenchmarkDatasetTests(unittest.TestCase):
                         "expected_tool_names": [],
                         "allow_retrieval_only": True,
                         "should_generate_answer": True,
+                        "fingerprint": "backlog-fingerprint-extra",
                         "review_status": "revise",
                         "review_notes": "needs tightening",
                         "unexpected": "boom",
@@ -350,6 +351,7 @@ class AskBenchmarkDatasetTests(unittest.TestCase):
             "expected_tool_names": ["fixture_tool"],
             "allow_retrieval_only": True,
             "should_generate_answer": True,
+            "fingerprint": "backlog-fingerprint-whitespace",
             "review_status": "revise",
             "review_notes": "needs tightening",
         }
@@ -408,6 +410,7 @@ class AskBenchmarkDatasetTests(unittest.TestCase):
                         "expected_tool_names": [],
                         "allow_retrieval_only": True,
                         "should_generate_answer": True,
+                        "fingerprint": "backlog-fingerprint-missing-status",
                         "review_notes": "needs tightening",
                     }
                 ],
@@ -507,6 +510,7 @@ class AskBenchmarkDatasetTests(unittest.TestCase):
                         expected_tool_names=[],
                         allow_retrieval_only=True,
                         should_generate_answer=True,
+                        fingerprint="backlog-fingerprint-round-trip",
                         review_status="revise",
                         review_notes="needs tightening",
                     )

@@ -80,6 +80,7 @@ def validate_ask_benchmark_review_backlog(
 ) -> ValidationResult:
     result = ValidationResult()
     case_ids: set[str] = set(known_case_ids or set())
+    fingerprints: set[str] = set()
 
     for item_index, item in enumerate(backlog.items):
         item_prefix = f"items[{item_index}]"
@@ -93,13 +94,18 @@ def validate_ask_benchmark_review_backlog(
         else:
             case_ids.add(item.case_id)
 
+        if item.fingerprint in fingerprints:
+            result.errors.append(f"{item_prefix}.fingerprint={item.fingerprint!r} is duplicated.")
+        else:
+            fingerprints.add(item.fingerprint)
+
         case_result = validate_ask_benchmark_dataset(
             AskBenchmarkDataset.model_construct(
                 schema_version=1,
                 cases=[
                     AskBenchmarkCase.model_validate(
                         {
-                            **item.model_dump(mode="json"),
+                            **item.model_dump(mode="json", exclude={"fingerprint"}),
                             "review_status": "approved",
                         }
                     )
@@ -145,7 +151,7 @@ def apply_review_outcomes(
         raise ValueError(f"review decisions include unknown case_ids: {', '.join(unexpected_decisions)}")
 
     _reject_duplicate_candidates(candidate_batch)
-    _reject_persisted_collisions(candidate_batch, approved_dataset, review_backlog)
+    _reject_persisted_collisions(candidate_batch, review_backlog)
 
     approved_cases: list[AskBenchmarkCase] = []
     backlog_items: list[AskBenchmarkBacklogItem] = []
@@ -225,7 +231,7 @@ def _candidate_to_backlog_item(
 ) -> AskBenchmarkBacklogItem:
     return AskBenchmarkBacklogItem.model_validate(
         {
-            **candidate.model_dump(mode="json", exclude={"fingerprint"}),
+            **candidate.model_dump(mode="json"),
             "review_status": decision.decision,
             "review_notes": decision.review_notes,
         }
@@ -274,14 +280,17 @@ def _reject_duplicate_candidates(candidates: list[AskBenchmarkCandidate]) -> Non
 
 def _reject_persisted_collisions(
     candidates: list[AskBenchmarkCandidate],
-    dataset: AskBenchmarkDataset,
     backlog: AskBenchmarkReviewBacklog,
 ) -> None:
-    existing_case_ids = {case.case_id for case in dataset.cases}
-    existing_case_ids.update(item.case_id for item in backlog.items)
+    existing_case_ids = {item.case_id for item in backlog.items}
+    existing_fingerprints = {item.fingerprint for item in backlog.items}
     for candidate in candidates:
         if candidate.case_id in existing_case_ids:
             raise ValueError(f"case_id {candidate.case_id!r} already exists in benchmark data.")
+        if candidate.fingerprint in existing_fingerprints:
+            raise ValueError(
+                f"fingerprint {candidate.fingerprint!r} already exists in benchmark data."
+            )
 
 
 def _build_arg_parser() -> argparse.ArgumentParser:

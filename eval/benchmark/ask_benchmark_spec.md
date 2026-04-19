@@ -65,7 +65,9 @@ Locator rule:
 ## Backlog Shape
 
 Backlog items use the same core case fields, but `review_status` is either `revise`
-or `reject`.
+or `reject`. Backlog items also persist the original candidate `fingerprint` so the
+review backlog can preserve the full incoming payload and reject fingerprint collisions
+during apply-review.
 
 ## Commands
 

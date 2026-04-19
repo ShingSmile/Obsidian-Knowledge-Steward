@@ -77,6 +77,7 @@ class AskBenchmarkBacklogItem(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)
 
     case_id: NonEmptyStr
+    fingerprint: NonEmptyStr
     bucket: AskBenchmarkBucket
     user_query: NonEmptyStr
     source_origin: AskBenchmarkSourceOrigin
