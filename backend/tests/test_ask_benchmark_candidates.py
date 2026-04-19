@@ -170,6 +170,49 @@ Ship the benchmark.
                 self.assertTrue(locator.heading_path)
                 self.assertTrue(locator.excerpt_anchor)
 
+    def test_build_candidate_batch_uses_exact_locator_contents_for_task_query(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            vault_root = Path(temp_dir)
+            self._write_note(
+                vault_root,
+                "日常/2024-03-14_星期四.md",
+                """# 一、工作任务
+
+- [x] 完成 digest graph
+- [ ] 清理 backlog
+
+# 二、今日总结
+
+今天接通了 DAILY_DIGEST。
+补充说明：今天先整理再收口。
+""",
+            )
+            self._write_note(
+                vault_root,
+                "日常/2024-03-15_星期五.md",
+                """# Summary
+
+## Highlights
+
+Ship the benchmark.
+""",
+            )
+
+            batch = build_candidate_batch(
+                vault_root=vault_root,
+                approved_dataset=self._empty_dataset(),
+                backlog=self._empty_backlog(),
+                count=5,
+            )
+
+            task_candidate = next(item for item in batch if item.user_query == "这篇笔记列了哪些待办？")
+            locator = task_candidate.expected_relevant_locators[0]
+
+            self.assertEqual(locator.note_path, "日常/2024-03-14_星期四.md")
+            self.assertEqual(locator.heading_path, "一、工作任务")
+            self.assertEqual(locator.excerpt_anchor, "清理 backlog")
+            self.assertEqual(task_candidate.expected_facts, ["清理 backlog"])
+
     def test_build_candidate_batch_skips_existing_case_fingerprints(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             vault_root = Path(temp_dir)
@@ -308,7 +351,7 @@ Ship the benchmark.
                 msg=[item.user_query for item in batch],
             )
 
-    def test_build_candidate_batch_skips_same_source_location_even_when_historical_query_was_worded_differently(self) -> None:
+    def test_build_candidate_batch_keeps_different_queries_from_same_heading_when_fingerprint_differs(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             vault_root = Path(temp_dir)
             source_note_path = "日常/2024-03-14_星期四.md"
@@ -357,14 +400,9 @@ Ship the benchmark.
             )
 
             self.assertEqual(len(batch), 5)
-            self.assertFalse(
-                any(
-                    locator.note_path == source_note_path
-                    and locator.heading_path == "一、工作任务"
-                    for item in batch
-                    for locator in item.expected_relevant_locators
-                ),
-                msg=[item.user_query for item in batch],
+            self.assertIn(
+                "这篇笔记列了哪些待办？",
+                {item.user_query for item in batch},
             )
 
     def test_task_query_expected_facts_are_task_relevant(self) -> None:
@@ -405,6 +443,48 @@ Ship the benchmark.
             task_candidate = next(item for item in batch if item.user_query == "这篇笔记列了哪些待办？")
 
             self.assertEqual(task_candidate.expected_facts, ["清理 backlog"])
+
+    def test_summary_query_comes_only_from_summary_like_chunk(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            vault_root = Path(temp_dir)
+            self._write_note(
+                vault_root,
+                "日常/2024-03-14_星期四.md",
+                """# 一、工作任务
+
+- [x] 完成 digest graph
+- [ ] 清理 backlog
+
+# 二、今日总结
+
+今天接通了 DAILY_DIGEST。
+补充说明：今天先整理再收口。
+""",
+            )
+            self._write_note(
+                vault_root,
+                "日常/2024-03-15_星期五.md",
+                """# Summary
+
+## Highlights
+
+Ship the benchmark.
+""",
+            )
+
+            batch = build_candidate_batch(
+                vault_root=vault_root,
+                approved_dataset=self._empty_dataset(),
+                backlog=self._empty_backlog(),
+                count=5,
+            )
+
+            summary_candidate = next(item for item in batch if item.user_query == "这篇笔记主要讲了什么？")
+            locator = summary_candidate.expected_relevant_locators[0]
+
+            self.assertIn(locator.heading_path, {"二、今日总结", "Summary > Highlights"})
+            self.assertIn(locator.excerpt_anchor, {"今天接通了 DAILY_DIGEST。", "Ship the benchmark."})
+            self.assertIn(summary_candidate.expected_facts[0], {"今天接通了 DAILY_DIGEST。", "Ship the benchmark."})
 
     def test_build_candidate_batch_orders_conservative_queries_before_freer_paraphrase(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -447,7 +527,7 @@ Ship the benchmark.
                     "这篇笔记的工作任务部分讲了什么？",
                     "这篇笔记列了哪些待办？",
                     "2024-03-14 这天做了什么？",
-                    "今天接通了 DAILY_DIGEST。这段在说什么？",
+                    "今天接通了 DAILY_DIGEST。 这段在说什么？",
                     "这篇笔记主要讲了什么？",
                 ],
             )

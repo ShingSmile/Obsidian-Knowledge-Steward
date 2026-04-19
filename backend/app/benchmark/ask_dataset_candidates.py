@@ -4,7 +4,7 @@ import hashlib
 import re
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Annotated, Literal
+from typing import Annotated
 
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints
 
@@ -20,8 +20,6 @@ from app.indexing.parser import parse_markdown_note
 
 
 NonEmptyStr = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
-CandidateKind = Literal["heading", "task", "date", "fact", "summary"]
-
 DEFAULT_FORBIDDEN_CLAIMS = ["不要编造笔记中没有出现的细节。"]
 _HEADINGS_WITH_SUMMARY_SIGNAL = ("summary", "总结", "复盘", "highlights")
 
@@ -46,7 +44,6 @@ class AskBenchmarkCandidate(BaseModel):
 
 @dataclass(frozen=True)
 class _CandidateSeed:
-    kind: CandidateKind
     bucket: AskBenchmarkBucket
     user_query: str
     note_path: str
@@ -66,8 +63,8 @@ def build_candidate_batch(
         return []
 
     resolved_vault_root = vault_root.expanduser().resolve()
-    existing_source_keys = _collect_existing_source_keys(approved_dataset, backlog)
-    seen_candidate_keys: set[str] = set()
+    existing_fingerprints = _collect_existing_fingerprints(approved_dataset, backlog)
+    seen_candidate_fingerprints: set[str] = set()
     batch: list[AskBenchmarkCandidate] = []
 
     for note_path in sorted(resolved_vault_root.rglob("*.md")):
@@ -78,19 +75,19 @@ def build_candidate_batch(
         note_relative_path = note_path.relative_to(resolved_vault_root).as_posix()
 
         for seed in _build_candidate_seeds(parsed_note, note_relative_path):
-            source_key = _source_key(seed.note_path, seed.heading_path)
-            if source_key in existing_source_keys:
+            candidate_fingerprint = _candidate_fingerprint(
+                note_path=seed.note_path,
+                heading_path=seed.heading_path,
+                user_query=seed.user_query,
+            )
+            if candidate_fingerprint in existing_fingerprints:
                 continue
 
-            candidate_key = _candidate_key(seed.note_path, seed.heading_path, seed.kind)
-            if candidate_key in seen_candidate_keys:
-                continue
-
-            candidate = _build_candidate(seed=seed, fingerprint=candidate_key)
+            candidate = _build_candidate(seed=seed, fingerprint=candidate_fingerprint)
             if candidate is None:
                 continue
 
-            seen_candidate_keys.add(candidate_key)
+            seen_candidate_fingerprints.add(candidate_fingerprint)
             batch.append(candidate)
             if len(batch) == count:
                 return batch
@@ -116,7 +113,6 @@ def _build_candidate_seeds(parsed_note: ParsedNote, note_path: str) -> list[_Can
             if heading_label:
                 seeds.append(
                     _CandidateSeed(
-                        kind="heading",
                         bucket="single_hop",
                         user_query=f"这篇笔记的{heading_label}部分讲了什么？",
                         note_path=note_path,
@@ -131,7 +127,6 @@ def _build_candidate_seeds(parsed_note: ParsedNote, note_path: str) -> list[_Can
         if task_facts:
             seeds.append(
                 _CandidateSeed(
-                    kind="task",
                     bucket="single_hop",
                     user_query="这篇笔记列了哪些待办？",
                     note_path=note_path,
@@ -148,8 +143,7 @@ def _build_candidate_seeds(parsed_note: ParsedNote, note_path: str) -> list[_Can
             date_facts = _extract_meaningful_facts(date_chunk.text)
             if date_excerpt and date_facts:
                 seeds.append(
-                    _CandidateSeed(
-                        kind="date",
+                _CandidateSeed(
                         bucket="metadata_filter",
                         user_query=f"{parsed_note.daily_note_date} 这天做了什么？",
                         note_path=note_path,
@@ -164,7 +158,6 @@ def _build_candidate_seeds(parsed_note: ParsedNote, note_path: str) -> list[_Can
         if fact_excerpt:
             seeds.append(
                 _CandidateSeed(
-                    kind="fact",
                     bucket="single_hop",
                     user_query=_compose_fact_query(fact_excerpt),
                     note_path=note_path,
@@ -179,7 +172,6 @@ def _build_candidate_seeds(parsed_note: ParsedNote, note_path: str) -> list[_Can
         if summary_excerpt:
             seeds.append(
                 _CandidateSeed(
-                    kind="summary",
                     bucket="single_hop",
                     user_query="这篇笔记主要讲了什么？",
                     note_path=note_path,
@@ -323,44 +315,44 @@ def _extract_task_facts(text: str) -> list[str]:
 
 
 def _compose_fact_query(fact_excerpt: str) -> str:
-    if fact_excerpt.endswith(("。", "！", "？", ".", "!", "?")):
-        return f"{fact_excerpt}这段在说什么？"
     return f"{fact_excerpt} 这段在说什么？"
 
 
-def _collect_existing_source_keys(
+def _collect_existing_fingerprints(
     approved_dataset: AskBenchmarkDataset,
     backlog: AskBenchmarkReviewBacklog,
 ) -> set[str]:
-    source_keys: set[str] = set()
+    fingerprints: set[str] = set()
     for case in approved_dataset.cases:
         for locator in case.expected_relevant_locators:
-            source_keys.add(_source_key(locator.note_path, locator.heading_path))
+            fingerprints.add(
+                _candidate_fingerprint(
+                    note_path=locator.note_path,
+                    heading_path=locator.heading_path,
+                    user_query=case.user_query,
+                )
+            )
     for item in backlog.items:
         for locator in item.expected_relevant_locators:
-            source_keys.add(_source_key(locator.note_path, locator.heading_path))
-    return source_keys
+            fingerprints.add(
+                _candidate_fingerprint(
+                    note_path=locator.note_path,
+                    heading_path=locator.heading_path,
+                    user_query=item.user_query,
+                )
+            )
+    return fingerprints
 
 
-def _source_key(note_path: str, heading_path: str) -> str:
-    return "\n".join(
+def _candidate_fingerprint(*, note_path: str, heading_path: str, user_query: str) -> str:
+    raw = "\n".join(
         [
             note_path.strip().replace("\\", "/"),
             heading_path.strip(),
+            user_query.strip(),
         ]
     )
-
-
-def _candidate_key(note_path: str, heading_path: str, kind: CandidateKind) -> str:
-    return hashlib.sha1(
-        "\n".join(
-            [
-                note_path.strip().replace("\\", "/"),
-                heading_path.strip(),
-                kind,
-            ]
-        ).encode("utf-8")
-    ).hexdigest()
+    return hashlib.sha1(raw.encode("utf-8")).hexdigest()
 
 
 __all__ = [
