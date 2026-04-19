@@ -100,23 +100,6 @@ def validate_ask_benchmark_review_backlog(
         else:
             case_ids.add(item.case_id)
 
-        item_effective_fingerprints = _backlog_item_effective_fingerprints(item)
-        if item.fingerprint in stored_fingerprints:
-            result.errors.append(f"{item_prefix}.fingerprint={item.fingerprint!r} is duplicated.")
-        else:
-            stored_fingerprints.add(item.fingerprint)
-
-        if item.fingerprint not in item_effective_fingerprints:
-            result.errors.append(
-                f"{item_prefix}.fingerprint does not match the content-derived fingerprint."
-            )
-
-        if effective_fingerprints.intersection(item_effective_fingerprints):
-            result.errors.append(
-                f"{item_prefix}.fingerprint overlaps with another backlog item."
-            )
-        effective_fingerprints.update(item_effective_fingerprints)
-
         case_result = validate_ask_benchmark_dataset(
             AskBenchmarkDataset.model_construct(
                 schema_version=1,
@@ -133,6 +116,31 @@ def validate_ask_benchmark_review_backlog(
         )
         result.errors.extend(f"{item_prefix}.{message}" for message in case_result.errors)
         result.warnings.extend(f"{item_prefix}.{message}" for message in case_result.warnings)
+
+        item_effective_fingerprints = _backlog_item_effective_fingerprints(item)
+        item_effective_fingerprint = _single_effective_fingerprint(
+            item_effective_fingerprints,
+            prefix=f"{item_prefix}.fingerprint",
+            kind="backlog item",
+            result=result,
+        )
+        if item_effective_fingerprint is None:
+            continue
+        if item.fingerprint in stored_fingerprints:
+            result.errors.append(f"{item_prefix}.fingerprint={item.fingerprint!r} is duplicated.")
+        else:
+            stored_fingerprints.add(item.fingerprint)
+
+        if item.fingerprint != item_effective_fingerprint:
+            result.errors.append(
+                f"{item_prefix}.fingerprint does not match the content-derived fingerprint."
+            )
+
+        if item_effective_fingerprint in effective_fingerprints:
+            result.errors.append(
+                f"{item_prefix}.fingerprint overlaps with another backlog item."
+            )
+        effective_fingerprints.add(item_effective_fingerprint)
 
     return result
 
@@ -156,8 +164,8 @@ def apply_review_outcomes(
             backlog_case_ids=[],
         )
 
-    approved_dataset = _load_dataset_or_empty(dataset_path)
-    review_backlog = _load_backlog_or_empty(backlog_path)
+    approved_dataset = _load_dataset_required(dataset_path)
+    review_backlog = _load_backlog_required(backlog_path)
     candidates_by_case_id = _group_candidates_by_case_id(candidate_batch)
     decision_by_case_id = _index_decisions(review_decisions)
 
@@ -217,8 +225,12 @@ def apply_review_outcomes(
     if backlog_validation.errors:
         raise ValueError("; ".join(backlog_validation.errors))
 
-    write_ask_benchmark_dataset(prospective_dataset, dataset_path)
-    write_ask_benchmark_backlog(prospective_backlog, backlog_path)
+    _write_review_outputs_atomic(
+        prospective_dataset=prospective_dataset,
+        prospective_backlog=prospective_backlog,
+        dataset_path=dataset_path,
+        backlog_path=backlog_path,
+    )
 
     return ReviewApplyResult(
         approved_count=len(approved_case_ids),
@@ -235,9 +247,16 @@ def validate_ask_benchmark_review_files(
     backlog_path: Path,
     vault_root: Path,
 ) -> ValidationResult:
-    dataset = _load_dataset_or_empty(dataset_path)
-    backlog = _load_backlog_or_empty(backlog_path)
+    result = ValidationResult()
+    if not dataset_path.exists():
+        result.errors.append(f"dataset_path {str(dataset_path)!r} does not exist.")
+    if not backlog_path.exists():
+        result.errors.append(f"backlog_path {str(backlog_path)!r} does not exist.")
+    if result.errors:
+        return result
 
+    dataset = load_ask_benchmark_dataset(dataset_path)
+    backlog = load_ask_benchmark_backlog(backlog_path)
     dataset_result = validate_ask_benchmark_dataset(dataset, vault_root)
     backlog_result = validate_ask_benchmark_review_backlog(
         backlog,
@@ -245,7 +264,6 @@ def validate_ask_benchmark_review_files(
         known_case_ids={case.case_id for case in dataset.cases},
     )
 
-    result = ValidationResult()
     result.errors.extend(dataset_result.errors)
     result.errors.extend(backlog_result.errors)
     result.warnings.extend(dataset_result.warnings)
@@ -320,20 +338,27 @@ def _reject_duplicate_candidates(candidates: list[AskBenchmarkCandidate]) -> Non
         if candidate.case_id in case_ids:
             raise ValueError(f"duplicate case_id {candidate.case_id!r} in candidate batch.")
         candidate_effective_fingerprints = _candidate_effective_fingerprints(candidate)
-        if candidate.fingerprint not in candidate_effective_fingerprints:
+        candidate_effective_fingerprint = _single_effective_fingerprint(
+            candidate_effective_fingerprints,
+            prefix=f"{candidate.case_id}.fingerprint",
+            kind="candidate",
+        )
+        if candidate_effective_fingerprint is None:
+            raise ValueError(
+                f"fingerprint identity is ambiguous for candidate {candidate.case_id!r}."
+            )
+        if candidate.fingerprint != candidate_effective_fingerprint:
             raise ValueError(
                 f"fingerprint {candidate.fingerprint!r} does not match the content-derived fingerprint."
             )
         if candidate.fingerprint in stored_fingerprints:
             raise ValueError(f"duplicate fingerprint {candidate.fingerprint!r} in candidate batch.")
-        if effective_fingerprints.intersection(candidate_effective_fingerprints):
-            duplicate_fingerprint = sorted(
-                effective_fingerprints.intersection(candidate_effective_fingerprints)
-            )[0]
+        if candidate_effective_fingerprint in effective_fingerprints:
+            duplicate_fingerprint = candidate_effective_fingerprint
             raise ValueError(f"duplicate fingerprint {duplicate_fingerprint!r} in candidate batch.")
         case_ids.add(candidate.case_id)
         stored_fingerprints.add(candidate.fingerprint)
-        effective_fingerprints.update(candidate_effective_fingerprints)
+        effective_fingerprints.add(candidate_effective_fingerprint)
 
 
 def _reject_persisted_collisions(
@@ -346,9 +371,19 @@ def _reject_persisted_collisions(
     for candidate in candidates:
         if candidate.case_id in existing_case_ids:
             raise ValueError(f"case_id {candidate.case_id!r} already exists in benchmark data.")
-        for fingerprint in _candidate_effective_fingerprints(candidate):
-            if fingerprint in existing_fingerprints:
-                raise ValueError(f"fingerprint {fingerprint!r} already exists in benchmark data.")
+        candidate_effective_fingerprint = _single_effective_fingerprint(
+            _candidate_effective_fingerprints(candidate),
+            prefix=f"{candidate.case_id}.fingerprint",
+            kind="candidate",
+        )
+        if candidate_effective_fingerprint is None:
+            raise ValueError(
+                f"fingerprint identity is ambiguous for candidate {candidate.case_id!r}."
+            )
+        if candidate_effective_fingerprint in existing_fingerprints:
+            raise ValueError(
+                f"fingerprint {candidate_effective_fingerprint!r} already exists in benchmark data."
+            )
 
 
 def _collect_persisted_fingerprints(
@@ -414,6 +449,52 @@ def _collect_backlog_fingerprints(backlog: AskBenchmarkReviewBacklog) -> set[str
     for item in backlog.items:
         fingerprints.update(_backlog_item_effective_fingerprints(item))
     return fingerprints
+
+
+def _single_effective_fingerprint(
+    fingerprints: set[str],
+    *,
+    prefix: str,
+    kind: str,
+    result: ValidationResult | None = None,
+) -> str | None:
+    if len(fingerprints) == 1:
+        return next(iter(fingerprints))
+    message = f"{prefix} fingerprint identity is ambiguous for the resolved locators."
+    if result is not None:
+        result.errors.append(message)
+        return None
+    raise ValueError(f"fingerprint identity is ambiguous for {kind}.")
+
+
+def _load_dataset_required(path: Path) -> AskBenchmarkDataset:
+    if not path.exists():
+        raise FileNotFoundError(f"dataset_path {str(path)!r} does not exist.")
+    return load_ask_benchmark_dataset(path)
+
+
+def _load_backlog_required(path: Path) -> AskBenchmarkReviewBacklog:
+    if not path.exists():
+        raise FileNotFoundError(f"backlog_path {str(path)!r} does not exist.")
+    return load_ask_benchmark_backlog(path)
+
+
+def _write_review_outputs_atomic(
+    *,
+    prospective_dataset: AskBenchmarkDataset,
+    prospective_backlog: AskBenchmarkReviewBacklog,
+    dataset_path: Path,
+    backlog_path: Path,
+) -> None:
+    original_dataset_text = dataset_path.read_text(encoding="utf-8")
+    original_backlog_text = backlog_path.read_text(encoding="utf-8")
+    try:
+        write_ask_benchmark_dataset(prospective_dataset, dataset_path)
+        write_ask_benchmark_backlog(prospective_backlog, backlog_path)
+    except Exception:
+        dataset_path.write_text(original_dataset_text, encoding="utf-8")
+        backlog_path.write_text(original_backlog_text, encoding="utf-8")
+        raise
 
 
 def _build_arg_parser() -> argparse.ArgumentParser:
@@ -511,7 +592,7 @@ def main(argv: list[str] | None = None) -> int:
     try:
         args = parser.parse_args(argv)
         return args.func(args)
-    except (FileNotFoundError, json.JSONDecodeError, ValidationError, ValueError) as exc:
+    except (OSError, json.JSONDecodeError, ValidationError, ValueError) as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
         return 1
 

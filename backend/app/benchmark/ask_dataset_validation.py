@@ -37,6 +37,15 @@ def validate_ask_benchmark_case(case: AskBenchmarkCase, vault_root: Path) -> Val
     result = ValidationResult()
     _validate_expected_paths(case, vault_root, result)
 
+    if not case.expected_relevant_paths:
+        result.errors.append(f"{case.case_id}.expected_relevant_paths must not be empty.")
+    if not case.expected_relevant_locators:
+        result.errors.append(f"{case.case_id}.expected_relevant_locators must not be empty.")
+    if not case.expected_facts:
+        result.errors.append(f"{case.case_id}.expected_facts must not be empty.")
+
+    expected_paths = {path for path in case.expected_relevant_paths if isinstance(path, str) and path.strip()}
+
     for locator_index, locator in enumerate(case.expected_relevant_locators):
         locator_prefix = f"{case.case_id}.expected_relevant_locators[{locator_index}]"
         if not isinstance(locator.note_path, str) or not locator.note_path.strip():
@@ -59,6 +68,11 @@ def validate_ask_benchmark_case(case: AskBenchmarkCase, vault_root: Path) -> Val
         if not isinstance(locator.excerpt_anchor, str) or not locator.excerpt_anchor.strip():
             result.errors.append(f"{locator_prefix}.excerpt_anchor must be a non-empty string.")
             continue
+
+        if expected_paths and locator.note_path not in expected_paths:
+            result.errors.append(
+                f"{locator_prefix}.note_path={locator.note_path!r} is not listed in expected_relevant_paths."
+            )
 
         selected_chunk, line_range_warning, line_range_error = _assess_locator_scope(
             heading_chunks,

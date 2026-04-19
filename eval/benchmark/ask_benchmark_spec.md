@@ -73,6 +73,10 @@ during apply-review.
 file are applied; unreviewed candidates from the batch are skipped and reported in the
 operator success output.
 
+Review-file validation is strict. Every reviewed candidate or backlog item must have
+non-empty `expected_relevant_paths`, `expected_relevant_locators`, and `expected_facts`,
+and each locator `note_path` must appear in `expected_relevant_paths`.
+
 ## Commands
 
 Load the formal dataset:

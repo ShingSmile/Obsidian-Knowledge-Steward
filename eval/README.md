@@ -61,6 +61,10 @@
 
 `apply-review` 支持 partial review 文件：只会处理 `--review` 中出现的 case，其余 batch 条目会被跳过，并在成功输出里显式报告 skipped 数量。
 
+review 文件的校验是严格的：每个被 review 的 candidate 或 backlog item 都必须提供非空的
+`expected_relevant_paths`、`expected_relevant_locators` 和 `expected_facts`，并且每个 locator 的
+`note_path` 必须出现在 `expected_relevant_paths` 中。
+
 路径覆盖参数 `--dataset`、`--backlog`、`--vault-root` 都可用于临时副本或 smoke test，不会强制写入正式文件。
 
 后续如需继续扩样本，优先补齐：
