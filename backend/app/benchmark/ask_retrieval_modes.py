@@ -83,6 +83,17 @@ def _dispatch_retrieval_mode(
                 limit=RETRIEVAL_BENCHMARK_LIMIT,
             )
         case RetrievalBenchmarkMode.HYBRID_RRF:
+            vector_probe_response = search_chunk_vectors(
+                connection,
+                query,
+                settings=settings,
+                limit=RETRIEVAL_BENCHMARK_LIMIT,
+            )
+            if vector_probe_response.disabled:
+                reason = vector_probe_response.disabled_reason or "disabled"
+                raise RetrievalBenchmarkModeError(
+                    f"Retrieval mode {mode.value} is disabled: {reason}"
+                )
             return search_hybrid_chunks(
                 connection,
                 query,

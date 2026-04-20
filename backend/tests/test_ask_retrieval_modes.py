@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import unittest
+from contextlib import ExitStack
 from unittest.mock import patch, sentinel
 
 from app.benchmark.ask_retrieval_modes import (
@@ -61,7 +62,15 @@ class AskRetrievalModesTest(unittest.TestCase):
         for mode, patch_target, query, expected_kwargs in cases:
             with self.subTest(mode=mode):
                 response = RetrievalSearchResponse(candidates=[candidate])
-                with patch(patch_target, return_value=response) as mocked_search:
+                with ExitStack() as stack:
+                    mocked_search = stack.enter_context(patch(patch_target, return_value=response))
+                    if mode == RetrievalBenchmarkMode.HYBRID_RRF:
+                        stack.enter_context(
+                            patch(
+                                "app.benchmark.ask_retrieval_modes.search_chunk_vectors",
+                                return_value=RetrievalSearchResponse(candidates=[candidate]),
+                            )
+                        )
                     result = run_retrieval_mode(
                         connection=connection,
                         query=query,
@@ -101,21 +110,55 @@ class AskRetrievalModesTest(unittest.TestCase):
 
         self.assertIn("vector_index_not_ready", str(ctx.exception))
 
+    def test_run_retrieval_mode_raises_for_hybrid_when_vector_backend_is_disabled(self) -> None:
+        settings = get_settings()
+        connection = sentinel.connection
+        candidate = _candidate()
+        vector_disabled_response = RetrievalSearchResponse(
+            candidates=[],
+            disabled=True,
+            disabled_reason="no_available_embedding_provider",
+        )
+        hybrid_partial_response = RetrievalSearchResponse(candidates=[candidate])
+
+        with patch(
+            "app.benchmark.ask_retrieval_modes.search_chunk_vectors",
+            return_value=vector_disabled_response,
+        ):
+            with patch(
+                "app.benchmark.ask_retrieval_modes.search_hybrid_chunks",
+                return_value=hybrid_partial_response,
+            ):
+                with self.assertRaises(RetrievalBenchmarkModeError) as ctx:
+                    run_retrieval_mode(
+                        connection=connection,
+                        query="hybrid query",
+                        settings=settings,
+                        mode=RetrievalBenchmarkMode.HYBRID_RRF,
+                    )
+
+        self.assertIn("no_available_embedding_provider", str(ctx.exception))
+
     def test_run_retrieval_mode_wraps_backend_exceptions(self) -> None:
         settings = get_settings()
         connection = sentinel.connection
+        probe_response = RetrievalSearchResponse(candidates=[_candidate()])
 
         with patch(
-            "app.benchmark.ask_retrieval_modes.search_hybrid_chunks",
-            side_effect=RuntimeError("backend exploded"),
+            "app.benchmark.ask_retrieval_modes.search_chunk_vectors",
+            return_value=probe_response,
         ):
-            with self.assertRaises(RetrievalBenchmarkModeError) as ctx:
-                run_retrieval_mode(
-                    connection=connection,
-                    query="hybrid query",
-                    settings=settings,
-                    mode=RetrievalBenchmarkMode.HYBRID_RRF,
-                )
+            with patch(
+                "app.benchmark.ask_retrieval_modes.search_hybrid_chunks",
+                side_effect=RuntimeError("backend exploded"),
+            ):
+                with self.assertRaises(RetrievalBenchmarkModeError) as ctx:
+                    run_retrieval_mode(
+                        connection=connection,
+                        query="hybrid query",
+                        settings=settings,
+                        mode=RetrievalBenchmarkMode.HYBRID_RRF,
+                    )
 
         self.assertIn("backend exploded", str(ctx.exception))
 
