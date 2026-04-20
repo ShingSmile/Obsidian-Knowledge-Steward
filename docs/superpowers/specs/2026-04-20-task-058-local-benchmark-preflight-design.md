@@ -222,6 +222,10 @@ The result should include at least:
 - `model_name`
 - `message`
 
+`provider_name` and `model_name` may be empty only when no exact local target
+can be resolved. For every probe-capable status, both fields should be
+populated from the strict local target that was selected.
+
 Allowed `status` values:
 
 - `ok`
@@ -239,14 +243,25 @@ The intended evaluation order is:
 4. if the probe fails:
    - return `provider_unreachable_or_model_unavailable`
 5. if the probe succeeds:
-   - inspect the benchmark DB for chunk embeddings matching
-     `provider_key + model_name`
-6. if no matching embeddings exist:
+   - inspect the benchmark DB for exact provider/model embedding coverage
+6. if the benchmark DB does not have full chunk coverage for that exact
+   `provider_key + model_name` pair:
    - return `vector_index_not_ready`
 7. otherwise:
    - return `ok`
 
 The CLI should treat only `ok` as runnable.
+
+For this follow-up, "vector index ready" should mean:
+
+- the benchmark DB has at least one chunk row
+- the number of `chunk_embedding` rows for the exact local
+  `provider_key + model_name` pair equals the number of rows in `chunk`
+
+Any shortfall should be treated as `vector_index_not_ready`, including partial
+coverage. This is intentionally stricter than the earlier ad hoc benchmark
+smoke runs, because the goal here is to avoid publishing retrieval numbers on a
+partially indexed corpus.
 
 ## 5. Error Semantics
 
@@ -258,13 +273,12 @@ This means no exact local embedding target can be constructed.
 
 Typical causes:
 
-- `KS_DEFAULT_MODEL_PROVIDER` is not set to `local`
 - `KS_LOCAL_BASE_URL` is blank
 - `KS_LOCAL_EMBEDDING_MODEL` is blank
 
 Expected message shape:
 
-- `Local embedding provider is not configured for TASK-058 benchmark. Set KS_DEFAULT_MODEL_PROVIDER=local and provide KS_LOCAL_BASE_URL plus KS_LOCAL_EMBEDDING_MODEL.`
+- `Local embedding provider is not configured for TASK-058 benchmark. Provide KS_LOCAL_BASE_URL plus KS_LOCAL_EMBEDDING_MODEL.`
 
 ### 5.2 Provider Unreachable Or Model Unavailable
 
@@ -280,7 +294,7 @@ Typical causes:
 
 Expected message shape:
 
-- `Local embedding provider probe failed for ollama/<model>.`
+- `Local embedding provider probe failed for <provider_name>/<model_name>.`
 
 If implementation can safely preserve a short underlying error detail without
 destabilizing tests, that detail may be appended. It is advisory, not required
@@ -293,7 +307,7 @@ contain chunk embeddings for that exact provider/model pair.
 
 Expected message shape:
 
-- `Vector index is not ready for local provider ollama/<model>. Run ingest to build chunk embeddings before benchmarking.`
+- `Vector index is not ready for local provider <provider_name>/<model_name>. Run ingest to build chunk embeddings before benchmarking.`
 
 This path is intentionally read-only. It must not auto-run ingest.
 
@@ -301,7 +315,7 @@ This path is intentionally read-only. It must not auto-run ingest.
 
 When preflight passes, the message can remain short:
 
-- `Local embedding preflight passed for ollama/<model>.`
+- `Local embedding preflight passed for <provider_name>/<model_name>.`
 
 Success output is mainly useful for tests and optional terminal diagnostics.
 
