@@ -270,7 +270,7 @@ class AskRetrievalBenchmarkTest(unittest.TestCase):
             mocked_write_result.assert_called_once_with(result, output_path)
             connection.close.assert_called_once_with()
 
-    def test_run_ask_retrieval_benchmark_fails_closed_on_mode_error_and_closes_connection(self) -> None:
+    def test_run_ask_retrieval_benchmark_fails_closed_on_mid_mode_error_and_closes_connection(self) -> None:
         dataset = _dataset(
             _case(case_id="case-1"),
             _case(case_id="case-2", bucket="multi_hop", locator=_locator(excerpt_anchor="beta evidence")),
@@ -298,6 +298,7 @@ class AskRetrievalBenchmarkTest(unittest.TestCase):
                             side_effect=[
                                 [_candidate(chunk_id="fts-1", text="alpha evidence")],
                                 [_candidate(chunk_id="fts-2", text="beta evidence")],
+                                [_candidate(chunk_id="vector-1", text="alpha evidence", retrieval_source="sqlite_vector")],
                                 RetrievalBenchmarkModeError("Retrieval mode vector_only is disabled: vector_index_not_ready"),
                             ],
                         ) as mocked_run_mode:
@@ -317,12 +318,16 @@ class AskRetrievalBenchmarkTest(unittest.TestCase):
         self.assertEqual(result["modes"]["hybrid_rrf"]["status"], "not_run")
         self.assertIn("stopped after mode failure", result["modes"]["hybrid_rrf"]["failure_reason"])
         self.assertEqual(len(result["cases"][0]["mode_results"]), 1)
+        self.assertEqual(result["cases"][0]["mode_results"][0]["mode"], "fts_only")
+        self.assertEqual(len(result["cases"][1]["mode_results"]), 1)
+        self.assertEqual(result["cases"][1]["mode_results"][0]["mode"], "fts_only")
         self.assertEqual(
             mocked_run_mode.call_args_list,
             [
                 call(connection=connection, query="query for case-1", settings=settings, mode=RetrievalBenchmarkMode.FTS_ONLY),
                 call(connection=connection, query="query for case-2", settings=settings, mode=RetrievalBenchmarkMode.FTS_ONLY),
                 call(connection=connection, query="query for case-1", settings=settings, mode=RetrievalBenchmarkMode.VECTOR_ONLY),
+                call(connection=connection, query="query for case-2", settings=settings, mode=RetrievalBenchmarkMode.VECTOR_ONLY),
             ],
         )
         connection.close.assert_called_once_with()

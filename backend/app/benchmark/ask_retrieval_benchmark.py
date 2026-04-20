@@ -122,8 +122,9 @@ def run_ask_retrieval_benchmark(
         for mode_index, mode in enumerate(_TASK_058_V1_MODES):
             mode_key = mode.value
             mode_case_metrics: list[dict[str, object]] = []
+            pending_mode_results: list[dict[str, object]] = []
             try:
-                for case, case_record in zip(selected_cases, result["cases"], strict=True):
+                for case in selected_cases:
                     candidates = run_retrieval_mode(
                         connection=connection,
                         query=case.user_query,
@@ -132,7 +133,7 @@ def run_ask_retrieval_benchmark(
                     )
                     case_metrics = compute_case_mode_metrics(case.expected_relevant_locators, candidates)
                     mode_case_metrics.append(case_metrics)
-                    case_record["mode_results"].append(
+                    pending_mode_results.append(
                         {
                             "mode": mode_key,
                             "top_k": RETRIEVAL_BENCHMARK_LIMIT,
@@ -154,6 +155,9 @@ def run_ask_retrieval_benchmark(
                         "failure_reason"
                     ] = "benchmark stopped after mode failure"
                 break
+
+            for case_record, mode_result in zip(result["cases"], pending_mode_results, strict=True):
+                case_record["mode_results"].append(mode_result)
 
             completed_modes.append(mode_key)
             case_metrics_by_mode[mode_key] = mode_case_metrics
