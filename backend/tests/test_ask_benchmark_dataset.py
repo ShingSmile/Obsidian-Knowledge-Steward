@@ -444,7 +444,13 @@ class AskBenchmarkDatasetTests(unittest.TestCase):
 
     def test_seeded_dataset_file_has_minimal_shape(self) -> None:
         payload = json.loads((ASK_BENCHMARK_DIR / "ask_benchmark_cases.json").read_text(encoding="utf-8"))
-        self.assertEqual(payload, {"schema_version": 1, "cases": []})
+        self.assertEqual(payload["schema_version"], 1)
+        self.assertIsInstance(payload["cases"], list)
+        self.assertGreaterEqual(len(payload["cases"]), 1)
+
+        loaded = load_ask_benchmark_dataset(ASK_BENCHMARK_DIR / "ask_benchmark_cases.json")
+        self.assertEqual(loaded.schema_version, 1)
+        self.assertEqual(len(loaded.cases), len(payload["cases"]))
 
     def test_seeded_backlog_file_has_minimal_shape(self) -> None:
         payload = json.loads((ASK_BENCHMARK_DIR / "ask_benchmark_review_backlog.json").read_text(encoding="utf-8"))

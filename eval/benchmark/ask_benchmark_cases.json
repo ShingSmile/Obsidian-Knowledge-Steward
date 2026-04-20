@@ -1,4 +1,1949 @@
 {
   "schema_version": 1,
-  "cases": []
+  "cases": [
+    {
+      "case_id": "ask_case_001",
+      "bucket": "single_hop",
+      "user_query": "2023-06-05 的工作任务里有哪些还没完成的事项？",
+      "source_origin": "sample_vault",
+      "expected_relevant_paths": [
+        "日常/2023-06/2023-06-05_星期一.md"
+      ],
+      "expected_relevant_locators": [
+        {
+          "note_path": "日常/2023-06/2023-06-05_星期一.md",
+          "heading_path": "一、 工作任务",
+          "line_range": {
+            "start_line": 1,
+            "end_line": 5
+          },
+          "excerpt_anchor": "对v6.2.5迭代进行总结复盘"
+        }
+      ],
+      "expected_facts": [
+        "对v6.2.5迭代进行总结复盘",
+        "自测相关"
+      ],
+      "forbidden_claims": [
+        "不要编造笔记中没有出现的细节。"
+      ],
+      "allow_tool": false,
+      "expected_tool_names": [],
+      "allow_retrieval_only": false,
+      "should_generate_answer": true,
+      "review_status": "approved",
+      "review_notes": "manual batch 001 approved by user"
+    },
+    {
+      "case_id": "ask_case_002",
+      "bucket": "single_hop",
+      "user_query": "2023-07-17 的今日总结里有哪些待完成事项？",
+      "source_origin": "sample_vault",
+      "expected_relevant_paths": [
+        "日常/2023-07/2023-07-17_星期一.md"
+      ],
+      "expected_relevant_locators": [
+        {
+          "note_path": "日常/2023-07/2023-07-17_星期一.md",
+          "heading_path": "四、今日总结",
+          "line_range": {
+            "start_line": 28,
+            "end_line": 37
+          },
+          "excerpt_anchor": "v6.3.0复盘总结"
+        }
+      ],
+      "expected_facts": [
+        "v6.3.0复盘总结",
+        "多商行账号需求梳理"
+      ],
+      "forbidden_claims": [
+        "不要编造笔记中没有出现的细节。"
+      ],
+      "allow_tool": false,
+      "expected_tool_names": [],
+      "allow_retrieval_only": false,
+      "should_generate_answer": true,
+      "review_status": "approved",
+      "review_notes": "manual batch 001 approved by user"
+    },
+    {
+      "case_id": "ask_case_003",
+      "bucket": "single_hop",
+      "user_query": "v6.2.5 迭代总结里列了哪些优化点？",
+      "source_origin": "sample_vault",
+      "expected_relevant_paths": [
+        "日常/2023-06/v6.2.5迭代总结.md"
+      ],
+      "expected_relevant_locators": [
+        {
+          "note_path": "日常/2023-06/v6.2.5迭代总结.md",
+          "heading_path": "二、任务总结 > 2、优化点",
+          "line_range": {
+            "start_line": 26,
+            "end_line": 29
+          },
+          "excerpt_anchor": "对业务特征积累熟练度，提高阅读代码的效率"
+        }
+      ],
+      "expected_facts": [
+        "对业务特征积累熟练度，提高阅读代码的效率",
+        "建立起修改代码以及新建接口代码的大致标准化流程",
+        "提高代码书写质量，减少代码优化环节时间"
+      ],
+      "forbidden_claims": [
+        "不要编造笔记中没有出现的细节。"
+      ],
+      "allow_tool": false,
+      "expected_tool_names": [],
+      "allow_retrieval_only": false,
+      "should_generate_answer": true,
+      "review_status": "approved",
+      "review_notes": "manual batch 001 approved by user"
+    },
+    {
+      "case_id": "ask_case_004",
+      "bucket": "single_hop",
+      "user_query": "v6.4.0 复盘总结里，整体回顾提到什么任务有点超时？",
+      "source_origin": "sample_vault",
+      "expected_relevant_paths": [
+        "日常/2023-08/v6.4.0复盘总结.md"
+      ],
+      "expected_relevant_locators": [
+        {
+          "note_path": "日常/2023-08/v6.4.0复盘总结.md",
+          "heading_path": "一、周报及任务汇总",
+          "line_range": {
+            "start_line": 51,
+            "end_line": 55
+          },
+          "excerpt_anchor": "前期的任务时间基本符合预期，就是最后的多商行登录需求有点超时，请了半天假"
+        }
+      ],
+      "expected_facts": [
+        "前期的任务时间基本符合预期，就是最后的多商行登录需求有点超时，请了半天假"
+      ],
+      "forbidden_claims": [
+        "不要编造笔记中没有出现的细节。"
+      ],
+      "allow_tool": false,
+      "expected_tool_names": [],
+      "allow_retrieval_only": false,
+      "should_generate_answer": true,
+      "review_status": "approved",
+      "review_notes": "manual batch 001 approved by user"
+    },
+    {
+      "case_id": "ask_case_005",
+      "bucket": "single_hop",
+      "user_query": "v6.4.0 迭代任务里，档主手机号校验的基础校验逻辑有哪些？",
+      "source_origin": "sample_vault",
+      "expected_relevant_paths": [
+        "日常/2023-08/v6.4.0迭代任务.md"
+      ],
+      "expected_relevant_locators": [
+        {
+          "note_path": "日常/2023-08/v6.4.0迭代任务.md",
+          "heading_path": "一、账号多商行登录 > （一）需求分析",
+          "line_range": {
+            "start_line": 4,
+            "end_line": 9
+          },
+          "excerpt_anchor": "不能存在集团账号：orgId>0"
+        }
+      ],
+      "expected_facts": [
+        "不能存在集团账号：orgId>0",
+        "(不能存在档主账号)：type不能为1",
+        "在本商行不能重复：根据type去员工或档主表查询，stallId不能与当前商行id相同"
+      ],
+      "forbidden_claims": [
+        "不要编造笔记中没有出现的细节。"
+      ],
+      "allow_tool": false,
+      "expected_tool_names": [],
+      "allow_retrieval_only": false,
+      "should_generate_answer": true,
+      "review_status": "approved",
+      "review_notes": "manual batch 001 approved by user"
+    },
+    {
+      "case_id": "ask_case_006",
+      "bucket": "metadata_filter",
+      "user_query": "2023-11-17 的总结里记录了哪些 jdk 升级问题？",
+      "source_origin": "sample_vault",
+      "expected_relevant_paths": [
+        "日常/2023-11-17_星期五.md"
+      ],
+      "expected_relevant_locators": [
+        {
+          "note_path": "日常/2023-11-17_星期五.md",
+          "heading_path": "Summary",
+          "line_range": {
+            "start_line": 20,
+            "end_line": 25
+          },
+          "excerpt_anchor": "第一个问题，maven版本升级之后idea版本跟不上，内置的maven命令直接报错"
+        }
+      ],
+      "expected_facts": [
+        "maven版本升级之后idea版本跟不上，内置的maven命令直接报错",
+        "maven配置里下载源忘记同步更新",
+        "最后在pom右键中的maven选择reload project解决问题"
+      ],
+      "forbidden_claims": [
+        "不要编造笔记中没有出现的细节。"
+      ],
+      "allow_tool": false,
+      "expected_tool_names": [],
+      "allow_retrieval_only": false,
+      "should_generate_answer": true,
+      "review_status": "approved",
+      "review_notes": "manual batch 002 approved by user"
+    },
+    {
+      "case_id": "ask_case_007",
+      "bucket": "metadata_filter",
+      "user_query": "2023-10-18 的总结里，复盘会给了什么提醒？",
+      "source_origin": "sample_vault",
+      "expected_relevant_paths": [
+        "日常/2023-10/2023-10-18_星期三.md"
+      ],
+      "expected_relevant_locators": [
+        {
+          "note_path": "日常/2023-10/2023-10-18_星期三.md",
+          "heading_path": "Summary",
+          "line_range": {
+            "start_line": 22,
+            "end_line": 28
+          },
+          "excerpt_anchor": "复盘是阶段性地调整和提醒自己"
+        }
+      ],
+      "expected_facts": [
+        "复盘是阶段性地调整和提醒自己",
+        "团队内成员直接或在分享中给予自己一些提醒",
+        "有些别人分享的问题自己可能也有，只是暂时没暴露出来"
+      ],
+      "forbidden_claims": [
+        "不要编造笔记中没有出现的细节。"
+      ],
+      "allow_tool": false,
+      "expected_tool_names": [],
+      "allow_retrieval_only": false,
+      "should_generate_answer": true,
+      "review_status": "approved",
+      "review_notes": "manual batch 002 approved by user"
+    },
+    {
+      "case_id": "ask_case_008",
+      "bucket": "metadata_filter",
+      "user_query": "2023-08-24 的总结提到，遇到迭代需求之外的功能时应该怎么处理？",
+      "source_origin": "sample_vault",
+      "expected_relevant_paths": [
+        "日常/2023-08/2023-08-24_星期四.md"
+      ],
+      "expected_relevant_locators": [
+        {
+          "note_path": "日常/2023-08/2023-08-24_星期四.md",
+          "heading_path": "Summary",
+          "line_range": {
+            "start_line": 21,
+            "end_line": 24
+          },
+          "excerpt_anchor": "一定要预估好影响范围并及时沟通决定是否要做"
+        }
+      ],
+      "expected_facts": [
+        "一定要预估好影响范围并及时沟通决定是否要做",
+        "不能闷头改"
+      ],
+      "forbidden_claims": [
+        "不要编造笔记中没有出现的细节。"
+      ],
+      "allow_tool": false,
+      "expected_tool_names": [],
+      "allow_retrieval_only": false,
+      "should_generate_answer": true,
+      "review_status": "approved",
+      "review_notes": "manual batch 002 approved by user"
+    },
+    {
+      "case_id": "ask_case_009",
+      "bucket": "metadata_filter",
+      "user_query": "2023-06-12 的今日进程总结了哪些结算重构功能模块？",
+      "source_origin": "sample_vault",
+      "expected_relevant_paths": [
+        "日常/2023-06/2023-06-12_星期一.md"
+      ],
+      "expected_relevant_locators": [
+        {
+          "note_path": "日常/2023-06/2023-06-12_星期一.md",
+          "heading_path": "三、今日进程",
+          "line_range": {
+            "start_line": 17,
+            "end_line": 58
+          },
+          "excerpt_anchor": "结算重构功能总结："
+        }
+      ],
+      "expected_facts": [
+        "批次结算页面",
+        "结算操作界面",
+        "结算详情",
+        "货主管理详情页面"
+      ],
+      "forbidden_claims": [
+        "不要编造笔记中没有出现的细节。"
+      ],
+      "allow_tool": false,
+      "expected_tool_names": [],
+      "allow_retrieval_only": false,
+      "should_generate_answer": true,
+      "review_status": "approved",
+      "review_notes": "manual batch 002 approved by user"
+    },
+    {
+      "case_id": "ask_case_010",
+      "bucket": "single_hop",
+      "user_query": "v6.3.0 迭代总结里提到的过程特征有哪些？",
+      "source_origin": "sample_vault",
+      "expected_relevant_paths": [
+        "日常/2023-07/v6.3.0迭代总结.md"
+      ],
+      "expected_relevant_locators": [
+        {
+          "note_path": "日常/2023-07/v6.3.0迭代总结.md",
+          "heading_path": "二、任务总结 > 1、过程特征",
+          "line_range": {
+            "start_line": 14,
+            "end_line": 18
+          },
+          "excerpt_anchor": "前期在熟悉代码逻辑，定义api，花费时间较长"
+        }
+      ],
+      "expected_facts": [
+        "前期在熟悉代码逻辑，定义api，花费时间较长",
+        "中期全速开发代码赶进度",
+        "后期做代码优化和sql优化"
+      ],
+      "forbidden_claims": [
+        "不要编造笔记中没有出现的细节。"
+      ],
+      "allow_tool": false,
+      "expected_tool_names": [],
+      "allow_retrieval_only": false,
+      "should_generate_answer": true,
+      "review_status": "approved",
+      "review_notes": "manual batch 002 approved by user"
+    },
+    {
+      "case_id": "ask_case_011",
+      "bucket": "metadata_filter",
+      "user_query": "2023-06-09 的复盘会记录了哪些影响范围？",
+      "source_origin": "sample_vault",
+      "expected_relevant_paths": [
+        "日常/2023-06/2023-06-09_星期五.md"
+      ],
+      "expected_relevant_locators": [
+        {
+          "note_path": "日常/2023-06/2023-06-09_星期五.md",
+          "heading_path": "三、今日进程 > 复盘会、",
+          "line_range": {
+            "start_line": 31,
+            "end_line": 33
+          },
+          "excerpt_anchor": "影响范围："
+        }
+      ],
+      "expected_facts": [
+        "平板端、手机端、财务端",
+        "结算功能、货主管理功能"
+      ],
+      "forbidden_claims": [
+        "不要编造笔记中没有出现的细节。"
+      ],
+      "allow_tool": false,
+      "expected_tool_names": [],
+      "allow_retrieval_only": false,
+      "should_generate_answer": true,
+      "review_status": "approved",
+      "review_notes": "manual batch 003 approved by user"
+    },
+    {
+      "case_id": "ask_case_012",
+      "bucket": "metadata_filter",
+      "user_query": "2023-06-16 的小会议里，周报内容需要包含哪些要求？",
+      "source_origin": "sample_vault",
+      "expected_relevant_paths": [
+        "日常/2023-06/2023-06-16_星期五.md"
+      ],
+      "expected_relevant_locators": [
+        {
+          "note_path": "日常/2023-06/2023-06-16_星期五.md",
+          "heading_path": "三、今日进程",
+          "line_range": {
+            "start_line": 20,
+            "end_line": 30
+          },
+          "excerpt_anchor": "周报命名（姓名+周报所属周五日期）"
+        }
+      ],
+      "expected_facts": [
+        "周报命名（姓名+周报所属周五日期）",
+        "文字不用特别多，但是要有条理",
+        "回顾最近一周的内容",
+        "做了什么，遇到了什么问题，解决了没有，为后端团队或者saas产品线做出了什么帮助"
+      ],
+      "forbidden_claims": [
+        "不要编造笔记中没有出现的细节。"
+      ],
+      "allow_tool": false,
+      "expected_tool_names": [],
+      "allow_retrieval_only": false,
+      "should_generate_answer": true,
+      "review_status": "approved",
+      "review_notes": "manual batch 003 approved by user"
+    },
+    {
+      "case_id": "ask_case_013",
+      "bucket": "metadata_filter",
+      "user_query": "2023-09-05 的总结里，为什么这里没有采用问号参数 SQL？",
+      "source_origin": "sample_vault",
+      "expected_relevant_paths": [
+        "日常/2023-09/2023-09-05_星期二.md"
+      ],
+      "expected_relevant_locators": [
+        {
+          "note_path": "日常/2023-09/2023-09-05_星期二.md",
+          "heading_path": "Summary",
+          "line_range": {
+            "start_line": 38,
+            "end_line": 40
+          },
+          "excerpt_anchor": "这里的做法stallid和personid参数是硬拼进去的，不是问号，与常规不同"
+        }
+      ],
+      "expected_facts": [
+        "这里的做法stallid和personid参数是硬拼进去的，不是问号，与常规不同",
+        "如果new boundsql可以做到问号sql，但是这里就需要在方法参数中必传所有的参数，折中选择的方式",
+        "打问号的sql数据库的解析会缓存"
+      ],
+      "forbidden_claims": [
+        "不要编造笔记中没有出现的细节。"
+      ],
+      "allow_tool": false,
+      "expected_tool_names": [],
+      "allow_retrieval_only": false,
+      "should_generate_answer": true,
+      "review_status": "approved",
+      "review_notes": "manual batch 003 approved by user"
+    },
+    {
+      "case_id": "ask_case_014",
+      "bucket": "metadata_filter",
+      "user_query": "2023-10-07 的总结里，筐子记录相关代码为什么减少了分组字段？",
+      "source_origin": "sample_vault",
+      "expected_relevant_paths": [
+        "日常/2023-10/2023-10-07_星期六.md"
+      ],
+      "expected_relevant_locators": [
+        {
+          "note_path": "日常/2023-10/2023-10-07_星期六.md",
+          "heading_path": "Summary",
+          "line_range": {
+            "start_line": 29,
+            "end_line": 29
+          },
+          "excerpt_anchor": "白天对权限sql提交，看了筐子记录的代码并进行修改，那里的做法是为了查询性能减少了分组字段，因为产生错误几率极低"
+        }
+      ],
+      "expected_facts": [
+        "那里的做法是为了查询性能减少了分组字段",
+        "因为产生错误几率极低"
+      ],
+      "forbidden_claims": [
+        "不要编造笔记中没有出现的细节。"
+      ],
+      "allow_tool": false,
+      "expected_tool_names": [],
+      "allow_retrieval_only": false,
+      "should_generate_answer": true,
+      "review_status": "approved",
+      "review_notes": "manual batch 003 approved by user"
+    },
+    {
+      "case_id": "ask_case_015",
+      "bucket": "single_hop",
+      "user_query": "v6.4.0 复盘总结的下一步计划有哪些？",
+      "source_origin": "sample_vault",
+      "expected_relevant_paths": [
+        "日常/2023-08/v6.4.0复盘总结.md"
+      ],
+      "expected_relevant_locators": [
+        {
+          "note_path": "日常/2023-08/v6.4.0复盘总结.md",
+          "heading_path": "四、下一步计划",
+          "line_range": {
+            "start_line": 86,
+            "end_line": 92
+          },
+          "excerpt_anchor": "记录业务文档"
+        }
+      ],
+      "expected_facts": [
+        "记录业务文档",
+        "学习技术文档",
+        "总结调整工作方法"
+      ],
+      "forbidden_claims": [
+        "不要编造笔记中没有出现的细节。"
+      ],
+      "allow_tool": false,
+      "expected_tool_names": [],
+      "allow_retrieval_only": false,
+      "should_generate_answer": true,
+      "review_status": "approved",
+      "review_notes": "manual batch 003 approved by user"
+    },
+    {
+      "case_id": "ask_case_016",
+      "bucket": "single_hop",
+      "user_query": "v6.3.0 迭代总结里，任务评估提到了哪些难点？",
+      "source_origin": "sample_vault",
+      "expected_relevant_paths": [
+        "日常/2023-07/v6.3.0迭代总结.md"
+      ],
+      "expected_relevant_locators": [
+        {
+          "note_path": "日常/2023-07/v6.3.0迭代总结.md",
+          "heading_path": "一、本次迭代任务 > 2、任务评估",
+          "line_range": {
+            "start_line": 8,
+            "end_line": 10
+          },
+          "excerpt_anchor": "场景复杂度不高，但是其中涉及到的一些字段的计算比较复杂"
+        }
+      ],
+      "expected_facts": [
+        "场景复杂度不高，但是其中涉及到的一些字段的计算比较复杂",
+        "开发时间压力大，包括一些联表sql的调优对于个人而言挑战性比较高"
+      ],
+      "forbidden_claims": [
+        "不要编造笔记中没有出现的细节。"
+      ],
+      "allow_tool": false,
+      "expected_tool_names": [],
+      "allow_retrieval_only": false,
+      "should_generate_answer": true,
+      "review_status": "approved",
+      "review_notes": "manual batch 004 approved by user"
+    },
+    {
+      "case_id": "ask_case_017",
+      "bucket": "single_hop",
+      "user_query": "v6.3.0 迭代总结里，可延续点和存在问题有哪些？",
+      "source_origin": "sample_vault",
+      "expected_relevant_paths": [
+        "日常/2023-07/v6.3.0迭代总结.md"
+      ],
+      "expected_relevant_locators": [
+        {
+          "note_path": "日常/2023-07/v6.3.0迭代总结.md",
+          "heading_path": "二、任务总结 > 4、可延续点和存在问题（流程）",
+          "line_range": {
+            "start_line": 25,
+            "end_line": 29
+          },
+          "excerpt_anchor": "在初期定义api期间阅读之前的代码并记录大致的解决方案"
+        }
+      ],
+      "expected_facts": [
+        "在初期定义api期间阅读之前的代码并记录大致的解决方案，有助于后期开发以及对开发进度的把控",
+        "需要单独预估时间在这个环节，这一次就是因为这个环节的时间的多出而影响整个周期的开发进度",
+        "本身还是会有一些模糊，缺乏一种对需求进行评审的敏感度，能不能做，做出来性能有没有问题",
+        "有问题的时候及时沟通或讨论，避免了一些自己没想到的隐患"
+      ],
+      "forbidden_claims": [
+        "不要编造笔记中没有出现的细节。"
+      ],
+      "allow_tool": false,
+      "expected_tool_names": [],
+      "allow_retrieval_only": false,
+      "should_generate_answer": true,
+      "review_status": "approved",
+      "review_notes": "manual batch 004 approved by user"
+    },
+    {
+      "case_id": "ask_case_018",
+      "bucket": "single_hop",
+      "user_query": "v6.4.0 复盘总结里，修改密码模块暴露出了哪些问题？",
+      "source_origin": "sample_vault",
+      "expected_relevant_paths": [
+        "日常/2023-08/v6.4.0复盘总结.md"
+      ],
+      "expected_relevant_locators": [
+        {
+          "note_path": "日常/2023-08/v6.4.0复盘总结.md",
+          "heading_path": "二、过程问题及可提升的",
+          "line_range": {
+            "start_line": 64,
+            "end_line": 68
+          },
+          "excerpt_anchor": "在做修改密码的模块的时候忽略了老版本兼容问题"
+        }
+      ],
+      "expected_facts": [
+        "在做修改密码的模块的时候忽略了老版本兼容问题",
+        "学习思维比较重，被动接收信息，主动思考的程度不够",
+        "总结提升思考问题严谨性的方法论"
+      ],
+      "forbidden_claims": [
+        "不要编造笔记中没有出现的细节。"
+      ],
+      "allow_tool": false,
+      "expected_tool_names": [],
+      "allow_retrieval_only": false,
+      "should_generate_answer": true,
+      "review_status": "approved",
+      "review_notes": "manual batch 004 approved by user"
+    },
+    {
+      "case_id": "ask_case_019",
+      "bucket": "single_hop",
+      "user_query": "v6.4.0 复盘总结里，其他可提升的方向有哪些？",
+      "source_origin": "sample_vault",
+      "expected_relevant_paths": [
+        "日常/2023-08/v6.4.0复盘总结.md"
+      ],
+      "expected_relevant_locators": [
+        {
+          "note_path": "日常/2023-08/v6.4.0复盘总结.md",
+          "heading_path": "三、其他可提升的",
+          "line_range": {
+            "start_line": 77,
+            "end_line": 83
+          },
+          "excerpt_anchor": "提升表达问题的沟通能力"
+        }
+      ],
+      "expected_facts": [
+        "提升表达问题的沟通能力",
+        "开发过程中尽量简化问题，过于复杂和精细化维护成本过高",
+        "工作方法，保持精神状态，提高工作效率"
+      ],
+      "forbidden_claims": [
+        "不要编造笔记中没有出现的细节。"
+      ],
+      "allow_tool": false,
+      "expected_tool_names": [],
+      "allow_retrieval_only": false,
+      "should_generate_answer": true,
+      "review_status": "approved",
+      "review_notes": "manual batch 004 approved by user"
+    },
+    {
+      "case_id": "ask_case_020",
+      "bucket": "single_hop",
+      "user_query": "v6.4.0 迭代任务里，修改档主信息时更换手机号要怎么校验？",
+      "source_origin": "sample_vault",
+      "expected_relevant_paths": [
+        "日常/2023-08/v6.4.0迭代任务.md"
+      ],
+      "expected_relevant_locators": [
+        {
+          "note_path": "日常/2023-08/v6.4.0迭代任务.md",
+          "heading_path": "一、账号多商行登录 > （一）需求分析",
+          "line_range": {
+            "start_line": 24,
+            "end_line": 27
+          },
+          "excerpt_anchor": "更换手机号校验"
+        }
+      ],
+      "expected_facts": [
+        "原：手机号不能存在，集团账号禁止修改手机号",
+        "现：手机号不能存在档主账号，集团账号禁止修改手机号，在本商行不能重复"
+      ],
+      "forbidden_claims": [
+        "不要编造笔记中没有出现的细节。"
+      ],
+      "allow_tool": false,
+      "expected_tool_names": [],
+      "allow_retrieval_only": false,
+      "should_generate_answer": true,
+      "review_status": "approved",
+      "review_notes": "manual batch 004 approved by user"
+    },
+    {
+      "case_id": "ask_case_021",
+      "bucket": "single_hop",
+      "user_query": "v6.4.0 迭代任务里，赊欠管理细化的分享标记是怎么设计的？",
+      "source_origin": "sample_vault",
+      "expected_relevant_paths": [
+        "日常/2023-08/v6.4.0迭代任务.md"
+      ],
+      "expected_relevant_locators": [
+        {
+          "note_path": "日常/2023-08/v6.4.0迭代任务.md",
+          "heading_path": "二、赊欠管理细化 > （一）需求分析",
+          "line_range": {
+            "start_line": 78,
+            "end_line": 81
+          },
+          "excerpt_anchor": "分享标记"
+        }
+      ],
+      "expected_facts": [
+        "新写接口",
+        "缓存：key:stallId+时间(String或者时间戳时分秒）value:set(存储买家id)",
+        "根据营业时间控制"
+      ],
+      "forbidden_claims": [
+        "不要编造笔记中没有出现的细节。"
+      ],
+      "allow_tool": false,
+      "expected_tool_names": [],
+      "allow_retrieval_only": false,
+      "should_generate_answer": true,
+      "review_status": "approved",
+      "review_notes": "manual batch 004 approved by user"
+    },
+    {
+      "case_id": "ask_case_022",
+      "bucket": "single_hop",
+      "user_query": "2023-07-31 的今日总结里，账号需求有哪些兼容和校验要求？",
+      "source_origin": "sample_vault",
+      "expected_relevant_paths": [
+        "日常/2023-07/2023-07-31_星期一.md"
+      ],
+      "expected_relevant_locators": [
+        {
+          "note_path": "日常/2023-07/2023-07-31_星期一.md",
+          "heading_path": "四、今日总结",
+          "line_range": {
+            "start_line": 36,
+            "end_line": 45
+          },
+          "excerpt_anchor": "集团账号先做兼容"
+        }
+      ],
+      "expected_facts": [
+        "集团账号先做兼容",
+        "老版本多账号直接报错",
+        "加人、启用、改手机号都需要验证",
+        "账号 商行 mac，不通过则校验验证码"
+      ],
+      "forbidden_claims": [
+        "不要编造笔记中没有出现的细节。"
+      ],
+      "allow_tool": false,
+      "expected_tool_names": [],
+      "allow_retrieval_only": false,
+      "should_generate_answer": true,
+      "review_status": "approved",
+      "review_notes": "manual batch 004 approved by user"
+    },
+    {
+      "case_id": "ask_case_023",
+      "bucket": "single_hop",
+      "user_query": "2024-01-05 的总结里，和白条订单相关的两个规则是什么？",
+      "source_origin": "sample_vault",
+      "expected_relevant_paths": [
+        "日常/2024-01-05_星期五.md"
+      ],
+      "expected_relevant_locators": [
+        {
+          "note_path": "日常/2024-01-05_星期五.md",
+          "heading_path": "Summary",
+          "line_range": {
+            "start_line": 31,
+            "end_line": 33
+          },
+          "excerpt_anchor": "编辑货品时需要增加校验，有白条记录的不让改"
+        }
+      ],
+      "expected_facts": [
+        "编辑货品时需要增加校验，有白条记录的不让改",
+        "统计赊欠的时候，需要排除白条订单"
+      ],
+      "forbidden_claims": [
+        "不要编造笔记中没有出现的细节。"
+      ],
+      "allow_tool": false,
+      "expected_tool_names": [],
+      "allow_retrieval_only": false,
+      "should_generate_answer": true,
+      "review_status": "approved",
+      "review_notes": "manual batch 004 approved by user"
+    },
+    {
+      "case_id": "ask_case_024",
+      "bucket": "single_hop",
+      "user_query": "2023-06-13 的今日进程里提到了哪些版本兼容方案？",
+      "source_origin": "sample_vault",
+      "expected_relevant_paths": [
+        "日常/2023-06/2023-06-13_星期二.md"
+      ],
+      "expected_relevant_locators": [
+        {
+          "note_path": "日常/2023-06/2023-06-13_星期二.md",
+          "heading_path": "三、今日进程",
+          "line_range": {
+            "start_line": 39,
+            "end_line": 42
+          },
+          "excerpt_anchor": "灰度问题：版本加配置（批次结算，货主管理），加配置因为是财务端"
+        }
+      ],
+      "expected_facts": [
+        "灰度问题：版本加配置（批次结算，货主管理），加配置因为是财务端",
+        "版本兼容问题：老版本写入数据要按照新版本模式修改，api全新的",
+        "可能要提前上一部分，先让老版本写新数据"
+      ],
+      "forbidden_claims": [
+        "不要编造笔记中没有出现的细节。"
+      ],
+      "allow_tool": false,
+      "expected_tool_names": [],
+      "allow_retrieval_only": false,
+      "should_generate_answer": true,
+      "review_status": "approved",
+      "review_notes": "manual batch 004 approved by user"
+    },
+    {
+      "case_id": "ask_case_025",
+      "bucket": "single_hop",
+      "user_query": "2023-09-05 的总结里提到了哪些数据权限实现方案或组件？",
+      "source_origin": "sample_vault",
+      "expected_relevant_paths": [
+        "日常/2023-09/2023-09-05_星期二.md"
+      ],
+      "expected_relevant_locators": [
+        {
+          "note_path": "日常/2023-09/2023-09-05_星期二.md",
+          "heading_path": "Summary",
+          "line_range": {
+            "start_line": 29,
+            "end_line": 37
+          },
+          "excerpt_anchor": "数据权限用注解自动拼接sql"
+        }
+      ],
+      "expected_facts": [
+        "数据权限用注解自动拼接sql",
+        "datapermissioninterceptor",
+        "mp的动态sql xmlLanguageDriver",
+        "boundSQL",
+        "metaobject"
+      ],
+      "forbidden_claims": [
+        "不要编造笔记中没有出现的细节。"
+      ],
+      "allow_tool": false,
+      "expected_tool_names": [],
+      "allow_retrieval_only": false,
+      "should_generate_answer": true,
+      "review_status": "approved",
+      "review_notes": "manual batch 004 approved by user"
+    },
+    {
+      "case_id": "ask_case_026",
+      "bucket": "single_hop",
+      "user_query": "2023-06-12_v6.30迭代 文档里，货主详情展示需要关注哪些问题？",
+      "source_origin": "sample_vault",
+      "expected_relevant_paths": [
+        "日常/2023-06/2023-06-12_v6.30迭代.md"
+      ],
+      "expected_relevant_locators": [
+        {
+          "note_path": "日常/2023-06/2023-06-12_v6.30迭代.md",
+          "heading_path": "二、流程梳理 > 4. 货主详情展示",
+          "line_range": {
+            "start_line": 71,
+            "end_line": 79
+          },
+          "excerpt_anchor": "结算总额怎么算：已有的结算单所有金额：来源结算头部表？"
+        }
+      ],
+      "expected_facts": [
+        "结算总额怎么算：已有的结算单所有金额：来源结算头部表？",
+        "已付款数据来源：打款记录表？",
+        "未结算总额怎么算",
+        "买家赊欠数据来源",
+        "付款记录数据来源，还要展示结算单？：打款记录表",
+        "结算单展示数据来源？：结算头部表和打款记录表",
+        "结算单详情数据来源？：结算明细表"
+      ],
+      "forbidden_claims": [
+        "不要编造笔记中没有出现的细节。"
+      ],
+      "allow_tool": false,
+      "expected_tool_names": [],
+      "allow_retrieval_only": false,
+      "should_generate_answer": true,
+      "review_status": "approved",
+      "review_notes": "manual batch 005 approved by user"
+    },
+    {
+      "case_id": "ask_case_027",
+      "bucket": "single_hop",
+      "user_query": "2024-01-09 的总结里哪些场景不需要排除白条？",
+      "source_origin": "sample_vault",
+      "expected_relevant_paths": [
+        "日常/2024-01-09_星期二.md"
+      ],
+      "expected_relevant_locators": [
+        {
+          "note_path": "日常/2024-01-09_星期二.md",
+          "heading_path": "Summary",
+          "line_range": {
+            "start_line": 22,
+            "end_line": 24
+          },
+          "excerpt_anchor": "明确不需要排除白条的"
+        }
+      ],
+      "expected_facts": [
+        "明确不需要排除白条的",
+        "查总赊欠",
+        "专门查白条金额的地方"
+      ],
+      "forbidden_claims": [
+        "不要编造笔记中没有出现的细节。"
+      ],
+      "allow_tool": false,
+      "expected_tool_names": [],
+      "allow_retrieval_only": false,
+      "should_generate_answer": true,
+      "review_status": "approved",
+      "review_notes": "manual batch 005 approved by user"
+    },
+    {
+      "case_id": "ask_case_028",
+      "bucket": "single_hop",
+      "user_query": "2023-06-12_v6.30迭代 文档里的结算数据流怎么描述？",
+      "source_origin": "sample_vault",
+      "expected_relevant_paths": [
+        "日常/2023-06/2023-06-12_v6.30迭代.md"
+      ],
+      "expected_relevant_locators": [
+        {
+          "note_path": "日常/2023-06/2023-06-12_v6.30迭代.md",
+          "heading_path": "三、数据流梳理 > 2. 结算数据流",
+          "line_range": {
+            "start_line": 85,
+            "end_line": 86
+          },
+          "excerpt_anchor": "批次结算页面：整个批次的所有货品的销售详情、所有的费用项"
+        }
+      ],
+      "expected_facts": [
+        "批次结算页面：整个批次的所有货品的销售详情、所有的费用项",
+        "去结算操作页面：选择未结算的销售单品、用项，设置代卖费、设置结算均价",
+        "结算详情界面：已经选择的销售单品、费用项，展示原始均价、原始货款"
+      ],
+      "forbidden_claims": [
+        "不要编造笔记中没有出现的细节。"
+      ],
+      "allow_tool": false,
+      "expected_tool_names": [],
+      "allow_retrieval_only": false,
+      "should_generate_answer": true,
+      "review_status": "approved",
+      "review_notes": "manual batch 005 approved by user"
+    },
+    {
+      "case_id": "ask_case_029",
+      "bucket": "multi_hop",
+      "user_query": "2023-07-17 今日总结里待完成的 v6.3.0复盘总结，后来在哪天收尾了？",
+      "source_origin": "sample_vault",
+      "expected_relevant_paths": [
+        "日常/2023-07/2023-07-17_星期一.md",
+        "日常/2023-07/2023-07-19_星期三.md"
+      ],
+      "expected_relevant_locators": [
+        {
+          "note_path": "日常/2023-07/2023-07-17_星期一.md",
+          "heading_path": "四、今日总结",
+          "line_range": {
+            "start_line": 35,
+            "end_line": 37
+          },
+          "excerpt_anchor": "v6.3.0复盘总结"
+        },
+        {
+          "note_path": "日常/2023-07/2023-07-19_星期三.md",
+          "heading_path": "一、工作任务",
+          "line_range": {
+            "start_line": 1,
+            "end_line": 4
+          },
+          "excerpt_anchor": "v6.3.0复盘总结 ✅ 2023-07-19"
+        }
+      ],
+      "expected_facts": [
+        "2023-07-17 的有待完成事项里包含 v6.3.0复盘总结",
+        "v6.3.0复盘总结 在 2023-07-19 标记完成"
+      ],
+      "forbidden_claims": [
+        "不要编造笔记中没有出现的细节。"
+      ],
+      "allow_tool": false,
+      "expected_tool_names": [],
+      "allow_retrieval_only": false,
+      "should_generate_answer": true,
+      "review_status": "approved",
+      "review_notes": "manual batch 005 approved by user"
+    },
+    {
+      "case_id": "ask_case_030",
+      "bucket": "multi_hop",
+      "user_query": "2023-06-05 待办中的 v6.2.5 迭代总结，后来总结出了哪些优化点？",
+      "source_origin": "sample_vault",
+      "expected_relevant_paths": [
+        "日常/2023-06/2023-06-05_星期一.md",
+        "日常/2023-06/v6.2.5迭代总结.md"
+      ],
+      "expected_relevant_locators": [
+        {
+          "note_path": "日常/2023-06/2023-06-05_星期一.md",
+          "heading_path": "一、 工作任务",
+          "line_range": {
+            "start_line": 1,
+            "end_line": 5
+          },
+          "excerpt_anchor": "对v6.2.5迭代进行总结复盘"
+        },
+        {
+          "note_path": "日常/2023-06/v6.2.5迭代总结.md",
+          "heading_path": "二、任务总结 > 2、优化点",
+          "line_range": {
+            "start_line": 26,
+            "end_line": 29
+          },
+          "excerpt_anchor": "对业务特征积累熟练度，提高阅读代码的效率"
+        }
+      ],
+      "expected_facts": [
+        "2023-06-05 的待办里包含 对v6.2.5迭代进行总结复盘",
+        "对业务特征积累熟练度，提高阅读代码的效率",
+        "建立起修改代码以及新建接口代码的大致标准化流程",
+        "提高代码书写质量，减少代码优化环节时间"
+      ],
+      "forbidden_claims": [
+        "不要编造笔记中没有出现的细节。"
+      ],
+      "allow_tool": false,
+      "expected_tool_names": [],
+      "allow_retrieval_only": false,
+      "should_generate_answer": true,
+      "review_status": "approved",
+      "review_notes": "manual batch 005 approved by user"
+    },
+    {
+      "case_id": "ask_case_031",
+      "bucket": "multi_hop",
+      "user_query": "v6.4.0 复盘总结里说最后多商行登录需求有点超时，对应的任务文档里这块有哪些核心手机号校验规则？",
+      "source_origin": "sample_vault",
+      "expected_relevant_paths": [
+        "日常/2023-08/v6.4.0复盘总结.md",
+        "日常/2023-08/v6.4.0迭代任务.md"
+      ],
+      "expected_relevant_locators": [
+        {
+          "note_path": "日常/2023-08/v6.4.0复盘总结.md",
+          "heading_path": "一、周报及任务汇总",
+          "line_range": {
+            "start_line": 51,
+            "end_line": 55
+          },
+          "excerpt_anchor": "前期的任务时间基本符合预期，就是最后的多商行登录需求有点超时，请了半天假"
+        },
+        {
+          "note_path": "日常/2023-08/v6.4.0迭代任务.md",
+          "heading_path": "一、账号多商行登录 > （一）需求分析",
+          "line_range": {
+            "start_line": 4,
+            "end_line": 9
+          },
+          "excerpt_anchor": "档主手机号校验"
+        }
+      ],
+      "expected_facts": [
+        "最后的多商行登录需求有点超时",
+        "不能存在集团账号：orgId>0",
+        "(不能存在档主账号)：type不能为1",
+        "在本商行不能重复：根据type去员工或档主表查询，stallId不能与当前商行id相同"
+      ],
+      "forbidden_claims": [
+        "不要编造笔记中没有出现的细节。"
+      ],
+      "allow_tool": false,
+      "expected_tool_names": [],
+      "allow_retrieval_only": false,
+      "should_generate_answer": true,
+      "review_status": "approved",
+      "review_notes": "manual batch 005 approved by user"
+    },
+    {
+      "case_id": "ask_case_032",
+      "bucket": "multi_hop",
+      "user_query": "2024-01-05 总结提到统计赊欠要排除白条订单，2024-01-09 又明确了哪些场景不需要排除白条？",
+      "source_origin": "sample_vault",
+      "expected_relevant_paths": [
+        "日常/2024-01-05_星期五.md",
+        "日常/2024-01-09_星期二.md"
+      ],
+      "expected_relevant_locators": [
+        {
+          "note_path": "日常/2024-01-05_星期五.md",
+          "heading_path": "Summary",
+          "line_range": {
+            "start_line": 31,
+            "end_line": 33
+          },
+          "excerpt_anchor": "统计赊欠的时候，需要排除白条订单"
+        },
+        {
+          "note_path": "日常/2024-01-09_星期二.md",
+          "heading_path": "Summary",
+          "line_range": {
+            "start_line": 22,
+            "end_line": 24
+          },
+          "excerpt_anchor": "明确不需要排除白条的"
+        }
+      ],
+      "expected_facts": [
+        "统计赊欠的时候，需要排除白条订单",
+        "查总赊欠",
+        "专门查白条金额的地方"
+      ],
+      "forbidden_claims": [
+        "不要编造笔记中没有出现的细节。"
+      ],
+      "allow_tool": false,
+      "expected_tool_names": [],
+      "allow_retrieval_only": false,
+      "should_generate_answer": true,
+      "review_status": "approved",
+      "review_notes": "manual batch 005 approved by user"
+    },
+    {
+      "case_id": "ask_case_033",
+      "bucket": "abstain_or_no_hit",
+      "user_query": "2023-06-05 的今日总结提到了 Docker 吗？",
+      "source_origin": "sample_vault",
+      "expected_relevant_paths": [
+        "日常/2023-06/2023-06-05_星期一.md"
+      ],
+      "expected_relevant_locators": [
+        {
+          "note_path": "日常/2023-06/2023-06-05_星期一.md",
+          "heading_path": "四、 今日总结",
+          "line_range": {
+            "start_line": 24,
+            "end_line": 27
+          },
+          "excerpt_anchor": "初步整理了一些文档"
+        }
+      ],
+      "expected_facts": [
+        "今日总结只提到 初步整理了一些文档",
+        "今日总结只提到 了解了一点jekins的使用"
+      ],
+      "forbidden_claims": [
+        "提到了 Docker。",
+        "提到了容器部署。",
+        "不要编造笔记中没有出现的细节。"
+      ],
+      "allow_tool": false,
+      "expected_tool_names": [],
+      "allow_retrieval_only": false,
+      "should_generate_answer": true,
+      "review_status": "approved",
+      "review_notes": "manual batch 005 approved by user"
+    },
+    {
+      "case_id": "ask_case_034",
+      "bucket": "tool_allowed",
+      "user_query": "v6.4.0 迭代任务这篇笔记有哪些一级章节？",
+      "source_origin": "sample_vault",
+      "expected_relevant_paths": [
+        "日常/2023-08/v6.4.0迭代任务.md"
+      ],
+      "expected_relevant_locators": [
+        {
+          "note_path": "日常/2023-08/v6.4.0迭代任务.md",
+          "heading_path": "一、账号多商行登录",
+          "line_range": {
+            "start_line": 1,
+            "end_line": 2
+          },
+          "excerpt_anchor": "一、账号多商行登录"
+        },
+        {
+          "note_path": "日常/2023-08/v6.4.0迭代任务.md",
+          "heading_path": "二、赊欠管理细化",
+          "line_range": {
+            "start_line": 71,
+            "end_line": 72
+          },
+          "excerpt_anchor": "二、赊欠管理细化"
+        },
+        {
+          "note_path": "日常/2023-08/v6.4.0迭代任务.md",
+          "heading_path": "三、买家采购分析报表",
+          "line_range": {
+            "start_line": 152,
+            "end_line": 153
+          },
+          "excerpt_anchor": "三、买家采购分析报表"
+        },
+        {
+          "note_path": "日常/2023-08/v6.4.0迭代任务.md",
+          "heading_path": "四、货品批量操作",
+          "line_range": {
+            "start_line": 183,
+            "end_line": 183
+          },
+          "excerpt_anchor": "四、货品批量操作"
+        },
+        {
+          "note_path": "日常/2023-08/v6.4.0迭代任务.md",
+          "heading_path": "五、库存备注",
+          "line_range": {
+            "start_line": 225,
+            "end_line": 225
+          },
+          "excerpt_anchor": "五、库存备注"
+        }
+      ],
+      "expected_facts": [
+        "一、账号多商行登录",
+        "二、赊欠管理细化",
+        "三、买家采购分析报表",
+        "四、货品批量操作",
+        "五、库存备注"
+      ],
+      "forbidden_claims": [
+        "不要编造笔记中没有出现的细节。"
+      ],
+      "allow_tool": true,
+      "expected_tool_names": [
+        "get_note_outline"
+      ],
+      "allow_retrieval_only": false,
+      "should_generate_answer": true,
+      "review_status": "approved",
+      "review_notes": "manual batch 005 approved by user"
+    },
+    {
+      "case_id": "ask_case_035",
+      "bucket": "tool_allowed",
+      "user_query": "哪些笔记链接到了 2023-06-12_v6.30迭代？",
+      "source_origin": "sample_vault",
+      "expected_relevant_paths": [
+        "日常/2023-06/2023-06-12_v6.30迭代.md",
+        "日常/2023-06/2023-06-12_星期一.md",
+        "日常/2023-06/2023-06-13_星期二.md"
+      ],
+      "expected_relevant_locators": [
+        {
+          "note_path": "日常/2023-06/2023-06-12_星期一.md",
+          "heading_path": "一、工作任务",
+          "line_range": {
+            "start_line": 1,
+            "end_line": 7
+          },
+          "excerpt_anchor": "[[2023-06-12_v6.30迭代]]"
+        },
+        {
+          "note_path": "日常/2023-06/2023-06-13_星期二.md",
+          "heading_path": "三、今日进程",
+          "line_range": {
+            "start_line": 15,
+            "end_line": 18
+          },
+          "excerpt_anchor": "[[2023-06-12_v6.30迭代]]"
+        }
+      ],
+      "expected_facts": [
+        "2023-06-12_星期一 链接到了 2023-06-12_v6.30迭代",
+        "2023-06-13_星期二 链接到了 2023-06-12_v6.30迭代"
+      ],
+      "forbidden_claims": [
+        "不要编造笔记中没有出现的细节。"
+      ],
+      "allow_tool": true,
+      "expected_tool_names": [
+        "find_backlinks"
+      ],
+      "allow_retrieval_only": false,
+      "should_generate_answer": true,
+      "review_status": "approved",
+      "review_notes": "manual batch 005 approved by user"
+    },
+    {
+      "case_id": "ask_case_036",
+      "bucket": "multi_hop",
+      "user_query": "2023-06-12 总结的结算重构功能，在 2023-06-12_v6.30迭代 文档里对应到哪些页面流转？",
+      "source_origin": "sample_vault",
+      "expected_relevant_paths": [
+        "日常/2023-06/2023-06-12_星期一.md",
+        "日常/2023-06/2023-06-12_v6.30迭代.md"
+      ],
+      "expected_relevant_locators": [
+        {
+          "note_path": "日常/2023-06/2023-06-12_星期一.md",
+          "heading_path": "三、今日进程",
+          "line_range": {
+            "start_line": 19,
+            "end_line": 56
+          },
+          "excerpt_anchor": "结算重构功能总结："
+        },
+        {
+          "note_path": "日常/2023-06/2023-06-12_v6.30迭代.md",
+          "heading_path": "三、数据流梳理 > 2. 结算数据流",
+          "line_range": {
+            "start_line": 85,
+            "end_line": 86
+          },
+          "excerpt_anchor": "批次结算页面：整个批次的所有货品的销售详情、所有的费用项"
+        }
+      ],
+      "expected_facts": [
+        "结算重构功能总结里涉及 批次结算页面、结算操作界面、结算详情、货主管理详情页面",
+        "结算数据流是 批次结算页面 -> 去结算操作页面 -> 结算详情界面"
+      ],
+      "forbidden_claims": [
+        "不要编造笔记中没有出现的细节。"
+      ],
+      "allow_tool": false,
+      "expected_tool_names": [],
+      "allow_retrieval_only": false,
+      "should_generate_answer": true,
+      "review_status": "approved",
+      "review_notes": "manual batch 006 approved by user"
+    },
+    {
+      "case_id": "ask_case_037",
+      "bucket": "multi_hop",
+      "user_query": "2023-07-31 过需求时提到的账号兼容要求，在 v6.4.0 任务文档里又被落实成了哪些规则？",
+      "source_origin": "sample_vault",
+      "expected_relevant_paths": [
+        "日常/2023-07/2023-07-31_星期一.md",
+        "日常/2023-08/v6.4.0迭代任务.md"
+      ],
+      "expected_relevant_locators": [
+        {
+          "note_path": "日常/2023-07/2023-07-31_星期一.md",
+          "heading_path": "四、今日总结",
+          "line_range": {
+            "start_line": 36,
+            "end_line": 45
+          },
+          "excerpt_anchor": "账号"
+        },
+        {
+          "note_path": "日常/2023-08/v6.4.0迭代任务.md",
+          "heading_path": "一、账号多商行登录 > （一）需求分析",
+          "line_range": {
+            "start_line": 38,
+            "end_line": 41
+          },
+          "excerpt_anchor": "集团账号：一个账号，多员工"
+        }
+      ],
+      "expected_facts": [
+        "2023-07-31 提到 集团账号先做兼容、老版本多账号直接报错",
+        "v6.4.0 任务文档写明 集团账号不能加入多账号模式",
+        "v6.4.0 任务文档写明 兼容问题思考：做了老版本功能会有什么问题，新版本功能会有什么问题"
+      ],
+      "forbidden_claims": [
+        "不要编造笔记中没有出现的细节。"
+      ],
+      "allow_tool": false,
+      "expected_tool_names": [],
+      "allow_retrieval_only": false,
+      "should_generate_answer": true,
+      "review_status": "approved",
+      "review_notes": "manual batch 006 approved by user"
+    },
+    {
+      "case_id": "ask_case_038",
+      "bucket": "multi_hop",
+      "user_query": "2024-01-05 和 2024-01-09 两天的笔记合起来看，白条在什么场景要排除、什么场景不用排除？",
+      "source_origin": "sample_vault",
+      "expected_relevant_paths": [
+        "日常/2024-01-05_星期五.md",
+        "日常/2024-01-09_星期二.md"
+      ],
+      "expected_relevant_locators": [
+        {
+          "note_path": "日常/2024-01-05_星期五.md",
+          "heading_path": "Summary",
+          "line_range": {
+            "start_line": 31,
+            "end_line": 33
+          },
+          "excerpt_anchor": "统计赊欠的时候，需要排除白条订单"
+        },
+        {
+          "note_path": "日常/2024-01-09_星期二.md",
+          "heading_path": "Summary",
+          "line_range": {
+            "start_line": 22,
+            "end_line": 28
+          },
+          "excerpt_anchor": "明确不需要排除白条的"
+        }
+      ],
+      "expected_facts": [
+        "统计赊欠的时候，需要排除白条订单",
+        "查总赊欠 不需要排除白条",
+        "专门查白条金额的地方 不需要排除白条",
+        "统计货品销售数量和重量的地方 需要排除白条"
+      ],
+      "forbidden_claims": [
+        "不要编造笔记中没有出现的细节。"
+      ],
+      "allow_tool": false,
+      "expected_tool_names": [],
+      "allow_retrieval_only": false,
+      "should_generate_answer": true,
+      "review_status": "approved",
+      "review_notes": "manual batch 006 approved by user"
+    },
+    {
+      "case_id": "ask_case_039",
+      "bucket": "multi_hop",
+      "user_query": "围绕 2023-06-12_v6.30迭代，6 月 12 日看需求之后，6 月 13 日又明确了哪些兼容方案？",
+      "source_origin": "sample_vault",
+      "expected_relevant_paths": [
+        "日常/2023-06/2023-06-12_星期一.md",
+        "日常/2023-06/2023-06-13_星期二.md"
+      ],
+      "expected_relevant_locators": [
+        {
+          "note_path": "日常/2023-06/2023-06-12_星期一.md",
+          "heading_path": "四、今日总结",
+          "line_range": {
+            "start_line": 59,
+            "end_line": 61
+          },
+          "excerpt_anchor": "白天看了一天的需求，整理了大概的接口"
+        },
+        {
+          "note_path": "日常/2023-06/2023-06-13_星期二.md",
+          "heading_path": "三、今日进程",
+          "line_range": {
+            "start_line": 39,
+            "end_line": 42
+          },
+          "excerpt_anchor": "灰度问题：版本加配置（批次结算，货主管理），加配置因为是财务端"
+        }
+      ],
+      "expected_facts": [
+        "2023-06-12 白天看了一天的需求，整理了大概的接口",
+        "2023-06-13 明确了灰度问题：版本加配置（批次结算，货主管理）",
+        "2023-06-13 明确了老版本写入数据要按照新版本模式修改，api全新的",
+        "2023-06-13 提到可能要提前上一部分，先让老版本写新数据"
+      ],
+      "forbidden_claims": [
+        "不要编造笔记中没有出现的细节。"
+      ],
+      "allow_tool": false,
+      "expected_tool_names": [],
+      "allow_retrieval_only": false,
+      "should_generate_answer": true,
+      "review_status": "approved",
+      "review_notes": "manual batch 006 approved by user"
+    },
+    {
+      "case_id": "ask_case_040",
+      "bucket": "abstain_or_no_hit",
+      "user_query": "2023-11-17 的 jdk 升级具体升级到了哪个版本？",
+      "source_origin": "sample_vault",
+      "expected_relevant_paths": [
+        "日常/2023-11-17_星期五.md"
+      ],
+      "expected_relevant_locators": [
+        {
+          "note_path": "日常/2023-11-17_星期五.md",
+          "heading_path": "Summary",
+          "line_range": {
+            "start_line": 20,
+            "end_line": 24
+          },
+          "excerpt_anchor": "第一个问题，maven版本升级之后idea版本跟不上，内置的maven命令直接报错"
+        }
+      ],
+      "expected_facts": [
+        "笔记只记录了 maven版本升级之后idea版本跟不上",
+        "笔记只记录了 maven配置里下载源忘记同步更新",
+        "笔记只记录了 reload project 解决包找不到问题"
+      ],
+      "forbidden_claims": [
+        "不要编造具体的 JDK 版本号。",
+        "不要编造笔记中没有出现的细节。"
+      ],
+      "allow_tool": false,
+      "expected_tool_names": [],
+      "allow_retrieval_only": false,
+      "should_generate_answer": true,
+      "review_status": "approved",
+      "review_notes": "manual batch 006 approved by user"
+    },
+    {
+      "case_id": "ask_case_041",
+      "bucket": "abstain_or_no_hit",
+      "user_query": "2023-06-05 了解了一点 jekins 的使用，具体用了哪个 job 或 pipeline？",
+      "source_origin": "sample_vault",
+      "expected_relevant_paths": [
+        "日常/2023-06/2023-06-05_星期一.md"
+      ],
+      "expected_relevant_locators": [
+        {
+          "note_path": "日常/2023-06/2023-06-05_星期一.md",
+          "heading_path": "四、 今日总结",
+          "line_range": {
+            "start_line": 24,
+            "end_line": 27
+          },
+          "excerpt_anchor": "了解了一点jekins的使用"
+        }
+      ],
+      "expected_facts": [
+        "笔记只写了 了解了一点jekins的使用"
+      ],
+      "forbidden_claims": [
+        "不要编造具体的 job 名称。",
+        "不要编造具体的 pipeline 名称。",
+        "不要编造笔记中没有出现的细节。"
+      ],
+      "allow_tool": false,
+      "expected_tool_names": [],
+      "allow_retrieval_only": false,
+      "should_generate_answer": true,
+      "review_status": "approved",
+      "review_notes": "manual batch 006 approved by user"
+    },
+    {
+      "case_id": "ask_case_042",
+      "bucket": "abstain_or_no_hit",
+      "user_query": "v6.3.0 迭代总结里具体调优了哪条联表 SQL？",
+      "source_origin": "sample_vault",
+      "expected_relevant_paths": [
+        "日常/2023-07/v6.3.0迭代总结.md"
+      ],
+      "expected_relevant_locators": [
+        {
+          "note_path": "日常/2023-07/v6.3.0迭代总结.md",
+          "heading_path": "一、本次迭代任务 > 2、任务评估",
+          "line_range": {
+            "start_line": 8,
+            "end_line": 10
+          },
+          "excerpt_anchor": "开发时间压力大，包括一些联表sql的调优对于个人而言挑战性比较高"
+        },
+        {
+          "note_path": "日常/2023-07/v6.3.0迭代总结.md",
+          "heading_path": "二、任务总结 > 1、过程特征",
+          "line_range": {
+            "start_line": 14,
+            "end_line": 17
+          },
+          "excerpt_anchor": "后期做代码优化和sql优化"
+        }
+      ],
+      "expected_facts": [
+        "文档只提到 联表sql的调优 对个人挑战性比较高",
+        "文档只提到 后期做代码优化和sql优化"
+      ],
+      "forbidden_claims": [
+        "不要编造具体的 SQL 语句。",
+        "不要编造具体的表连接条件。",
+        "不要编造笔记中没有出现的细节。"
+      ],
+      "allow_tool": false,
+      "expected_tool_names": [],
+      "allow_retrieval_only": false,
+      "should_generate_answer": true,
+      "review_status": "approved",
+      "review_notes": "manual batch 006 approved by user"
+    },
+    {
+      "case_id": "ask_case_043",
+      "bucket": "tool_allowed",
+      "user_query": "把 2023-11-17 这篇笔记的 Summary 原文摘出来。",
+      "source_origin": "sample_vault",
+      "expected_relevant_paths": [
+        "日常/2023-11-17_星期五.md"
+      ],
+      "expected_relevant_locators": [
+        {
+          "note_path": "日常/2023-11-17_星期五.md",
+          "heading_path": "Summary",
+          "line_range": {
+            "start_line": 20,
+            "end_line": 24
+          },
+          "excerpt_anchor": "第一个问题，maven版本升级之后idea版本跟不上，内置的maven命令直接报错"
+        }
+      ],
+      "expected_facts": [
+        "第一个问题，maven版本升级之后idea版本跟不上，内置的maven命令直接报错",
+        "第二个问题，maven配置里下载源忘记同步更新",
+        "第三个问题，maven中的包都下好了，交给maven托管运行项目也可以，但是文件中所有的包都找不到，也无法运行项目，最后在pom右键中的maven选择reload project解决问题"
+      ],
+      "forbidden_claims": [
+        "不要编造笔记中没有出现的细节。"
+      ],
+      "allow_tool": true,
+      "expected_tool_names": [
+        "load_note_excerpt"
+      ],
+      "allow_retrieval_only": false,
+      "should_generate_answer": true,
+      "review_status": "approved",
+      "review_notes": "manual batch 006 approved by user"
+    },
+    {
+      "case_id": "ask_case_044",
+      "bucket": "tool_allowed",
+      "user_query": "2023-06-12_v6.30迭代 这篇笔记在“四、本次任务”下有哪些子章节？",
+      "source_origin": "sample_vault",
+      "expected_relevant_paths": [
+        "日常/2023-06/2023-06-12_v6.30迭代.md"
+      ],
+      "expected_relevant_locators": [
+        {
+          "note_path": "日常/2023-06/2023-06-12_v6.30迭代.md",
+          "heading_path": "四、本次任务 > 1. pos端",
+          "line_range": {
+            "start_line": 89,
+            "end_line": 89
+          },
+          "excerpt_anchor": "1. pos端"
+        },
+        {
+          "note_path": "日常/2023-06/2023-06-12_v6.30迭代.md",
+          "heading_path": "四、本次任务 > 2. app端",
+          "line_range": {
+            "start_line": 141,
+            "end_line": 141
+          },
+          "excerpt_anchor": "2. app端"
+        },
+        {
+          "note_path": "日常/2023-06/2023-06-12_v6.30迭代.md",
+          "heading_path": "四、本次任务 > 3. 财务端",
+          "line_range": {
+            "start_line": 197,
+            "end_line": 197
+          },
+          "excerpt_anchor": "3. 财务端"
+        },
+        {
+          "note_path": "日常/2023-06/2023-06-12_v6.30迭代.md",
+          "heading_path": "四、本次任务 > 4. app端经营业绩",
+          "line_range": {
+            "start_line": 232,
+            "end_line": 236
+          },
+          "excerpt_anchor": "4. app端经营业绩"
+        },
+        {
+          "note_path": "日常/2023-06/2023-06-12_v6.30迭代.md",
+          "heading_path": "四、本次任务 > 5. 代卖收益",
+          "line_range": {
+            "start_line": 237,
+            "end_line": 237
+          },
+          "excerpt_anchor": "5. 代卖收益"
+        }
+      ],
+      "expected_facts": [
+        "1. pos端",
+        "2. app端",
+        "3. 财务端",
+        "4. app端经营业绩",
+        "5. 代卖收益"
+      ],
+      "forbidden_claims": [
+        "不要编造笔记中没有出现的细节。"
+      ],
+      "allow_tool": true,
+      "expected_tool_names": [
+        "get_note_outline"
+      ],
+      "allow_retrieval_only": false,
+      "should_generate_answer": true,
+      "review_status": "approved",
+      "review_notes": "manual batch 006 approved by user"
+    },
+    {
+      "case_id": "ask_case_045",
+      "bucket": "tool_allowed",
+      "user_query": "v6.4.0 迭代任务里“一、账号多商行登录”下有哪些二级小节？",
+      "source_origin": "sample_vault",
+      "expected_relevant_paths": [
+        "日常/2023-08/v6.4.0迭代任务.md"
+      ],
+      "expected_relevant_locators": [
+        {
+          "note_path": "日常/2023-08/v6.4.0迭代任务.md",
+          "heading_path": "一、账号多商行登录 > （一）需求分析",
+          "line_range": {
+            "start_line": 3,
+            "end_line": 42
+          },
+          "excerpt_anchor": "（一）需求分析"
+        },
+        {
+          "note_path": "日常/2023-08/v6.4.0迭代任务.md",
+          "heading_path": "一、账号多商行登录 > （二）api定义阶段",
+          "line_range": {
+            "start_line": 43,
+            "end_line": 45
+          },
+          "excerpt_anchor": "（二）api定义阶段"
+        },
+        {
+          "note_path": "日常/2023-08/v6.4.0迭代任务.md",
+          "heading_path": "一、账号多商行登录 > （三）开发阶段",
+          "line_range": {
+            "start_line": 46,
+            "end_line": 70
+          },
+          "excerpt_anchor": "（三）开发阶段"
+        }
+      ],
+      "expected_facts": [
+        "（一）需求分析",
+        "（二）api定义阶段",
+        "（三）开发阶段"
+      ],
+      "forbidden_claims": [
+        "不要编造笔记中没有出现的细节。"
+      ],
+      "allow_tool": true,
+      "expected_tool_names": [
+        "get_note_outline"
+      ],
+      "allow_retrieval_only": false,
+      "should_generate_answer": true,
+      "review_status": "approved",
+      "review_notes": "manual batch 006 approved by user"
+    },
+    {
+      "case_id": "ask_case_046",
+      "bucket": "multi_hop",
+      "user_query": "6 月里关于 jekins 的记录，从 2023-06-05 的“了解了一点”到 2023-06-26 又补充了什么实际操作提醒？",
+      "source_origin": "sample_vault",
+      "expected_relevant_paths": [
+        "日常/2023-06/2023-06-05_星期一.md",
+        "日常/2023-06/2023-06-26_星期一.md"
+      ],
+      "expected_relevant_locators": [
+        {
+          "note_path": "日常/2023-06/2023-06-05_星期一.md",
+          "heading_path": "四、 今日总结",
+          "line_range": {
+            "start_line": 24,
+            "end_line": 27
+          },
+          "excerpt_anchor": "了解了一点jekins的使用"
+        },
+        {
+          "note_path": "日常/2023-06/2023-06-26_星期一.md",
+          "heading_path": "四、今日总结",
+          "line_range": {
+            "start_line": 23,
+            "end_line": 26
+          },
+          "excerpt_anchor": "swagger的更新需要在jekins发一下后台"
+        }
+      ],
+      "expected_facts": [
+        "2023-06-05 只提到 了解了一点jekins的使用",
+        "2023-06-26 补充了 swagger的更新需要在jekins发一下后台"
+      ],
+      "forbidden_claims": [
+        "不要编造笔记中没有出现的细节。"
+      ],
+      "allow_tool": false,
+      "expected_tool_names": [],
+      "allow_retrieval_only": false,
+      "should_generate_answer": true,
+      "review_status": "approved",
+      "review_notes": "manual batch 007 approved by user"
+    },
+    {
+      "case_id": "ask_case_047",
+      "bucket": "multi_hop",
+      "user_query": "2024-01-12 记录了哪些白条实体差异，2024-01-15 又检查出了哪些统计不一致？",
+      "source_origin": "sample_vault",
+      "expected_relevant_paths": [
+        "日常/2024-01-12_星期五.md",
+        "日常/2024-01-15_星期一.md"
+      ],
+      "expected_relevant_locators": [
+        {
+          "note_path": "日常/2024-01-12_星期五.md",
+          "heading_path": "Summary",
+          "line_range": {
+            "start_line": 25,
+            "end_line": 31
+          },
+          "excerpt_anchor": "白条货主"
+        },
+        {
+          "note_path": "日常/2024-01-15_星期一.md",
+          "heading_path": "Summary",
+          "line_range": {
+            "start_line": 22,
+            "end_line": 24
+          },
+          "excerpt_anchor": "买家采购详情-统计里没有统计白条订单"
+        }
+      ],
+      "expected_facts": [
+        "2024-01-12 记录了 白条货主：person表有，supplier表没有",
+        "2024-01-12 记录了 白条批次：batch表，没有stall_Id",
+        "2024-01-12 记录了 白条货品：历史账，没有stall_id",
+        "2024-01-15 检查出 买家采购详情-统计里没有统计白条订单",
+        "2024-01-15 检查出 买家采购详情-明细里统计了白条订单",
+        "2024-01-15 检查出 买家采购统计报表里没有统计白条"
+      ],
+      "forbidden_claims": [
+        "不要编造笔记中没有出现的细节。"
+      ],
+      "allow_tool": false,
+      "expected_tool_names": [],
+      "allow_retrieval_only": false,
+      "should_generate_answer": true,
+      "review_status": "approved",
+      "review_notes": "manual batch 007 approved by user"
+    },
+    {
+      "case_id": "ask_case_048",
+      "bucket": "abstain_or_no_hit",
+      "user_query": "2023-06-12_v6.30迭代 里 “测试结算货主” 的手机号是多少？",
+      "source_origin": "sample_vault",
+      "expected_relevant_paths": [
+        "日常/2023-06/2023-06-12_v6.30迭代.md"
+      ],
+      "expected_relevant_locators": [
+        {
+          "note_path": "日常/2023-06/2023-06-12_v6.30迭代.md",
+          "heading_path": "四、本次任务 > 1. pos端 > （1）批次结算页面",
+          "line_range": {
+            "start_line": 104,
+            "end_line": 117
+          },
+          "excerpt_anchor": "\"supplierName\":\"测试结算货主\""
+        }
+      ],
+      "expected_facts": [
+        "文档只出现了 supplierName 为 测试结算货主",
+        "文档没有给出该货主的手机号"
+      ],
+      "forbidden_claims": [
+        "不要编造手机号。",
+        "不要编造笔记中没有出现的细节。"
+      ],
+      "allow_tool": false,
+      "expected_tool_names": [],
+      "allow_retrieval_only": false,
+      "should_generate_answer": true,
+      "review_status": "approved",
+      "review_notes": "manual batch 007 approved by user"
+    },
+    {
+      "case_id": "ask_case_049",
+      "bucket": "abstain_or_no_hit",
+      "user_query": "v6.4.0 迭代任务里 creditShare 接口的完整请求/响应 JSON 是什么？",
+      "source_origin": "sample_vault",
+      "expected_relevant_paths": [
+        "日常/2023-08/v6.4.0迭代任务.md"
+      ],
+      "expected_relevant_locators": [
+        {
+          "note_path": "日常/2023-08/v6.4.0迭代任务.md",
+          "heading_path": "二、赊欠管理细化 > （二）api定义阶段",
+          "line_range": {
+            "start_line": 91,
+            "end_line": 99
+          },
+          "excerpt_anchor": "com.cxm.api.user.CxmCustomerApi#creditShare"
+        }
+      ],
+      "expected_facts": [
+        "文档只给出了 creditShare 接口名和接口路径",
+        "文档只列了 接口参数 和 缓存 这样的提纲",
+        "文档没有给出完整的请求 JSON 或响应 JSON"
+      ],
+      "forbidden_claims": [
+        "不要编造完整的请求 JSON。",
+        "不要编造完整的响应 JSON。",
+        "不要编造笔记中没有出现的细节。"
+      ],
+      "allow_tool": false,
+      "expected_tool_names": [],
+      "allow_retrieval_only": false,
+      "should_generate_answer": true,
+      "review_status": "approved",
+      "review_notes": "manual batch 007 approved by user"
+    },
+    {
+      "case_id": "ask_case_050",
+      "bucket": "tool_allowed",
+      "user_query": "sample_vault 里哪里提到了 jekins？",
+      "source_origin": "sample_vault",
+      "expected_relevant_paths": [
+        "日常/2023-06/2023-06-05_星期一.md",
+        "日常/2023-06/2023-06-26_星期一.md"
+      ],
+      "expected_relevant_locators": [
+        {
+          "note_path": "日常/2023-06/2023-06-05_星期一.md",
+          "heading_path": "四、 今日总结",
+          "line_range": {
+            "start_line": 24,
+            "end_line": 27
+          },
+          "excerpt_anchor": "了解了一点jekins的使用"
+        },
+        {
+          "note_path": "日常/2023-06/2023-06-26_星期一.md",
+          "heading_path": "四、今日总结",
+          "line_range": {
+            "start_line": 23,
+            "end_line": 26
+          },
+          "excerpt_anchor": "swagger的更新需要在jekins发一下后台"
+        }
+      ],
+      "expected_facts": [
+        "2023-06-05 的今日总结提到 了解了一点jekins的使用",
+        "2023-06-26 的今日总结提到 swagger的更新需要在jekins发一下后台"
+      ],
+      "forbidden_claims": [
+        "不要编造其他未命中的 jekins 记录。",
+        "不要编造笔记中没有出现的细节。"
+      ],
+      "allow_tool": true,
+      "expected_tool_names": [
+        "search_notes"
+      ],
+      "allow_retrieval_only": false,
+      "should_generate_answer": true,
+      "review_status": "approved",
+      "review_notes": "manual batch 007 approved by user"
+    }
+  ]
 }
