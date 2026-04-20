@@ -2,10 +2,11 @@ from __future__ import annotations
 
 from enum import Enum
 import sqlite3
+from unittest.mock import patch
 
 from app.config import Settings
 from app.contracts.workflow import RetrievedChunkCandidate, RetrievalSearchResponse
-from app.retrieval.embeddings import resolve_embedding_provider_targets
+import app.retrieval.hybrid as hybrid_retrieval
 from app.retrieval.hybrid import search_hybrid_chunks
 from app.retrieval.sqlite_fts import search_chunks
 from app.retrieval.sqlite_vector import search_chunk_vectors
@@ -86,58 +87,59 @@ def _dispatch_retrieval_mode(
                 limit=RETRIEVAL_BENCHMARK_LIMIT,
             )
         case RetrievalBenchmarkMode.HYBRID_RRF:
-            _ensure_hybrid_vector_backend_ready(connection, settings)
-            return search_hybrid_chunks(
-                connection,
-                query,
+            return _run_hybrid_with_vector_tracking(
+                connection=connection,
+                query=query,
                 settings=settings,
-                limit=RETRIEVAL_BENCHMARK_LIMIT,
             )
 
     raise RetrievalBenchmarkModeError(f"Unsupported retrieval benchmark mode: {mode.value}")
 
 
-def _ensure_hybrid_vector_backend_ready(
-    connection: sqlite3.Connection,
-    settings: Settings,
-) -> None:
-    targets = resolve_embedding_provider_targets(settings=settings)
-    if not targets:
-        raise RetrievalBenchmarkModeError(
-            f"Retrieval mode {RetrievalBenchmarkMode.HYBRID_RRF.value} is disabled: "
-            "no_available_embedding_provider"
-        )
-
-    chunk_count = _fetch_scalar_count(connection, "SELECT COUNT(*) FROM chunk;")
-    if chunk_count == 0:
-        return
-
-    for target in targets:
-        embedding_count = _fetch_scalar_count(
-            connection,
-            """
-            SELECT COUNT(*)
-            FROM chunk_embedding
-            WHERE provider_key = ? AND model_name = ?;
-            """,
-            target.provider_key,
-            target.model_name,
-        )
-        if embedding_count > 0:
-            return
-
-    raise RetrievalBenchmarkModeError(
-        f"Retrieval mode {RetrievalBenchmarkMode.HYBRID_RRF.value} is disabled: "
-        "vector_index_not_ready"
-    )
-
-
-def _fetch_scalar_count(
+def _run_hybrid_with_vector_tracking(
     connection: sqlite3.Connection,
     query: str,
-    *params: object,
-) -> int:
-    row = connection.execute(query, params).fetchone()
-    if row is None:
-        return 0
-    return int(row[0] or 0)
+    settings: Settings,
+) -> RetrievalSearchResponse:
+    vector_state = {"disabled": False, "reason": None}
+    original_search_chunk_vectors = hybrid_retrieval.search_chunk_vectors
+
+    def _tracking_search_chunk_vectors(
+        connection: sqlite3.Connection,
+        query: str,
+        *,
+        settings: Settings,
+        limit: int = 5,
+        metadata_filter=None,
+        provider_preference: str | None = None,
+        allow_filter_fallback: bool = True,
+    ) -> RetrievalSearchResponse:
+        response = original_search_chunk_vectors(
+            connection,
+            query,
+            settings=settings,
+            limit=limit,
+            metadata_filter=metadata_filter,
+            provider_preference=provider_preference,
+            allow_filter_fallback=allow_filter_fallback,
+        )
+        if response.disabled:
+            vector_state["disabled"] = True
+            vector_state["reason"] = response.disabled_reason
+        return response
+
+    with patch.object(hybrid_retrieval, "search_chunk_vectors", _tracking_search_chunk_vectors):
+        response = search_hybrid_chunks(
+            connection,
+            query,
+            settings=settings,
+            limit=RETRIEVAL_BENCHMARK_LIMIT,
+        )
+
+    if vector_state["disabled"]:
+        reason = vector_state["reason"] or "disabled"
+        raise RetrievalBenchmarkModeError(
+            f"Retrieval mode {RetrievalBenchmarkMode.HYBRID_RRF.value} is disabled: {reason}"
+        )
+
+    return response
