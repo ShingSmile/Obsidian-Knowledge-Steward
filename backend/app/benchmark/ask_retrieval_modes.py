@@ -5,6 +5,7 @@ import sqlite3
 
 from app.config import Settings
 from app.contracts.workflow import RetrievedChunkCandidate, RetrievalSearchResponse
+from app.retrieval.embeddings import resolve_embedding_provider_targets
 from app.retrieval.hybrid import search_hybrid_chunks
 from app.retrieval.sqlite_fts import search_chunks
 from app.retrieval.sqlite_vector import search_chunk_vectors
@@ -37,6 +38,8 @@ def run_retrieval_mode(
             settings=settings,
             mode=normalized_mode,
         )
+    except RetrievalBenchmarkModeError:
+        raise
     except Exception as exc:  # noqa: BLE001
         raise RetrievalBenchmarkModeError(
             f"Retrieval mode {normalized_mode.value} failed: {exc}"
@@ -83,17 +86,7 @@ def _dispatch_retrieval_mode(
                 limit=RETRIEVAL_BENCHMARK_LIMIT,
             )
         case RetrievalBenchmarkMode.HYBRID_RRF:
-            vector_probe_response = search_chunk_vectors(
-                connection,
-                query,
-                settings=settings,
-                limit=RETRIEVAL_BENCHMARK_LIMIT,
-            )
-            if vector_probe_response.disabled:
-                reason = vector_probe_response.disabled_reason or "disabled"
-                raise RetrievalBenchmarkModeError(
-                    f"Retrieval mode {mode.value} is disabled: {reason}"
-                )
+            _ensure_hybrid_vector_backend_ready(connection, settings)
             return search_hybrid_chunks(
                 connection,
                 query,
@@ -102,3 +95,49 @@ def _dispatch_retrieval_mode(
             )
 
     raise RetrievalBenchmarkModeError(f"Unsupported retrieval benchmark mode: {mode.value}")
+
+
+def _ensure_hybrid_vector_backend_ready(
+    connection: sqlite3.Connection,
+    settings: Settings,
+) -> None:
+    targets = resolve_embedding_provider_targets(settings=settings)
+    if not targets:
+        raise RetrievalBenchmarkModeError(
+            f"Retrieval mode {RetrievalBenchmarkMode.HYBRID_RRF.value} is disabled: "
+            "no_available_embedding_provider"
+        )
+
+    chunk_count = _fetch_scalar_count(connection, "SELECT COUNT(*) FROM chunk;")
+    if chunk_count == 0:
+        return
+
+    for target in targets:
+        embedding_count = _fetch_scalar_count(
+            connection,
+            """
+            SELECT COUNT(*)
+            FROM chunk_embedding
+            WHERE provider_key = ? AND model_name = ?;
+            """,
+            target.provider_key,
+            target.model_name,
+        )
+        if embedding_count > 0:
+            return
+
+    raise RetrievalBenchmarkModeError(
+        f"Retrieval mode {RetrievalBenchmarkMode.HYBRID_RRF.value} is disabled: "
+        "vector_index_not_ready"
+    )
+
+
+def _fetch_scalar_count(
+    connection: sqlite3.Connection,
+    query: str,
+    *params: object,
+) -> int:
+    row = connection.execute(query, params).fetchone()
+    if row is None:
+        return 0
+    return int(row[0] or 0)

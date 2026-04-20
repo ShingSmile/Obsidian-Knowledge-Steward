@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import unittest
 from contextlib import ExitStack
-from unittest.mock import patch, sentinel
+from unittest.mock import MagicMock, patch, sentinel
 
 from app.benchmark.ask_retrieval_modes import (
     RetrievalBenchmarkMode,
@@ -11,6 +11,7 @@ from app.benchmark.ask_retrieval_modes import (
 )
 from app.config import get_settings
 from app.contracts.workflow import RetrievalSearchResponse, RetrievedChunkCandidate
+from app.retrieval.embeddings import EmbeddingProviderTarget
 
 
 def _candidate() -> RetrievedChunkCandidate:
@@ -30,6 +31,16 @@ def _candidate() -> RetrievedChunkCandidate:
         snippet="snippet",
         text="alpha evidence",
     )
+
+
+def _hybrid_ready_connection(*, chunk_count: int = 1, embedding_count: int = 1) -> MagicMock:
+    connection = MagicMock()
+    chunk_cursor = MagicMock()
+    chunk_cursor.fetchone.return_value = (chunk_count,)
+    embedding_cursor = MagicMock()
+    embedding_cursor.fetchone.return_value = (embedding_count,)
+    connection.execute.side_effect = [chunk_cursor, embedding_cursor]
+    return connection
 
 
 class AskRetrievalModesTest(unittest.TestCase):
@@ -67,10 +78,24 @@ class AskRetrievalModesTest(unittest.TestCase):
                     if mode == RetrievalBenchmarkMode.HYBRID_RRF:
                         stack.enter_context(
                             patch(
-                                "app.benchmark.ask_retrieval_modes.search_chunk_vectors",
-                                return_value=RetrievalSearchResponse(candidates=[candidate]),
+                                "app.benchmark.ask_retrieval_modes.resolve_embedding_provider_targets",
+                                return_value=[
+                                    EmbeddingProviderTarget(
+                                        provider_key="cloud",
+                                        provider_name=settings.cloud_provider_name,
+                                        base_url="https://example.com",
+                                        model_name="text-embedding-test",
+                                    )
+                                ],
                             )
                         )
+                        stack.enter_context(
+                            patch(
+                                "app.benchmark.ask_retrieval_modes.search_chunk_vectors",
+                                side_effect=AssertionError("hybrid must not probe vector search"),
+                            )
+                        )
+                        connection = _hybrid_ready_connection()
                     result = run_retrieval_mode(
                         connection=connection,
                         query=query,
@@ -86,6 +111,8 @@ class AskRetrievalModesTest(unittest.TestCase):
                 self.assertEqual(called_kwargs["limit"], 10)
                 for key, value in expected_kwargs.items():
                     self.assertEqual(called_kwargs[key], value)
+                if mode == RetrievalBenchmarkMode.HYBRID_RRF:
+                    connection.execute.assert_called()
 
     def test_run_retrieval_mode_raises_for_disabled_responses(self) -> None:
         settings = get_settings()
@@ -113,40 +140,38 @@ class AskRetrievalModesTest(unittest.TestCase):
     def test_run_retrieval_mode_raises_for_hybrid_when_vector_backend_is_disabled(self) -> None:
         settings = get_settings()
         connection = sentinel.connection
-        candidate = _candidate()
-        vector_disabled_response = RetrievalSearchResponse(
-            candidates=[],
-            disabled=True,
-            disabled_reason="no_available_embedding_provider",
-        )
-        hybrid_partial_response = RetrievalSearchResponse(candidates=[candidate])
 
         with patch(
-            "app.benchmark.ask_retrieval_modes.search_chunk_vectors",
-            return_value=vector_disabled_response,
+            "app.benchmark.ask_retrieval_modes.resolve_embedding_provider_targets",
+            return_value=[],
         ):
-            with patch(
-                "app.benchmark.ask_retrieval_modes.search_hybrid_chunks",
-                return_value=hybrid_partial_response,
-            ):
-                with self.assertRaises(RetrievalBenchmarkModeError) as ctx:
-                    run_retrieval_mode(
-                        connection=connection,
-                        query="hybrid query",
-                        settings=settings,
-                        mode=RetrievalBenchmarkMode.HYBRID_RRF,
-                    )
+            with self.assertRaises(RetrievalBenchmarkModeError) as ctx:
+                run_retrieval_mode(
+                    connection=connection,
+                    query="hybrid query",
+                    settings=settings,
+                    mode=RetrievalBenchmarkMode.HYBRID_RRF,
+                )
 
-        self.assertIn("no_available_embedding_provider", str(ctx.exception))
+        self.assertEqual(
+            str(ctx.exception),
+            "Retrieval mode hybrid_rrf is disabled: no_available_embedding_provider",
+        )
 
     def test_run_retrieval_mode_wraps_backend_exceptions(self) -> None:
         settings = get_settings()
-        connection = sentinel.connection
-        probe_response = RetrievalSearchResponse(candidates=[_candidate()])
+        connection = _hybrid_ready_connection()
 
         with patch(
-            "app.benchmark.ask_retrieval_modes.search_chunk_vectors",
-            return_value=probe_response,
+            "app.benchmark.ask_retrieval_modes.resolve_embedding_provider_targets",
+            return_value=[
+                EmbeddingProviderTarget(
+                    provider_key="cloud",
+                    provider_name=settings.cloud_provider_name,
+                    base_url="https://example.com",
+                    model_name="text-embedding-test",
+                )
+            ],
         ):
             with patch(
                 "app.benchmark.ask_retrieval_modes.search_hybrid_chunks",
