@@ -12,8 +12,9 @@ from app.config import get_settings
 from app.contracts.workflow import RetrievalSearchResponse, RetrievedChunkCandidate
 
 
-def _candidate() -> RetrievedChunkCandidate:
+def _candidate(*, retrieval_source: str = "sqlite_fts") -> RetrievedChunkCandidate:
     return RetrievedChunkCandidate(
+        retrieval_source=retrieval_source,
         chunk_id="chunk-1",
         note_id="note-1",
         path="Notes/Alpha.md",
@@ -37,7 +38,10 @@ class AskRetrievalModesTest(unittest.TestCase):
         connection = sentinel.connection
         candidate = _candidate()
 
-        with patch("app.benchmark.ask_retrieval_modes.search_chunks", return_value=RetrievalSearchResponse(candidates=[candidate])) as mocked_fts:
+        with patch(
+            "app.benchmark.ask_retrieval_modes.search_chunks",
+            return_value=RetrievalSearchResponse(candidates=[candidate]),
+        ) as mocked_fts:
             result = run_retrieval_mode(
                 connection=connection,
                 query="fts query",
@@ -53,7 +57,10 @@ class AskRetrievalModesTest(unittest.TestCase):
         self.assertEqual(called_kwargs["limit"], 10)
         self.assertEqual(called_kwargs["vault_root"], settings.sample_vault_dir)
 
-        with patch("app.benchmark.ask_retrieval_modes.search_chunk_vectors", return_value=RetrievalSearchResponse(candidates=[candidate])) as mocked_vector:
+        with patch(
+            "app.benchmark.ask_retrieval_modes.search_chunk_vectors",
+            return_value=RetrievalSearchResponse(candidates=[candidate]),
+        ) as mocked_vector:
             result = run_retrieval_mode(
                 connection=connection,
                 query="vector query",
@@ -69,10 +76,16 @@ class AskRetrievalModesTest(unittest.TestCase):
         self.assertEqual(called_kwargs["limit"], 10)
         self.assertEqual(called_kwargs["settings"], settings)
 
-        with patch("app.retrieval.hybrid.search_chunks", return_value=RetrievalSearchResponse(candidates=[candidate])) as mocked_hybrid_fts:
+        fts_candidate = _candidate()
+        vector_candidate = _candidate()
+        vector_candidate = vector_candidate.model_copy(update={"retrieval_source": "sqlite_vector"})
+        with patch(
+            "app.benchmark.ask_retrieval_modes.search_chunks",
+            return_value=RetrievalSearchResponse(candidates=[fts_candidate]),
+        ) as mocked_hybrid_fts:
             with patch(
-                "app.retrieval.hybrid.search_chunk_vectors",
-                return_value=RetrievalSearchResponse(candidates=[candidate]),
+                "app.benchmark.ask_retrieval_modes.search_chunk_vectors",
+                return_value=RetrievalSearchResponse(candidates=[vector_candidate]),
             ) as mocked_hybrid_vector:
                 result = run_retrieval_mode(
                     connection=connection,
@@ -82,8 +95,7 @@ class AskRetrievalModesTest(unittest.TestCase):
                 )
 
         self.assertEqual(len(result), 1)
-        self.assertEqual(result[0].path, candidate.path)
-        self.assertEqual(result[0].chunk_id, candidate.chunk_id)
+        self.assertEqual(result[0].chunk_id, fts_candidate.chunk_id)
         self.assertEqual(result[0].retrieval_source, "hybrid_rrf")
         mocked_hybrid_fts.assert_called_once()
         mocked_hybrid_vector.assert_called_once()
@@ -91,6 +103,7 @@ class AskRetrievalModesTest(unittest.TestCase):
         self.assertEqual(hybrid_fts_args[0], connection)
         self.assertEqual(hybrid_fts_args[1], "hybrid query")
         self.assertEqual(hybrid_fts_kwargs["limit"], 10)
+        self.assertEqual(hybrid_fts_kwargs["vault_root"], settings.sample_vault_dir)
         hybrid_vector_args, hybrid_vector_kwargs = mocked_hybrid_vector.call_args
         self.assertEqual(hybrid_vector_args[0], connection)
         self.assertEqual(hybrid_vector_args[1], "hybrid query")
@@ -130,9 +143,12 @@ class AskRetrievalModesTest(unittest.TestCase):
             disabled_reason="all_embedding_providers_failed",
         )
 
-        with patch("app.retrieval.hybrid.search_chunks", return_value=RetrievalSearchResponse(candidates=[candidate])):
+        with patch(
+            "app.benchmark.ask_retrieval_modes.search_chunks",
+            return_value=RetrievalSearchResponse(candidates=[candidate]),
+        ) as mocked_fts:
             with patch(
-                "app.retrieval.hybrid.search_chunk_vectors",
+                "app.benchmark.ask_retrieval_modes.search_chunk_vectors",
                 return_value=disabled_vector_response,
             ) as mocked_vector_search:
                 with self.assertRaises(RetrievalBenchmarkModeError) as ctx:
@@ -147,6 +163,7 @@ class AskRetrievalModesTest(unittest.TestCase):
             str(ctx.exception),
             "Retrieval mode hybrid_rrf is disabled: all_embedding_providers_failed",
         )
+        mocked_fts.assert_called_once()
         mocked_vector_search.assert_called_once()
 
     def test_run_retrieval_mode_preserves_intentional_benchmark_errors(self) -> None:
@@ -154,16 +171,20 @@ class AskRetrievalModesTest(unittest.TestCase):
         connection = sentinel.connection
 
         with patch(
-            "app.benchmark.ask_retrieval_modes.search_hybrid_chunks",
-            side_effect=RetrievalBenchmarkModeError("Retrieval mode hybrid_rrf is disabled: explicit"),
+            "app.benchmark.ask_retrieval_modes.search_chunks",
+            return_value=RetrievalSearchResponse(candidates=[_candidate()]),
         ):
-            with self.assertRaises(RetrievalBenchmarkModeError) as ctx:
-                run_retrieval_mode(
-                    connection=connection,
-                    query="hybrid query",
-                    settings=settings,
-                    mode=RetrievalBenchmarkMode.HYBRID_RRF,
-                )
+            with patch(
+                "app.benchmark.ask_retrieval_modes.search_chunk_vectors",
+                side_effect=RetrievalBenchmarkModeError("Retrieval mode hybrid_rrf is disabled: explicit"),
+            ):
+                with self.assertRaises(RetrievalBenchmarkModeError) as ctx:
+                    run_retrieval_mode(
+                        connection=connection,
+                        query="hybrid query",
+                        settings=settings,
+                        mode=RetrievalBenchmarkMode.HYBRID_RRF,
+                    )
 
         self.assertEqual(
             str(ctx.exception),
@@ -174,9 +195,12 @@ class AskRetrievalModesTest(unittest.TestCase):
         settings = get_settings()
         connection = sentinel.connection
 
-        with patch("app.retrieval.hybrid.search_chunks", return_value=RetrievalSearchResponse(candidates=[_candidate()])):
+        with patch(
+            "app.benchmark.ask_retrieval_modes.search_chunks",
+            return_value=RetrievalSearchResponse(candidates=[_candidate()]),
+        ):
             with patch(
-                "app.retrieval.hybrid.search_chunk_vectors",
+                "app.benchmark.ask_retrieval_modes.search_chunk_vectors",
                 side_effect=RuntimeError("backend exploded"),
             ):
                 with self.assertRaises(RetrievalBenchmarkModeError) as ctx:
