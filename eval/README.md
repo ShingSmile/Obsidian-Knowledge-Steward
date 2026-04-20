@@ -39,6 +39,18 @@
 - 不把本轮扩成分场景 benchmark 或 dashboard
 - 不把离线指标直接接进 ask runtime gate
 
+## Operator Entry Points
+
+`eval/run_eval.py` 仍然是 regression baseline runner，用来跑整套 eval 回归，不替代 benchmark 数据层。
+
+`eval/benchmark/run_retrieval_benchmark.py` 是 retrieval-only benchmark 入口，只跑 ask retrieval benchmark；它支持 `--output` 显式指定结果文件，也支持 `--dataset` 覆盖数据集路径做 smoke test。`--output` 省略时，结果会落到 `eval/results/` 下的默认时间戳文件。
+
+示例：
+
+```bash
+/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/.conda/knowledge-steward/bin/python eval/benchmark/run_retrieval_benchmark.py --output /tmp/retrieval-benchmark.json
+```
+
 ## Ask Benchmark Dataset Workflow
 
 `eval/benchmark/` 目录下的 operator 入口是：
