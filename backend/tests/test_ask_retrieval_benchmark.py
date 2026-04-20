@@ -310,6 +310,10 @@ class AskRetrievalBenchmarkTest(unittest.TestCase):
         self.assertEqual(result["run_status"], "failed")
         self.assertNotIn("summary_metrics", result["modes"]["fts_only"])
         self.assertEqual(result["modes"]["fts_only"]["status"], "completed_before_failure")
+        self.assertIn(
+            "benchmark stopped on vector_only failure",
+            result["modes"]["fts_only"]["failure_reason"],
+        )
         self.assertEqual(result["modes"]["vector_only"]["status"], "failed")
         self.assertEqual(
             result["modes"]["vector_only"]["failure_reason"],

@@ -147,6 +147,9 @@ def run_ask_retrieval_benchmark(
                 result["run_status"] = "failed"
                 for completed_mode in completed_modes:
                     result["modes"][completed_mode]["status"] = "completed_before_failure"
+                    result["modes"][completed_mode]["failure_reason"] = (
+                        f"mode completed before benchmark stopped on {mode_key} failure"
+                    )
                 result["modes"][mode_key]["status"] = "failed"
                 result["modes"][mode_key]["failure_reason"] = str(exc)
                 for remaining_mode in _TASK_058_V1_MODES[mode_index + 1 :]:
