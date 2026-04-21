@@ -5,6 +5,10 @@ import sqlite3
 
 from app.config import Settings
 from app.contracts.workflow import RetrievedChunkCandidate, RetrievalSearchResponse
+from app.retrieval.embeddings import (
+    EmbeddingProviderTarget,
+    resolve_exact_embedding_provider_target,
+)
 from app.retrieval.hybrid import HYBRID_BRANCH_MIN_LIMIT, _fuse_candidates
 from app.retrieval.sqlite_fts import search_chunks
 from app.retrieval.sqlite_vector import search_chunk_vectors
@@ -78,11 +82,16 @@ def _dispatch_retrieval_mode(
                 vault_root=settings.sample_vault_dir,
             )
         case RetrievalBenchmarkMode.VECTOR_ONLY:
+            local_target = _require_local_embedding_target(
+                settings=settings,
+                mode=mode,
+            )
             return search_chunk_vectors(
                 connection,
                 query,
                 settings=settings,
                 limit=RETRIEVAL_BENCHMARK_LIMIT,
+                provider_targets=[local_target],
             )
         case RetrievalBenchmarkMode.HYBRID_RRF:
             return _run_hybrid_rrf(
@@ -94,12 +103,32 @@ def _dispatch_retrieval_mode(
     raise RetrievalBenchmarkModeError(f"Unsupported retrieval benchmark mode: {mode.value}")
 
 
+def _require_local_embedding_target(
+    *,
+    settings: Settings,
+    mode: RetrievalBenchmarkMode,
+) -> EmbeddingProviderTarget:
+    local_target = resolve_exact_embedding_provider_target(
+        settings=settings,
+        provider_key="local",
+    )
+    if local_target is None:
+        raise RetrievalBenchmarkModeError(
+            f"Retrieval mode {mode.value} is disabled: local_embedding_provider_not_configured"
+        )
+    return local_target
+
+
 def _run_hybrid_rrf(
     connection: sqlite3.Connection,
     query: str,
     settings: Settings,
 ) -> RetrievalSearchResponse:
     branch_limit = max(RETRIEVAL_BENCHMARK_LIMIT, HYBRID_BRANCH_MIN_LIMIT)
+    local_target = _require_local_embedding_target(
+        settings=settings,
+        mode=RetrievalBenchmarkMode.HYBRID_RRF,
+    )
     lexical_response = search_chunks(
         connection,
         query,
@@ -111,6 +140,7 @@ def _run_hybrid_rrf(
         query,
         settings=settings,
         limit=branch_limit,
+        provider_targets=[local_target],
     )
     if vector_response.disabled:
         reason = vector_response.disabled_reason or "disabled"

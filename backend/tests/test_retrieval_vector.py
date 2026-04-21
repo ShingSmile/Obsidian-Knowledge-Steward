@@ -4,15 +4,55 @@ from dataclasses import replace
 from pathlib import Path
 import tempfile
 import unittest
-from unittest.mock import patch
+from unittest.mock import Mock, patch, sentinel
 
 from app.config import get_settings
 from app.indexing.ingest import ingest_vault
-from app.retrieval.embeddings import EmbeddingBatchResult
-from app.retrieval.sqlite_vector import search_chunk_vectors_in_db
+from app.retrieval.embeddings import EmbeddingBatchResult, EmbeddingProviderTarget
+from app.retrieval.sqlite_vector import search_chunk_vectors, search_chunk_vectors_in_db
 
 
 class SqliteVectorRetrievalTests(unittest.TestCase):
+    def test_search_chunk_vectors_forwards_explicit_provider_targets(self) -> None:
+        connection = Mock()
+        connection.execute.return_value.fetchone.return_value = [0]
+        settings = get_settings()
+        target = EmbeddingProviderTarget(
+            provider_key="local",
+            provider_name="ollama",
+            base_url="http://127.0.0.1:11434",
+            model_name="nomic-embed-text",
+        )
+
+        with patch(
+            "app.retrieval.sqlite_vector.embed_texts",
+            return_value=EmbeddingBatchResult(
+                embeddings=[[1.0, 0.0]],
+                provider_key="local",
+                provider_name="ollama",
+                model_name="nomic-embed-text",
+            ),
+        ) as mocked_embed:
+            with patch(
+                "app.retrieval.sqlite_vector._count_matching_embeddings",
+                return_value=1,
+            ):
+                with patch(
+                    "app.retrieval.sqlite_vector._query_vector_candidates",
+                    return_value=[],
+                ):
+                    response = search_chunk_vectors(
+                        connection=connection,
+                        query="alpha question",
+                        settings=settings,
+                        provider_targets=[target],
+                    )
+
+        self.assertFalse(response.disabled)
+        self.assertEqual(response.candidates, [])
+        self.assertEqual(mocked_embed.call_args.kwargs["provider_targets"], [target])
+        self.assertIsNone(mocked_embed.call_args.kwargs["provider_preference"])
+
     def test_search_chunk_vectors_returns_standard_candidates(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_root = Path(temp_dir)

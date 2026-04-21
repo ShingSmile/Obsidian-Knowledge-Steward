@@ -4,6 +4,7 @@ import argparse
 import json
 from pathlib import Path
 import sqlite3
+from typing import Sequence
 
 from app.config import Settings, get_settings
 from app.contracts.workflow import (
@@ -12,7 +13,7 @@ from app.contracts.workflow import (
     RetrievedChunkCandidate,
 )
 from app.indexing.store import connect_sqlite, initialize_index_db
-from app.retrieval.embeddings import embed_texts
+from app.retrieval.embeddings import EmbeddingProviderTarget, embed_texts
 from app.retrieval.sqlite_fts import _build_filter_sql, _normalize_metadata_filter
 
 
@@ -27,6 +28,7 @@ def search_chunk_vectors(
     limit: int = 5,
     metadata_filter: RetrievalMetadataFilter | None = None,
     provider_preference: str | None = None,
+    provider_targets: Sequence[EmbeddingProviderTarget] | None = None,
     allow_filter_fallback: bool = True,
 ) -> RetrievalSearchResponse:
     if limit <= 0:
@@ -44,6 +46,7 @@ def search_chunk_vectors(
         [normalized_query],
         settings=settings,
         provider_preference=provider_preference,
+        provider_targets=provider_targets,
     )
     if query_embedding_result.disabled:
         return RetrievalSearchResponse(
@@ -119,6 +122,7 @@ def search_chunk_vectors_in_db(
     limit: int = 5,
     metadata_filter: RetrievalMetadataFilter | None = None,
     provider_preference: str | None = None,
+    provider_targets: Sequence[EmbeddingProviderTarget] | None = None,
     allow_filter_fallback: bool = True,
 ) -> RetrievalSearchResponse:
     runtime_settings = settings or get_settings()
@@ -135,6 +139,7 @@ def search_chunk_vectors_in_db(
             limit=limit,
             metadata_filter=metadata_filter,
             provider_preference=provider_preference,
+            provider_targets=provider_targets,
             allow_filter_fallback=allow_filter_fallback,
         )
     finally:
