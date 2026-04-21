@@ -13,6 +13,7 @@ if str(BACKEND_DIR) not in sys.path:
     sys.path.insert(0, str(BACKEND_DIR))
 
 from app.benchmark.ask_retrieval_benchmark import run_ask_retrieval_benchmark  # noqa: E402
+from app.benchmark.ask_retrieval_preflight import run_local_retrieval_preflight  # noqa: E402
 from app.config import get_settings  # noqa: E402
 
 
@@ -29,8 +30,14 @@ def main(argv: list[str] | None = None) -> int:
     parser = _build_arg_parser()
     try:
         args = parser.parse_args(argv)
+        settings = get_settings()
+        preflight = run_local_retrieval_preflight(settings=settings)
+        if preflight.status != "ok":
+            print(f"ERROR: {preflight.message}", file=sys.stderr)
+            return 1
+
         result = run_ask_retrieval_benchmark(
-            settings=get_settings(),
+            settings=settings,
             dataset_path=args.dataset,
             output_path=args.output,
         )
