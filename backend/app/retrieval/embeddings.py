@@ -75,6 +75,31 @@ def resolve_embedding_provider_targets(
     return ordered_targets
 
 
+def resolve_exact_embedding_provider_target(
+    *,
+    settings: Settings,
+    provider_key: str,
+) -> EmbeddingProviderTarget | None:
+    normalized_provider_key = provider_key.strip().casefold()
+    if normalized_provider_key == "cloud":
+        return _build_provider_target(
+            provider_key="cloud",
+            provider_name=settings.cloud_provider_name,
+            base_url=settings.cloud_base_url,
+            model_name=settings.cloud_embedding_model,
+            api_key=settings.cloud_api_key or None,
+        )
+    if normalized_provider_key == "local":
+        return _build_provider_target(
+            provider_key="local",
+            provider_name=settings.local_provider_name,
+            base_url=settings.local_base_url,
+            model_name=settings.local_embedding_model,
+            api_key=None,
+        )
+    return None
+
+
 def embed_texts(
     texts: Sequence[str],
     *,
