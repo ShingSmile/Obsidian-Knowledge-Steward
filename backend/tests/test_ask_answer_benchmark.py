@@ -49,6 +49,16 @@ def _fake_execution(
     return Mock(ask_result=ask_result)
 
 
+def _call_matrix(call_args_list: list[tuple[object, dict[str, object]]]) -> list[tuple[str, str]]:
+    return [
+        (
+            call.args[0].metadata["case_id"],
+            call.args[0].metadata["variant_id"],
+        )
+        for call in call_args_list
+    ]
+
+
 class AskAnswerBenchmarkContractTests(unittest.TestCase):
     def test_load_smoke_case_ids_returns_fixed_unique_ten_case_subset(self) -> None:
         case_ids = load_answer_benchmark_smoke_case_ids()
@@ -264,8 +274,17 @@ class AskAnswerBenchmarkOrchestrationTests(unittest.TestCase):
             self.assertEqual(len(result["selected_case_ids"]), 10)
             self.assertEqual(result["selected_case_ids"], list(load_answer_benchmark_smoke_case_ids()))
             self.assertEqual(mocked_invoke.call_count, 30)
+            expected_case_variant_matrix = [
+                (case_id, variant.variant_id)
+                for case_id in result["selected_case_ids"]
+                for variant in ANSWER_BENCHMARK_VARIANTS
+            ]
+            self.assertEqual(_call_matrix(mocked_invoke.call_args_list), expected_case_variant_matrix)
             first_request = mocked_invoke.call_args_list[0].args[0]
+            first_kwargs = mocked_invoke.call_args_list[0].kwargs
             self.assertEqual(first_request.provider_preference, "cloud")
+            self.assertEqual(first_kwargs["settings"].cloud_chat_model, "qwen-max")
+            self.assertEqual(first_kwargs["settings"].local_chat_model, "")
             self.assertTrue(output_path.exists())
             self.assertEqual(result["provider_name"], "openai-compatible")
             self.assertEqual(result["model_name"], "qwen-max")
@@ -277,24 +296,15 @@ class AskAnswerBenchmarkOrchestrationTests(unittest.TestCase):
             self.assertEqual(len(result["case_variant_records"]), 30)
             self.assertEqual(result["smoke_subset_version"], 1)
             self.assertNotIn("tool_allowed", result["variant_aggregates"]["hybrid"])
+            self.assertEqual(result["artifact_metadata"]["provider_name"], "openai-compatible")
+            self.assertEqual(result["artifact_metadata"]["model_name"], "qwen-max")
             self.assertEqual(
-                set(result["artifact_metadata"]),
-                {
-                    "schema_version",
-                    "benchmark_kind",
-                    "benchmark_mode",
-                    "dataset_version",
-                    "provider_name",
-                    "model_name",
-                    "run_timestamp",
-                    "git_commit",
-                    "prompt_version",
-                    "worktree_dirty",
-                    "selected_case_count",
-                    "selected_case_ids",
-                    "smoke_subset_version",
-                },
+                result["artifact_metadata"]["prompt_version"],
+                resolve_answer_benchmark_prompt_version(),
             )
+            self.assertEqual(result["artifact_metadata"]["git_commit"], "abc1234")
+            self.assertEqual(result["artifact_metadata"]["benchmark_mode"], "smoke")
+            self.assertEqual(result["artifact_metadata"]["selected_case_ids"], result["selected_case_ids"])
 
     def test_run_ask_answer_benchmark_full_selects_fifty_cases_and_includes_tool_aggregate(self) -> None:
         settings = get_settings()
@@ -332,28 +342,29 @@ class AskAnswerBenchmarkOrchestrationTests(unittest.TestCase):
             self.assertEqual(result["benchmark_mode"], "full")
             self.assertEqual(len(result["selected_case_ids"]), 50)
             self.assertEqual(mocked_invoke.call_count, 150)
+            expected_case_variant_matrix = [
+                (case.case_id, variant.variant_id)
+                for case in dataset.cases
+                for variant in ANSWER_BENCHMARK_VARIANTS
+            ]
+            self.assertEqual(_call_matrix(mocked_invoke.call_args_list), expected_case_variant_matrix)
             first_request = mocked_invoke.call_args_list[0].args[0]
+            first_kwargs = mocked_invoke.call_args_list[0].kwargs
             self.assertEqual(first_request.provider_preference, "cloud")
+            self.assertEqual(first_kwargs["settings"].cloud_chat_model, "qwen-max")
+            self.assertEqual(first_kwargs["settings"].local_chat_model, "")
             self.assertEqual(result["provider_name"], "openai-compatible")
             self.assertEqual(result["model_name"], "qwen-max")
             self.assertEqual(result["git_commit"], "abc1234")
             self.assertTrue(result["worktree_dirty"])
             self.assertEqual(len(result["case_variant_records"]), 150)
             self.assertIn("tool_allowed", result["variant_aggregates"]["hybrid"])
+            self.assertEqual(result["artifact_metadata"]["provider_name"], "openai-compatible")
+            self.assertEqual(result["artifact_metadata"]["model_name"], "qwen-max")
             self.assertEqual(
-                set(result["artifact_metadata"]),
-                {
-                    "schema_version",
-                    "benchmark_kind",
-                    "benchmark_mode",
-                    "dataset_version",
-                    "provider_name",
-                    "model_name",
-                    "run_timestamp",
-                    "git_commit",
-                    "prompt_version",
-                    "worktree_dirty",
-                    "selected_case_count",
-                    "selected_case_ids",
-                },
+                result["artifact_metadata"]["prompt_version"],
+                resolve_answer_benchmark_prompt_version(),
             )
+            self.assertEqual(result["artifact_metadata"]["git_commit"], "abc1234")
+            self.assertEqual(result["artifact_metadata"]["benchmark_mode"], "full")
+            self.assertEqual(result["artifact_metadata"]["selected_case_ids"], result["selected_case_ids"])
