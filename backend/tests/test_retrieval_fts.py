@@ -12,6 +12,72 @@ from app.retrieval.sqlite_fts import search_chunks_in_db
 
 
 class SqliteFTSRetrievalTests(unittest.TestCase):
+    def test_search_chunks_supports_natural_language_date_query(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_root = Path(temp_dir)
+            vault_path = temp_root / "vault"
+            (vault_path / "日常" / "2023-06").mkdir(parents=True)
+            db_path = temp_root / "knowledge_steward.sqlite3"
+
+            (vault_path / "日常" / "2023-06" / "2023-06-05_星期一.md").write_text(
+                "# 一、 工作任务\n\n"
+                "- [ ] 对v6.2.5迭代进行总结复盘\n"
+                "- [x] 周报完成 ✅ 2023-06-05\n"
+                "- [ ] 自测相关工作继续推进\n",
+                encoding="utf-8",
+            )
+            (vault_path / "日常" / "2023-06" / "2023-06-06_星期二.md").write_text(
+                "# 一、 工作任务\n\n"
+                "- [ ] 普通跟进事项\n",
+                encoding="utf-8",
+            )
+
+            ingest_vault(vault_path=vault_path, db_path=db_path)
+            response = search_chunks_in_db(
+                db_path,
+                "2023-06-05 的工作任务里有哪些还没完成的事项？",
+                limit=5,
+            )
+
+            self.assertGreaterEqual(len(response.candidates), 1)
+            self.assertEqual(
+                response.candidates[0].path,
+                "日常/2023-06/2023-06-05_星期一.md",
+            )
+
+    def test_search_chunks_supports_natural_language_version_query(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_root = Path(temp_dir)
+            vault_path = temp_root / "vault"
+            (vault_path / "日常" / "2023-06").mkdir(parents=True)
+            db_path = temp_root / "knowledge_steward.sqlite3"
+
+            (vault_path / "日常" / "2023-06" / "v6.2.5迭代总结.md").write_text(
+                "# v6.2.5 迭代总结\n\n"
+                "## 2、优化点\n\n"
+                "- 对业务特征积累熟练度，提高阅读代码的效率\n",
+                encoding="utf-8",
+            )
+            (vault_path / "日常" / "2023-06" / "v6.3.0迭代总结.md").write_text(
+                "# v6.3.0 迭代总结\n\n"
+                "## 2、优化点\n\n"
+                "- 一般性的优化点\n",
+                encoding="utf-8",
+            )
+
+            ingest_vault(vault_path=vault_path, db_path=db_path)
+            response = search_chunks_in_db(
+                db_path,
+                "v6.2.5 迭代总结里列了哪些优化点？",
+                limit=5,
+            )
+
+            self.assertGreaterEqual(len(response.candidates), 1)
+            self.assertEqual(
+                response.candidates[0].path,
+                "日常/2023-06/v6.2.5迭代总结.md",
+            )
+
     def test_search_chunks_returns_standard_candidates_with_metadata_filter(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_root = Path(temp_dir)

@@ -17,19 +17,28 @@ from app.path_semantics import PathContractError, normalize_path_separators, nor
 
 QUERY_TERM_RE = re.compile(r"[0-9A-Za-z_\u4e00-\u9fff]+")
 DATE_RE = re.compile(r"\d{4}-\d{2}-\d{2}")
+CJK_ONLY_RE = re.compile(r"[\u4e00-\u9fff]+")
+
+MAX_CJK_SUBTERM_LENGTH = 6
+MIN_CJK_SUBTERM_LENGTH = 3
+MAX_CJK_SUBTERMS = 2
 
 # 兼容 TASK-006 阶段已有命名，避免后续接 TASK-007 时把调用面完全推翻。
 ChunkSearchHit = RetrievedChunkCandidate
 
 
-def _normalize_query(raw_query: str) -> str:
+def _normalize_query(connection: sqlite3.Connection, raw_query: str) -> str:
     terms = QUERY_TERM_RE.findall(raw_query.strip())
     if not terms:
         raise ValueError("Search query must contain at least one searchable term.")
 
+    expanded_terms: list[str] = []
+    for term in terms:
+        expanded_terms.extend(_expand_query_term(connection, term))
+
     deduplicated_terms: list[str] = []
     seen: set[str] = set()
-    for term in terms:
+    for term in expanded_terms:
         lowered = term.casefold()
         if lowered in seen:
             continue
@@ -40,6 +49,83 @@ def _normalize_query(raw_query: str) -> str:
     # 避免用户输入 `Roadmap!!!`、`(plan)` 之类内容时直接把 MATCH 语法打崩。
     escaped_terms = [term.replace('"', '""') for term in deduplicated_terms]
     return " ".join(f'"{term}"' for term in escaped_terms)
+
+
+def _expand_query_term(
+    connection: sqlite3.Connection,
+    term: str,
+) -> list[str]:
+    if not CJK_ONLY_RE.fullmatch(term):
+        return [term]
+    if len(term) <= MAX_CJK_SUBTERM_LENGTH:
+        return [term]
+
+    matched_subterms = _select_matching_cjk_subterms(connection, term)
+    return matched_subterms or [term]
+
+
+def _select_matching_cjk_subterms(
+    connection: sqlite3.Connection,
+    term: str,
+) -> list[str]:
+    selected_subterms = _select_matching_cjk_subterms_with_min_length(
+        connection,
+        term,
+        min_length=MIN_CJK_SUBTERM_LENGTH,
+    )
+    if selected_subterms:
+        return selected_subterms
+    return _select_matching_cjk_subterms_with_min_length(
+        connection,
+        term,
+        min_length=2,
+    )
+
+
+def _select_matching_cjk_subterms_with_min_length(
+    connection: sqlite3.Connection,
+    term: str,
+    *,
+    min_length: int,
+) -> list[str]:
+    candidate_ranges: list[tuple[int, int, str]] = []
+    max_length = min(MAX_CJK_SUBTERM_LENGTH, len(term))
+    for length in range(max_length, min_length - 1, -1):
+        for start in range(0, len(term) - length + 1):
+            subterm = term[start : start + length]
+            if not _cjk_subterm_matches(connection, subterm):
+                continue
+            candidate_ranges.append((start, start + length, subterm))
+
+    if not candidate_ranges:
+        return []
+
+    selected: list[tuple[int, int, str]] = []
+    for start, end, subterm in candidate_ranges:
+        if any(not (end <= selected_start or start >= selected_end) for selected_start, selected_end, _ in selected):
+            continue
+        selected.append((start, end, subterm))
+        if len(selected) >= MAX_CJK_SUBTERMS:
+            break
+
+    return [subterm for _, _, subterm in selected]
+
+
+def _cjk_subterm_matches(
+    connection: sqlite3.Connection,
+    subterm: str,
+) -> bool:
+    quoted_subterm = f'"{subterm.replace(chr(34), chr(34) * 2)}"'
+    row = connection.execute(
+        """
+        SELECT 1
+        FROM chunk_fts
+        WHERE chunk_fts MATCH ?
+        LIMIT 1;
+        """,
+        (quoted_subterm,),
+    ).fetchone()
+    return row is not None
 
 
 def _deduplicate_terms(values: list[str], *, casefold: bool = False) -> list[str]:
@@ -275,7 +361,7 @@ def search_chunks(
         raise ValueError("Search limit must be greater than 0.")
 
     _ensure_chunk_fts_ready(connection)
-    normalized_query = _normalize_query(query)
+    normalized_query = _normalize_query(connection, query)
     requested_filter = _normalize_metadata_filter(
         metadata_filter,
         vault_root=vault_root,
