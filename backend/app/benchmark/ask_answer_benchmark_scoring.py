@@ -85,7 +85,7 @@ def score_answer_benchmark_case(
         else:
             verdict = "incorrect"
     elif ask_result.mode in (AskResultMode.RETRIEVAL_ONLY, AskResultMode.NO_HITS):
-        if case.allow_retrieval_only and not case.should_generate_answer:
+        if case.allow_retrieval_only:
             verdict = "partial"
         else:
             verdict = "incorrect"

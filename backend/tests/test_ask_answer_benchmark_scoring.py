@@ -126,7 +126,7 @@ class AskAnswerBenchmarkScoringTest(unittest.TestCase):
             case_id="case-fallback",
             expected_facts=["Alpha 已完成"],
             allow_retrieval_only=True,
-            should_generate_answer=False,
+            should_generate_answer=True,
         )
         ask_result = _ask_result(
             mode=AskResultMode.RETRIEVAL_ONLY,
@@ -134,6 +134,27 @@ class AskAnswerBenchmarkScoringTest(unittest.TestCase):
         )
 
         score = score_answer_benchmark_case(case=case, ask_result=ask_result, latency_ms=180)
+
+        self.assertEqual(score.verdict, "partial")
+        self.assertEqual(score.correctness_points, 0.5)
+        self.assertFalse(score.unsupported_claim)
+        self.assertEqual(score.matched_expected_facts, [])
+        self.assertEqual(score.missed_expected_facts, ["Alpha 已完成"])
+        self.assertEqual(score.forbidden_claim_hits, [])
+
+    def test_score_case_treats_no_hits_as_compliant_fallback_when_allowed(self) -> None:
+        case = _case(
+            case_id="case-no-hits",
+            expected_facts=["Alpha 已完成"],
+            allow_retrieval_only=True,
+            should_generate_answer=True,
+        )
+        ask_result = _ask_result(
+            mode=AskResultMode.NO_HITS,
+            answer="",
+        )
+
+        score = score_answer_benchmark_case(case=case, ask_result=ask_result, latency_ms=190)
 
         self.assertEqual(score.verdict, "partial")
         self.assertEqual(score.correctness_points, 0.5)
