@@ -17,6 +17,7 @@ from app.path_semantics import PathContractError, normalize_path_separators, nor
 
 QUERY_TERM_RE = re.compile(r"[0-9A-Za-z_\u4e00-\u9fff]+")
 DATE_RE = re.compile(r"\d{4}-\d{2}-\d{2}")
+VERSION_RE = re.compile(r"[Vv]\d+(?:\.\d+)+")
 CJK_ONLY_RE = re.compile(r"[\u4e00-\u9fff]+")
 
 MAX_CJK_SUBTERM_LENGTH = 6
@@ -28,7 +29,10 @@ ChunkSearchHit = RetrievedChunkCandidate
 
 
 def _normalize_query(connection: sqlite3.Connection, raw_query: str) -> str:
-    terms = QUERY_TERM_RE.findall(raw_query.strip())
+    stripped_query = _strip_query_hints(raw_query)
+    terms = QUERY_TERM_RE.findall(stripped_query.strip())
+    if not terms:
+        terms = QUERY_TERM_RE.findall(raw_query.strip())
     if not terms:
         raise ValueError("Search query must contain at least one searchable term.")
 
@@ -49,6 +53,19 @@ def _normalize_query(connection: sqlite3.Connection, raw_query: str) -> str:
     # 避免用户输入 `Roadmap!!!`、`(plan)` 之类内容时直接把 MATCH 语法打崩。
     escaped_terms = [term.replace('"', '""') for term in deduplicated_terms]
     return " ".join(f'"{term}"' for term in escaped_terms)
+
+
+def _extract_query_hints(raw_query: str) -> list[str]:
+    return _deduplicate_terms(
+        DATE_RE.findall(raw_query) + VERSION_RE.findall(raw_query),
+        casefold=True,
+    )
+
+
+def _strip_query_hints(raw_query: str) -> str:
+    stripped_query = DATE_RE.sub(" ", raw_query)
+    stripped_query = VERSION_RE.sub(" ", stripped_query)
+    return stripped_query
 
 
 def _expand_query_term(
@@ -244,6 +261,10 @@ def _escape_like_prefix(prefix: str) -> str:
     return prefix.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
 
 
+def _escape_like_contains(value: str) -> str:
+    return _escape_like_prefix(value)
+
+
 def _build_filter_sql(
     metadata_filter: RetrievalMetadataFilter,
 ) -> tuple[list[str], list[object]]:
@@ -294,6 +315,7 @@ def _query_candidates(
     *,
     limit: int,
     metadata_filter: RetrievalMetadataFilter,
+    query_hints: list[str],
 ) -> list[RetrievedChunkCandidate]:
     filter_clauses, filter_params = _build_filter_sql(metadata_filter)
     where_clauses = ["chunk_fts MATCH ?"]
@@ -327,7 +349,18 @@ def _query_candidates(
         params,
     ).fetchall()
 
-    return [
+    if query_hints:
+        rows = _merge_candidate_rows(
+            base_rows=rows,
+            supplemental_rows=_query_hint_rows(
+                connection,
+                normalized_query,
+                metadata_filter=metadata_filter,
+                query_hints=query_hints,
+            ),
+        )
+
+    candidates = [
         RetrievedChunkCandidate(
             chunk_id=row["chunk_id"],
             note_id=row["note_id"],
@@ -340,12 +373,153 @@ def _query_candidates(
             source_mtime_ns=row["source_mtime_ns"],
             start_line=row["start_line"],
             end_line=row["end_line"],
-            score=row["score"],
+            score=row["score"] + _compute_hint_boost(row, query_hints),
             snippet=row["snippet"],
             text=row["text"],
         )
         for row in rows
     ]
+    candidates.sort(
+        key=lambda candidate: (
+            -candidate.score,
+            candidate.path,
+            candidate.start_line,
+        )
+    )
+    return candidates[:limit]
+
+
+def _query_hint_rows(
+    connection: sqlite3.Connection,
+    normalized_query: str,
+    *,
+    metadata_filter: RetrievalMetadataFilter,
+    query_hints: list[str],
+) -> list[sqlite3.Row]:
+    filter_clauses, filter_params = _build_filter_sql(metadata_filter)
+    hint_clauses, hint_params = _build_hint_sql(query_hints)
+    if not hint_clauses:
+        return []
+
+    where_clauses = ["chunk_fts MATCH ?"]
+    where_clauses.extend(filter_clauses)
+    where_clauses.append(f"({' OR '.join(hint_clauses)})")
+    params: list[object] = [normalized_query, *filter_params, *hint_params]
+
+    return connection.execute(
+        f"""
+        SELECT
+            chunk_fts.chunk_id AS chunk_id,
+            chunk_fts.note_id AS note_id,
+            note.path AS path,
+            note.title AS title,
+            note.note_type AS note_type,
+            note.template_family AS template_family,
+            note.daily_note_date AS daily_note_date,
+            note.source_mtime_ns AS source_mtime_ns,
+            chunk.heading_path AS heading_path,
+            chunk.start_line AS start_line,
+            chunk.end_line AS end_line,
+            chunk.text AS text,
+            -bm25(chunk_fts) AS score,
+            snippet(chunk_fts, -1, '[', ']', '...', 12) AS snippet
+        FROM chunk_fts
+        INNER JOIN chunk ON chunk.chunk_id = chunk_fts.chunk_id
+        INNER JOIN note ON note.note_id = chunk.note_id
+        WHERE {' AND '.join(where_clauses)}
+        ORDER BY score DESC, note.path ASC, chunk.start_line ASC;
+        """,
+        params,
+    ).fetchall()
+
+
+def _build_hint_sql(query_hints: list[str]) -> tuple[list[str], list[object]]:
+    clauses: list[str] = []
+    params: list[object] = []
+    for hint in query_hints:
+        normalized_hint = hint.casefold()
+        like_param = f"%{_escape_like_contains(normalized_hint)}%"
+        clauses.append(
+            "("
+            "lower(note.path) LIKE ? ESCAPE '\\' OR "
+            "lower(note.title) LIKE ? ESCAPE '\\' OR "
+            "lower(COALESCE(chunk.heading_path, '')) LIKE ? ESCAPE '\\' OR "
+            "lower(chunk.text) LIKE ? ESCAPE '\\'"
+            ")"
+        )
+        params.extend([like_param, like_param, like_param, like_param])
+    return clauses, params
+
+
+def _merge_candidate_rows(
+    *,
+    base_rows: list[sqlite3.Row],
+    supplemental_rows: list[sqlite3.Row],
+) -> list[sqlite3.Row]:
+    merged_rows: dict[int, sqlite3.Row] = {}
+    for row in base_rows:
+        merged_rows[row["chunk_id"]] = row
+    for row in supplemental_rows:
+        merged_rows[row["chunk_id"]] = row
+    return list(merged_rows.values())
+
+
+def _compute_hint_boost(
+    row: sqlite3.Row,
+    query_hints: list[str],
+) -> float:
+    if not query_hints:
+        return 0.0
+
+    path = str(row["path"] or "").casefold()
+    title = str(row["title"] or "").casefold()
+    heading_path = str(row["heading_path"] or "").casefold()
+    text = str(row["text"] or "").casefold()
+
+    boost = 0.0
+    for hint in query_hints:
+        if _hint_matches_value(path, hint):
+            boost += 100.0
+        elif _hint_matches_value(title, hint):
+            boost += 80.0
+        elif _hint_matches_value(heading_path, hint):
+            boost += 40.0
+        elif _hint_matches_value(text, hint):
+            boost += 20.0
+    return boost
+
+
+def _hint_matches_value(value: str, hint: str) -> bool:
+    if not value or not hint:
+        return False
+
+    search_start = 0
+    while True:
+        match_index = value.find(hint, search_start)
+        if match_index < 0:
+            return False
+        if _is_valid_hint_boundary(value, hint, match_index):
+            return True
+        search_start = match_index + 1
+
+
+def _is_valid_hint_boundary(
+    value: str,
+    hint: str,
+    match_index: int,
+) -> bool:
+    before = value[match_index - 1] if match_index > 0 else ""
+    after_index = match_index + len(hint)
+    after = value[after_index] if after_index < len(value) else ""
+
+    if VERSION_RE.fullmatch(hint):
+        invalid_neighbors = set("0123456789abcdefghijklmnopqrstuvwxyz.")
+    elif DATE_RE.fullmatch(hint):
+        invalid_neighbors = set("0123456789abcdefghijklmnopqrstuvwxyz")
+    else:
+        invalid_neighbors = set("0123456789abcdefghijklmnopqrstuvwxyz")
+
+    return before not in invalid_neighbors and after not in invalid_neighbors
 
 
 def search_chunks(
@@ -361,6 +535,7 @@ def search_chunks(
         raise ValueError("Search limit must be greater than 0.")
 
     _ensure_chunk_fts_ready(connection)
+    query_hints = _extract_query_hints(query)
     normalized_query = _normalize_query(connection, query)
     requested_filter = _normalize_metadata_filter(
         metadata_filter,
@@ -371,6 +546,7 @@ def search_chunks(
         normalized_query,
         limit=limit,
         metadata_filter=requested_filter,
+        query_hints=query_hints,
     )
 
     fallback_used = False
@@ -387,6 +563,7 @@ def search_chunks(
             normalized_query,
             limit=limit,
             metadata_filter=effective_filter,
+            query_hints=query_hints,
         )
 
     return RetrievalSearchResponse(
