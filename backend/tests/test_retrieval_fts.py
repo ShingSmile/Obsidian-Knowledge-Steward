@@ -215,6 +215,70 @@ class SqliteFTSRetrievalTests(unittest.TestCase):
                 "日常/2023-06/Z-2023-06-05.md",
             )
 
+    def test_search_chunks_supports_identifier_only_date_query(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_root = Path(temp_dir)
+            vault_path = temp_root / "vault"
+            (vault_path / "日常" / "2023-06").mkdir(parents=True)
+            db_path = temp_root / "knowledge_steward.sqlite3"
+
+            (vault_path / "日常" / "2023-06" / "2023-06-05_星期一.md").write_text(
+                "# 四、今日总结\n\n"
+                "* 待办记录\n",
+                encoding="utf-8",
+            )
+            (vault_path / "日常" / "2023-06" / "2023-06-06_星期二.md").write_text(
+                "# 四、今日总结\n\n"
+                "* 其他记录\n",
+                encoding="utf-8",
+            )
+
+            ingest_vault(vault_path=vault_path, db_path=db_path)
+            response = search_chunks_in_db(
+                db_path,
+                "2023-06-05",
+                limit=5,
+            )
+
+            self.assertGreaterEqual(len(response.candidates), 1)
+            self.assertEqual(
+                response.candidates[0].path,
+                "日常/2023-06/2023-06-05_星期一.md",
+            )
+
+    def test_search_chunks_supports_identifier_only_version_query(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_root = Path(temp_dir)
+            vault_path = temp_root / "vault"
+            (vault_path / "日常" / "2023-06").mkdir(parents=True)
+            db_path = temp_root / "knowledge_steward.sqlite3"
+
+            (vault_path / "日常" / "2023-06" / "v6.2.5迭代总结.md").write_text(
+                "# 二、任务总结\n\n"
+                "## 2、优化点\n\n"
+                "- 目标版本优化点\n",
+                encoding="utf-8",
+            )
+            (vault_path / "日常" / "2023-06" / "v6.3.0迭代总结.md").write_text(
+                "# 二、任务总结\n\n"
+                "## 2、优化点\n\n"
+                "- 其他版本优化点\n",
+                encoding="utf-8",
+            )
+
+            ingest_vault(vault_path=vault_path, db_path=db_path)
+            response = search_chunks_in_db(
+                db_path,
+                "v6.2.5",
+                limit=5,
+            )
+
+            self.assertGreaterEqual(len(response.candidates), 1)
+            self.assertEqual(
+                response.candidates[0].path,
+                "日常/2023-06/v6.2.5迭代总结.md",
+            )
+
     def test_search_chunks_returns_standard_candidates_with_metadata_filter(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_root = Path(temp_dir)

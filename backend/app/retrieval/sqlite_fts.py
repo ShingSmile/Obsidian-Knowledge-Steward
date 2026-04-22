@@ -28,10 +28,15 @@ MAX_CJK_SUBTERMS = 2
 ChunkSearchHit = RetrievedChunkCandidate
 
 
-def _normalize_query(connection: sqlite3.Connection, raw_query: str) -> str:
+def _normalize_query(
+    connection: sqlite3.Connection,
+    raw_query: str,
+) -> str | None:
     stripped_query = _strip_query_hints(raw_query)
     terms = QUERY_TERM_RE.findall(stripped_query.strip())
     if not terms:
+        if _extract_query_hints(raw_query):
+            return None
         terms = QUERY_TERM_RE.findall(raw_query.strip())
     if not terms:
         raise ValueError("Search query must contain at least one searchable term.")
@@ -311,43 +316,45 @@ def _build_filter_sql(
 
 def _query_candidates(
     connection: sqlite3.Connection,
-    normalized_query: str,
+    normalized_query: str | None,
     *,
     limit: int,
     metadata_filter: RetrievalMetadataFilter,
     query_hints: list[str],
 ) -> list[RetrievedChunkCandidate]:
-    filter_clauses, filter_params = _build_filter_sql(metadata_filter)
-    where_clauses = ["chunk_fts MATCH ?"]
-    where_clauses.extend(filter_clauses)
-    params: list[object] = [normalized_query, *filter_params, limit]
+    rows: list[sqlite3.Row] = []
+    if normalized_query is not None:
+        filter_clauses, filter_params = _build_filter_sql(metadata_filter)
+        where_clauses = ["chunk_fts MATCH ?"]
+        where_clauses.extend(filter_clauses)
+        params: list[object] = [normalized_query, *filter_params, limit]
 
-    rows = connection.execute(
-        f"""
-        SELECT
-            chunk_fts.chunk_id AS chunk_id,
-            chunk_fts.note_id AS note_id,
-            note.path AS path,
-            note.title AS title,
-            note.note_type AS note_type,
-            note.template_family AS template_family,
-            note.daily_note_date AS daily_note_date,
-            note.source_mtime_ns AS source_mtime_ns,
-            chunk.heading_path AS heading_path,
-            chunk.start_line AS start_line,
-            chunk.end_line AS end_line,
-            chunk.text AS text,
-            -bm25(chunk_fts) AS score,
-            snippet(chunk_fts, -1, '[', ']', '...', 12) AS snippet
-        FROM chunk_fts
-        INNER JOIN chunk ON chunk.chunk_id = chunk_fts.chunk_id
-        INNER JOIN note ON note.note_id = chunk.note_id
-        WHERE {' AND '.join(where_clauses)}
-        ORDER BY score DESC, note.path ASC, chunk.start_line ASC
-        LIMIT ?;
-        """,
-        params,
-    ).fetchall()
+        rows = connection.execute(
+            f"""
+            SELECT
+                chunk_fts.chunk_id AS chunk_id,
+                chunk_fts.note_id AS note_id,
+                note.path AS path,
+                note.title AS title,
+                note.note_type AS note_type,
+                note.template_family AS template_family,
+                note.daily_note_date AS daily_note_date,
+                note.source_mtime_ns AS source_mtime_ns,
+                chunk.heading_path AS heading_path,
+                chunk.start_line AS start_line,
+                chunk.end_line AS end_line,
+                chunk.text AS text,
+                -bm25(chunk_fts) AS score,
+                snippet(chunk_fts, -1, '[', ']', '...', 12) AS snippet
+            FROM chunk_fts
+            INNER JOIN chunk ON chunk.chunk_id = chunk_fts.chunk_id
+            INNER JOIN note ON note.note_id = chunk.note_id
+            WHERE {' AND '.join(where_clauses)}
+            ORDER BY score DESC, note.path ASC, chunk.start_line ASC
+            LIMIT ?;
+            """,
+            params,
+        ).fetchall()
 
     if query_hints:
         rows = _merge_candidate_rows(
@@ -391,7 +398,7 @@ def _query_candidates(
 
 def _query_hint_rows(
     connection: sqlite3.Connection,
-    normalized_query: str,
+    normalized_query: str | None,
     *,
     metadata_filter: RetrievalMetadataFilter,
     query_hints: list[str],
@@ -401,16 +408,33 @@ def _query_hint_rows(
     if not hint_clauses:
         return []
 
-    where_clauses = ["chunk_fts MATCH ?"]
-    where_clauses.extend(filter_clauses)
+    where_clauses = list(filter_clauses)
     where_clauses.append(f"({' OR '.join(hint_clauses)})")
-    params: list[object] = [normalized_query, *filter_params, *hint_params]
+    params: list[object] = [*filter_params, *hint_params]
+
+    score_sql = "0.0 AS score"
+    snippet_sql = "substr(chunk.text, 1, 240) AS snippet"
+    from_sql = """
+        FROM chunk
+        INNER JOIN note ON note.note_id = chunk.note_id
+    """
+
+    if normalized_query is not None:
+        where_clauses.insert(0, "chunk_fts MATCH ?")
+        params.insert(0, normalized_query)
+        score_sql = "-bm25(chunk_fts) AS score"
+        snippet_sql = "snippet(chunk_fts, -1, '[', ']', '...', 12) AS snippet"
+        from_sql = """
+        FROM chunk_fts
+        INNER JOIN chunk ON chunk.chunk_id = chunk_fts.chunk_id
+        INNER JOIN note ON note.note_id = chunk.note_id
+        """
 
     return connection.execute(
         f"""
         SELECT
-            chunk_fts.chunk_id AS chunk_id,
-            chunk_fts.note_id AS note_id,
+            chunk.chunk_id AS chunk_id,
+            chunk.note_id AS note_id,
             note.path AS path,
             note.title AS title,
             note.note_type AS note_type,
@@ -421,11 +445,9 @@ def _query_hint_rows(
             chunk.start_line AS start_line,
             chunk.end_line AS end_line,
             chunk.text AS text,
-            -bm25(chunk_fts) AS score,
-            snippet(chunk_fts, -1, '[', ']', '...', 12) AS snippet
-        FROM chunk_fts
-        INNER JOIN chunk ON chunk.chunk_id = chunk_fts.chunk_id
-        INNER JOIN note ON note.note_id = chunk.note_id
+            {score_sql},
+            {snippet_sql}
+        {from_sql}
         WHERE {' AND '.join(where_clauses)}
         ORDER BY score DESC, note.path ASC, chunk.start_line ASC;
         """,
