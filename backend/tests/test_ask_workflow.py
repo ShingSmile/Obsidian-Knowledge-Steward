@@ -20,6 +20,7 @@ from app.contracts.workflow import (
     RetrievalMetadataFilter,
     RetrievalSearchResponse,
     RetrievedChunkCandidate,
+    RuntimeFaithfulnessSignal,
     RuntimeFaithfulnessOutcome,
     RunStatus,
     ToolCallDecision,
@@ -1282,6 +1283,178 @@ class AskWorkflowTests(unittest.TestCase):
                 execution.ask_result.runtime_faithfulness.outcome,
                 RuntimeFaithfulnessOutcome.ALLOW,
             )
+
+    def test_generate_ask_result_keeps_generated_answer_when_benchmark_disables_runtime_gate(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            db_path = self._build_index_fixture(Path(temp_dir))
+            settings = replace(
+                get_settings(),
+                index_db_path=db_path,
+                cloud_base_url="https://example.com",
+                cloud_chat_model="gpt-test",
+                local_chat_model="",
+            )
+
+            with patch(
+                "app.services.ask._request_grounded_answer",
+                return_value="Roadmap 已拆成检索与 ask 两段实现。[1]",
+            ):
+                with patch(
+                    "app.services.ask.build_runtime_ask_faithfulness_signal",
+                    return_value=RuntimeFaithfulnessSignal(
+                        outcome=RuntimeFaithfulnessOutcome.DOWNGRADE_TO_RETRIEVAL_ONLY,
+                        score=0.1,
+                        threshold=0.67,
+                        backend="lexical_semantic",
+                        reason="forced_test_signal",
+                        claim_count=1,
+                        unsupported_claim_count=1,
+                    ),
+                ):
+                    result = self._invoke_ask_result(
+                        WorkflowInvokeRequest(
+                            action_type=WorkflowAction.ASK_QA,
+                            user_query="Roadmap",
+                            provider_preference="cloud",
+                            metadata={
+                                "answer_benchmark_variant": {
+                                    "variant_id": "hybrid_assembly",
+                                    "context_assembly_enabled": True,
+                                    "runtime_faithfulness_gate_enabled": False,
+                                }
+                            },
+                        ),
+                        settings=settings,
+                    )
+
+            self.assertEqual(result.mode, AskResultMode.GENERATED_ANSWER)
+            self.assertIsNotNone(result.runtime_faithfulness)
+            self.assertEqual(
+                result.runtime_faithfulness.outcome,
+                RuntimeFaithfulnessOutcome.DOWNGRADE_TO_RETRIEVAL_ONLY,
+            )
+
+    def test_build_initial_ask_turn_bypasses_assembly_when_benchmark_disables_context_assembly(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            db_path = self._build_index_fixture(Path(temp_dir))
+            settings = replace(
+                get_settings(),
+                index_db_path=db_path,
+                cloud_base_url="https://example.com",
+                cloud_chat_model="gpt-test",
+                local_chat_model="",
+            )
+
+            raw_candidates = [
+                RetrievedChunkCandidate(
+                    retrieval_source="hybrid_rrf",
+                    chunk_id="raw-first",
+                    note_id="note_first",
+                    path="first/First.md",
+                    title="First",
+                    heading_path="First",
+                    note_type="summary_note",
+                    template_family="plain",
+                    daily_note_date=None,
+                    source_mtime_ns=1,
+                    start_line=1,
+                    end_line=2,
+                    score=0.6,
+                    snippet="first raw snippet",
+                    text="first raw snippet",
+                ),
+                RetrievedChunkCandidate(
+                    retrieval_source="hybrid_rrf",
+                    chunk_id="raw-second",
+                    note_id="note_second",
+                    path="second/Second.md",
+                    title="Second",
+                    heading_path="Second",
+                    note_type="summary_note",
+                    template_family="plain",
+                    daily_note_date=None,
+                    source_mtime_ns=1,
+                    start_line=3,
+                    end_line=4,
+                    score=0.9,
+                    snippet="second raw snippet",
+                    text="second raw snippet",
+                ),
+            ]
+            misleading_bundle = ContextBundle(
+                user_intent="Roadmap",
+                workflow_action=WorkflowAction.ASK_QA,
+                evidence_items=[
+                    ContextEvidenceItem(
+                        source_path="second/Second.md",
+                        chunk_id="raw-second",
+                        source_note_title="Second",
+                        heading_path="Second",
+                        position_hint="1/1",
+                        text="assembled snippet that should stay hidden",
+                        score=0.9,
+                        source_kind="retrieval",
+                    ),
+                ],
+                token_budget=2400,
+            )
+            captured_messages: dict[str, list[dict[str, str]]] = {}
+
+            def _capture_grounded_answer(
+                *,
+                provider_target: object,
+                query: str,
+                bundle: object,
+            ) -> str:
+                del provider_target
+                captured_messages["messages"] = ask_service._build_grounded_messages(
+                    query=query,
+                    bundle=bundle,
+                )
+                return "first raw snippet.[1] second raw snippet.[2]"
+
+            with patch(
+                "app.services.ask.search_hybrid_chunks_in_db",
+                return_value=RetrievalSearchResponse(candidates=raw_candidates),
+            ):
+                with patch(
+                    "app.services.ask.build_ask_context_bundle",
+                    return_value=misleading_bundle,
+                ) as mocked_assembly:
+                    with patch(
+                        "app.services.ask._request_tool_call_decision",
+                        return_value=ToolCallDecision(requested=False),
+                    ):
+                        with patch(
+                            "app.services.ask._request_grounded_answer",
+                            side_effect=_capture_grounded_answer,
+                        ):
+                            result = self._invoke_ask_result(
+                                WorkflowInvokeRequest(
+                                    action_type=WorkflowAction.ASK_QA,
+                                    user_query="Roadmap",
+                                    metadata={
+                                        "answer_benchmark_variant": {
+                                            "variant_id": "hybrid",
+                                            "context_assembly_enabled": False,
+                                            "runtime_faithfulness_gate_enabled": False,
+                                        }
+                                    },
+                                ),
+                                settings=settings,
+                            )
+
+            mocked_assembly.assert_not_called()
+            self.assertEqual(result.mode, AskResultMode.GENERATED_ANSWER)
+            self.assertEqual(
+                [candidate.chunk_id for candidate in result.retrieved_candidates],
+                ["raw-first", "raw-second"],
+            )
+            self.assertIn("messages", captured_messages)
+            prompt = captured_messages["messages"][1]["content"]
+            self.assertIn("first raw snippet", prompt)
+            self.assertIn("second raw snippet", prompt)
+            self.assertNotIn("assembled snippet that should stay hidden", prompt)
 
     def test_invoke_ask_graph_emits_runtime_faithfulness_trace_fields(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
