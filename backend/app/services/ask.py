@@ -459,7 +459,13 @@ def _build_raw_ask_context_bundle(
     token_budget: int,
     allowed_tool_names: list[str],
 ) -> ContextBundle:
-    evidence_items = _build_raw_retrieval_evidence_items(candidates)
+    evidence_items, trimmed_for_budget = _build_raw_retrieval_evidence_items(
+        candidates,
+        token_budget=token_budget,
+    )
+    assembly_notes = ["benchmark_variant:raw_retrieval_candidates"]
+    if trimmed_for_budget:
+        assembly_notes.append(f"trimmed_for_budget:{trimmed_for_budget}")
     return ContextBundle(
         user_intent=user_query,
         workflow_action=workflow_action,
@@ -467,49 +473,68 @@ def _build_raw_ask_context_bundle(
         tool_results=tool_results,
         allowed_tool_names=allowed_tool_names,
         token_budget=token_budget,
-        safety_flags=_collect_raw_bundle_safety_flags(candidates, tool_results),
-        assembly_notes=["benchmark_variant:raw_retrieval_candidates"],
+        safety_flags=_collect_raw_bundle_safety_flags(evidence_items, tool_results),
+        assembly_notes=assembly_notes,
     )
 
 
 def _build_raw_retrieval_evidence_items(
     candidates: list[RetrievedChunkCandidate],
-) -> list[ContextEvidenceItem]:
+    *,
+    token_budget: int,
+) -> tuple[list[ContextEvidenceItem], int]:
     total_by_path: dict[str, int] = {}
     for candidate in candidates:
         total_by_path[candidate.path] = total_by_path.get(candidate.path, 0) + 1
 
     seen_by_path: dict[str, int] = {}
     evidence_items: list[ContextEvidenceItem] = []
+    consumed = 0
+    trimmed_for_budget = 0
     for candidate in candidates:
         seen_by_path[candidate.path] = seen_by_path.get(candidate.path, 0) + 1
+        position_hint = (
+            f"第 {seen_by_path[candidate.path]} 条 / "
+            f"共 {total_by_path[candidate.path]} 条"
+        )
+        metadata_chars = (
+            len(candidate.path)
+            + len(candidate.title)
+            + len(candidate.heading_path or "")
+            + len(position_hint)
+        )
+        remaining_chars = token_budget - consumed - metadata_chars
+        if remaining_chars <= 0:
+            trimmed_for_budget += 1
+            continue
+        visible_text = candidate.text[:remaining_chars]
+        if len(visible_text) < len(candidate.text):
+            trimmed_for_budget += 1
         evidence_items.append(
             ContextEvidenceItem(
                 source_path=candidate.path,
                 chunk_id=candidate.chunk_id,
                 source_note_title=candidate.title,
                 heading_path=candidate.heading_path,
-                position_hint=(
-                    f"第 {seen_by_path[candidate.path]} 条 / "
-                    f"共 {total_by_path[candidate.path]} 条"
-                ),
-                text=candidate.text,
+                position_hint=position_hint,
+                text=visible_text,
                 score=candidate.score,
                 source_kind="retrieval",
             )
         )
-    return evidence_items
+        consumed += metadata_chars + len(visible_text)
+    return evidence_items, trimmed_for_budget
 
 
 def _collect_raw_bundle_safety_flags(
-    candidates: list[RetrievedChunkCandidate],
+    evidence_items: list[ContextEvidenceItem],
     tool_results: list[ToolExecutionResult],
 ) -> list[str]:
     flags: list[str] = []
     seen: set[str] = set()
 
-    for candidate in candidates:
-        for flag in detect_safety_flags(candidate.text):
+    for evidence_item in evidence_items:
+        for flag in detect_safety_flags(evidence_item.text):
             if flag in seen:
                 continue
             seen.add(flag)
