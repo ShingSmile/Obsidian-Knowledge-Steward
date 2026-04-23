@@ -59,6 +59,10 @@ def _call_matrix(call_args_list: list[tuple[object, dict[str, object]]]) -> list
     ]
 
 
+def _thread_ids(call_args_list: list[tuple[object, dict[str, object]]]) -> list[str]:
+    return [call.kwargs["thread_id"] for call in call_args_list]
+
+
 class AskAnswerBenchmarkContractTests(unittest.TestCase):
     def test_load_smoke_case_ids_returns_fixed_unique_ten_case_subset(self) -> None:
         case_ids = load_answer_benchmark_smoke_case_ids()
@@ -280,11 +284,16 @@ class AskAnswerBenchmarkOrchestrationTests(unittest.TestCase):
                 for variant in ANSWER_BENCHMARK_VARIANTS
             ]
             self.assertEqual(_call_matrix(mocked_invoke.call_args_list), expected_case_variant_matrix)
+            thread_ids = _thread_ids(mocked_invoke.call_args_list)
+            self.assertEqual(len(thread_ids), len(set(thread_ids)))
             first_request = mocked_invoke.call_args_list[0].args[0]
             first_kwargs = mocked_invoke.call_args_list[0].kwargs
             self.assertEqual(first_request.provider_preference, "cloud")
             self.assertEqual(first_kwargs["settings"].cloud_chat_model, "qwen-max")
             self.assertEqual(first_kwargs["settings"].local_chat_model, "")
+            self.assertTrue(
+                first_kwargs["thread_id"].startswith("task059_ask_case_001_hybrid_")
+            )
             self.assertTrue(output_path.exists())
             self.assertEqual(result["provider_name"], "openai-compatible")
             self.assertEqual(result["model_name"], "qwen-max")
@@ -348,11 +357,16 @@ class AskAnswerBenchmarkOrchestrationTests(unittest.TestCase):
                 for variant in ANSWER_BENCHMARK_VARIANTS
             ]
             self.assertEqual(_call_matrix(mocked_invoke.call_args_list), expected_case_variant_matrix)
+            thread_ids = _thread_ids(mocked_invoke.call_args_list)
+            self.assertEqual(len(thread_ids), len(set(thread_ids)))
             first_request = mocked_invoke.call_args_list[0].args[0]
             first_kwargs = mocked_invoke.call_args_list[0].kwargs
             self.assertEqual(first_request.provider_preference, "cloud")
             self.assertEqual(first_kwargs["settings"].cloud_chat_model, "qwen-max")
             self.assertEqual(first_kwargs["settings"].local_chat_model, "")
+            self.assertTrue(
+                first_kwargs["thread_id"].startswith("task059_ask_case_001_hybrid_")
+            )
             self.assertEqual(result["provider_name"], "openai-compatible")
             self.assertEqual(result["model_name"], "qwen-max")
             self.assertEqual(result["git_commit"], "abc1234")

@@ -86,8 +86,11 @@ def run_ask_answer_benchmark(
                     smoke_subset=smoke_subset,
                 ),
             )
-            thread_id = f"task059_{case.case_id}_{variant.variant_id}"
-            run_id = f"{thread_id}_{uuid4().hex}"
+            execution_token = uuid4().hex
+            thread_id = (
+                f"task059_{case.case_id}_{variant.variant_id}_{execution_token}"
+            )
+            run_id = f"{thread_id}_run"
             start_time = perf_counter()
             execution = invoke_ask_graph(
                 request,
