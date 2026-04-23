@@ -54,7 +54,7 @@ class AskAnswerBenchmarkPreflightTests(unittest.TestCase):
             )
 
         self.assertEqual(result.status, "canonical_model_mismatch")
-        self.assertIn("qwen3.6-max-preview", result.message)
+        self.assertIn("qwen3.6-flash-2026-04-16", result.message)
 
     def test_reports_missing_smoke_subset_file_in_smoke_mode(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -66,7 +66,7 @@ class AskAnswerBenchmarkPreflightTests(unittest.TestCase):
             settings = replace(
                 get_settings(),
                 cloud_base_url="https://example.com",
-                cloud_chat_model="qwen3.6-max-preview",
+                cloud_chat_model="qwen3.6-flash-2026-04-16",
             )
             result = run_answer_benchmark_preflight(
                 settings=settings,

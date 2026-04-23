@@ -64,7 +64,7 @@ class AskAnswerBenchmarkCliTests(unittest.TestCase):
                 return_value=AskAnswerBenchmarkPreflightResult(
                     status="ok",
                     provider_name="openai-compatible",
-                    model_name="qwen3.6-max-preview",
+                    model_name="qwen3.6-flash-2026-04-16",
                     message="Answer benchmark preflight passed.",
                 ),
             ):
