@@ -380,7 +380,11 @@ def _query_candidates(
             source_mtime_ns=row["source_mtime_ns"],
             start_line=row["start_line"],
             end_line=row["end_line"],
-            score=row["score"] + _compute_hint_boost(row, query_hints),
+            score=(
+                row["score"]
+                + _compute_hint_boost(row, query_hints)
+                + _compute_normalized_query_boost(row, normalized_query)
+            ),
             snippet=row["snippet"],
             text=row["text"],
         )
@@ -418,17 +422,10 @@ def _query_hint_rows(
         FROM chunk
         INNER JOIN note ON note.note_id = chunk.note_id
     """
-
-    if normalized_query is not None:
-        where_clauses.insert(0, "chunk_fts MATCH ?")
-        params.insert(0, normalized_query)
-        score_sql = "-bm25(chunk_fts) AS score"
-        snippet_sql = "snippet(chunk_fts, -1, '[', ']', '...', 12) AS snippet"
-        from_sql = """
-        FROM chunk_fts
-        INNER JOIN chunk ON chunk.chunk_id = chunk_fts.chunk_id
-        INNER JOIN note ON note.note_id = chunk.note_id
-        """
+    _ = normalized_query
+    # Hint rescue must remain independent from the normalized MATCH query.
+    # Otherwise a date/version hint cannot recover a target note when the
+    # extracted natural-language terms are too strict to co-occur in one chunk.
 
     return connection.execute(
         f"""
@@ -508,6 +505,38 @@ def _compute_hint_boost(
             boost += 40.0
         elif _hint_matches_value(text, hint):
             boost += 20.0
+    return boost
+
+
+def _compute_normalized_query_boost(
+    row: sqlite3.Row,
+    normalized_query: str | None,
+) -> float:
+    if not normalized_query:
+        return 0.0
+
+    query_terms = _deduplicate_terms(
+        QUERY_TERM_RE.findall(normalized_query),
+        casefold=True,
+    )
+    if not query_terms:
+        return 0.0
+
+    path = str(row["path"] or "").casefold()
+    title = str(row["title"] or "").casefold()
+    heading_path = str(row["heading_path"] or "").casefold()
+    text = str(row["text"] or "").casefold()
+
+    boost = 0.0
+    for term in query_terms:
+        if term in path:
+            boost += 24.0
+        elif term in title:
+            boost += 16.0
+        elif term in heading_path:
+            boost += 12.0
+        elif term in text:
+            boost += 8.0
     return boost
 
 

@@ -29,7 +29,7 @@ ANSWER_BENCHMARK_SCHEMA_VERSION = 1
 ANSWER_BENCHMARK_KIND = "ask_answer"
 ANSWER_BENCHMARK_MODES = ("smoke", "full")
 ANSWER_BENCHMARK_SMOKE_SUBSET_VERSION = 1
-ANSWER_BENCHMARK_CANONICAL_MODEL = "qwen-max"
+ANSWER_BENCHMARK_CANONICAL_MODEL = "qwen3.6-max-preview"
 
 
 def build_default_output_path(results_dir: Path) -> Path:

@@ -26,7 +26,7 @@ from app.benchmark.ask_answer_benchmark import run_ask_answer_benchmark
 def _fake_execution(
     *,
     provider_name: str = "openai-compatible",
-    model_name: str = "qwen-max",
+    model_name: str = "qwen3.6-max-preview",
     ask_result_mode: AskResultMode = AskResultMode.GENERATED_ANSWER,
 ) -> Mock:
     ask_result = Mock(
@@ -289,14 +289,14 @@ class AskAnswerBenchmarkOrchestrationTests(unittest.TestCase):
             first_request = mocked_invoke.call_args_list[0].args[0]
             first_kwargs = mocked_invoke.call_args_list[0].kwargs
             self.assertEqual(first_request.provider_preference, "cloud")
-            self.assertEqual(first_kwargs["settings"].cloud_chat_model, "qwen-max")
+            self.assertEqual(first_kwargs["settings"].cloud_chat_model, "qwen3.6-max-preview")
             self.assertEqual(first_kwargs["settings"].local_chat_model, "")
             self.assertTrue(
                 first_kwargs["thread_id"].startswith("task059_ask_case_001_hybrid_")
             )
             self.assertTrue(output_path.exists())
             self.assertEqual(result["provider_name"], "openai-compatible")
-            self.assertEqual(result["model_name"], "qwen-max")
+            self.assertEqual(result["model_name"], "qwen3.6-max-preview")
             self.assertEqual(result["prompt_version"], resolve_answer_benchmark_prompt_version())
             self.assertEqual(result["git_commit"], "abc1234")
             self.assertFalse(result["worktree_dirty"])
@@ -306,7 +306,7 @@ class AskAnswerBenchmarkOrchestrationTests(unittest.TestCase):
             self.assertEqual(result["smoke_subset_version"], 1)
             self.assertNotIn("tool_allowed", result["variant_aggregates"]["hybrid"])
             self.assertEqual(result["artifact_metadata"]["provider_name"], "openai-compatible")
-            self.assertEqual(result["artifact_metadata"]["model_name"], "qwen-max")
+            self.assertEqual(result["artifact_metadata"]["model_name"], "qwen3.6-max-preview")
             self.assertEqual(
                 result["artifact_metadata"]["prompt_version"],
                 resolve_answer_benchmark_prompt_version(),
@@ -362,19 +362,19 @@ class AskAnswerBenchmarkOrchestrationTests(unittest.TestCase):
             first_request = mocked_invoke.call_args_list[0].args[0]
             first_kwargs = mocked_invoke.call_args_list[0].kwargs
             self.assertEqual(first_request.provider_preference, "cloud")
-            self.assertEqual(first_kwargs["settings"].cloud_chat_model, "qwen-max")
+            self.assertEqual(first_kwargs["settings"].cloud_chat_model, "qwen3.6-max-preview")
             self.assertEqual(first_kwargs["settings"].local_chat_model, "")
             self.assertTrue(
                 first_kwargs["thread_id"].startswith("task059_ask_case_001_hybrid_")
             )
             self.assertEqual(result["provider_name"], "openai-compatible")
-            self.assertEqual(result["model_name"], "qwen-max")
+            self.assertEqual(result["model_name"], "qwen3.6-max-preview")
             self.assertEqual(result["git_commit"], "abc1234")
             self.assertTrue(result["worktree_dirty"])
             self.assertEqual(len(result["case_variant_records"]), 150)
             self.assertIn("tool_allowed", result["variant_aggregates"]["hybrid"])
             self.assertEqual(result["artifact_metadata"]["provider_name"], "openai-compatible")
-            self.assertEqual(result["artifact_metadata"]["model_name"], "qwen-max")
+            self.assertEqual(result["artifact_metadata"]["model_name"], "qwen3.6-max-preview")
             self.assertEqual(
                 result["artifact_metadata"]["prompt_version"],
                 resolve_answer_benchmark_prompt_version(),

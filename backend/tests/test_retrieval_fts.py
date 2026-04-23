@@ -147,6 +147,74 @@ class SqliteFTSRetrievalTests(unittest.TestCase):
                 "日常/2023-08/Z-v6.2.5迭代总结.md",
             )
 
+    def test_search_chunks_uses_hint_only_rescue_when_natural_language_terms_do_not_cooccur(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_root = Path(temp_dir)
+            vault_path = temp_root / "vault"
+            (vault_path / "日常" / "2023-08").mkdir(parents=True)
+            db_path = temp_root / "knowledge_steward.sqlite3"
+
+            (vault_path / "日常" / "2023-08" / "v6.4.0复盘总结.md").write_text(
+                "# 一、周报及任务汇总\n\n"
+                "## 整体回顾\n\n"
+                "- 最后的多商行登录需求有点超时\n",
+                encoding="utf-8",
+            )
+            (vault_path / "日常" / "2023-08" / "其他复盘总结.md").write_text(
+                "# 一、周报及任务汇总\n\n"
+                "## 整体回顾\n\n"
+                "- 一般事项\n",
+                encoding="utf-8",
+            )
+
+            ingest_vault(vault_path=vault_path, db_path=db_path)
+            response = search_chunks_in_db(
+                db_path,
+                "v6.4.0 复盘总结里，整体回顾提到什么任务有点超时？",
+                limit=5,
+            )
+
+            self.assertGreaterEqual(len(response.candidates), 1)
+            self.assertEqual(
+                response.candidates[0].path,
+                "日常/2023-08/v6.4.0复盘总结.md",
+            )
+
+    def test_search_chunks_reranks_hint_rescue_rows_with_remaining_query_terms(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_root = Path(temp_dir)
+            vault_path = temp_root / "vault"
+            (vault_path / "日常" / "2023-08").mkdir(parents=True)
+            db_path = temp_root / "knowledge_steward.sqlite3"
+
+            (vault_path / "日常" / "2023-08" / "v6.4.0复盘总结.md").write_text(
+                "# 一、周报及任务汇总\n\n"
+                "## 整体回顾\n\n"
+                "- 多商行登录需求有点超时\n",
+                encoding="utf-8",
+            )
+            (vault_path / "日常" / "2023-08" / "v6.4.0迭代任务.md").write_text(
+                "# 一、账号多商行登录\n\n"
+                "## （一）需求分析\n\n"
+                "* 档主手机号校验\n"
+                "\t* 校验逻辑\n"
+                "\t\t* 在本商行不能重复\n",
+                encoding="utf-8",
+            )
+
+            ingest_vault(vault_path=vault_path, db_path=db_path)
+            response = search_chunks_in_db(
+                db_path,
+                "v6.4.0 迭代任务里，档主手机号校验的基础校验逻辑有哪些？",
+                limit=5,
+            )
+
+            self.assertGreaterEqual(len(response.candidates), 1)
+            self.assertEqual(
+                response.candidates[0].path,
+                "日常/2023-08/v6.4.0迭代任务.md",
+            )
+
     def test_search_chunks_does_not_prune_hint_only_target_before_reranking(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_root = Path(temp_dir)
