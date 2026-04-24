@@ -84,6 +84,7 @@ def run_ask_answer_benchmark(
                     case_id=case.case_id,
                     variant=variant,
                     smoke_subset=smoke_subset,
+                    allow_tool=case.allow_tool,
                 ),
             )
             execution_token = uuid4().hex

@@ -552,6 +552,33 @@ class ContextAssemblyTests(unittest.TestCase):
         self.assertEqual(bundle.assembly_metadata.full_text_char_budget, 900)
         self.assertEqual(bundle.assembly_metadata.summary_char_budget, 280)
 
+    def test_build_ask_context_bundle_uses_query_focused_window_for_long_evidence(
+        self,
+    ) -> None:
+        target = "5. 整体回顾\n前期的任务时间基本符合预期，就是最后的多商行登录需求有点超时，请了半天假"
+        text = ("铺垫内容" * 260) + "\n" + target
+
+        bundle = build_ask_context_bundle(
+            user_query="整体回顾提到什么任务有点超时？",
+            candidates=[
+                _make_candidate(
+                    path="vault/v6.4.0复盘总结.md",
+                    chunk_id="c1",
+                    heading_path="一、周报及任务汇总",
+                    text=text,
+                    score=1.0,
+                )
+            ],
+            tool_results=[],
+            token_budget=2400,
+            allowed_tool_names=[],
+        )
+
+        self.assertEqual([item.chunk_id for item in bundle.evidence_items], ["c1"])
+        self.assertLessEqual(len(bundle.evidence_items[0].text), 900)
+        self.assertIn("整体回顾", bundle.evidence_items[0].text)
+        self.assertIn("多商行登录需求有点超时，请了半天假", bundle.evidence_items[0].text)
+
     def test_build_ask_context_bundle_prioritizes_higher_scores_for_full_text_budget(
         self,
     ) -> None:

@@ -1722,6 +1722,7 @@ class AskWorkflowTests(unittest.TestCase):
                     runtime_faithfulness_gate_enabled=False,
                 ),
                 smoke_subset=False,
+                allow_tool=False,
             )
             raw_candidates = [
                 RetrievedChunkCandidate(
@@ -2189,6 +2190,58 @@ class AskWorkflowTests(unittest.TestCase):
                     "finalize_ask",
                 ],
             )
+
+    def test_invoke_ask_graph_respects_zero_max_tool_rounds(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            db_path = self._build_index_fixture(Path(temp_dir))
+            settings = replace(
+                get_settings(),
+                index_db_path=db_path,
+                cloud_base_url="https://example.com",
+                cloud_chat_model="gpt-test",
+                local_chat_model="",
+            )
+
+            with patch(
+                "app.services.ask._request_tool_call_decision",
+                return_value=ToolCallDecision(
+                    requested=True,
+                    tool_name="search_notes",
+                    arguments={"query": "Roadmap", "limit": 3},
+                    rationale="Try supplemental search.",
+                ),
+            ):
+                with patch("app.services.ask.execute_tool_call") as mocked_execute:
+                    with patch(
+                        "app.services.ask._request_grounded_answer",
+                        return_value="Roadmap 已拆成检索与 ask 两段实现。[1]",
+                    ):
+                        execution = invoke_ask_graph(
+                            WorkflowInvokeRequest(
+                                thread_id="thread_zero_tool_rounds",
+                                action_type=WorkflowAction.ASK_QA,
+                                user_query="Roadmap",
+                                metadata={"max_tool_rounds": 0},
+                            ),
+                            settings=settings,
+                            thread_id="thread_zero_tool_rounds",
+                            run_id="run_zero_tool_rounds",
+                        )
+
+            self.assertEqual(execution.ask_result.mode, AskResultMode.GENERATED_ANSWER)
+            self.assertTrue(execution.ask_result.tool_call_attempted)
+            self.assertEqual(execution.ask_result.tool_call_used, "search_notes")
+            self.assertEqual(execution.ask_result.tool_call_rounds, 0)
+            mocked_execute.assert_not_called()
+            self.assertEqual(
+                [event["node_name"] for event in execution.trace_events],
+                ["prepare_ask", "llm_call", "finalize_ask"],
+            )
+            llm_event = next(
+                event for event in execution.trace_events if event["node_name"] == "llm_call"
+            )
+            self.assertTrue(llm_event["details"]["requested_tool_call"])
+            self.assertEqual(llm_event["details"]["forced_finalize_reason"], "max_tool_rounds")
 
     def test_invoke_workflow_persists_run_trace_rows_and_supports_query(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

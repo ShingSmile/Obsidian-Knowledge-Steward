@@ -221,6 +221,7 @@ class AskAnswerBenchmarkContractTests(unittest.TestCase):
                 case_id="ask_case_001",
                 variant=variant,
                 smoke_subset=False,
+                allow_tool=False,
             ),
             {
                 "benchmark_kind": "ask_answer",
@@ -230,6 +231,7 @@ class AskAnswerBenchmarkContractTests(unittest.TestCase):
                 "runtime_faithfulness_gate_enabled": True,
                 "smoke_subset": False,
                 "prompt_version": "tool:2026-04-22-tool-v1|answer:2026-04-22-grounded-v1",
+                "max_tool_rounds": 0,
             },
         )
 
@@ -238,6 +240,22 @@ class AskAnswerBenchmarkContractTests(unittest.TestCase):
             inspect.signature(build_answer_benchmark_metadata).parameters["smoke_subset"].default,
             inspect._empty,
         )
+
+    def test_build_answer_benchmark_metadata_requires_explicit_tool_policy(self) -> None:
+        self.assertIs(
+            inspect.signature(build_answer_benchmark_metadata).parameters["allow_tool"].default,
+            inspect._empty,
+        )
+
+    def test_build_answer_benchmark_metadata_does_not_disable_tool_allowed_cases(self) -> None:
+        metadata = build_answer_benchmark_metadata(
+            case_id="ask_case_tool",
+            variant=ANSWER_BENCHMARK_VARIANTS[0],
+            smoke_subset=False,
+            allow_tool=True,
+        )
+
+        self.assertNotIn("max_tool_rounds", metadata)
 
 
 class AskAnswerBenchmarkOrchestrationTests(unittest.TestCase):
@@ -289,6 +307,7 @@ class AskAnswerBenchmarkOrchestrationTests(unittest.TestCase):
             first_request = mocked_invoke.call_args_list[0].args[0]
             first_kwargs = mocked_invoke.call_args_list[0].kwargs
             self.assertEqual(first_request.provider_preference, "cloud")
+            self.assertEqual(first_request.metadata["max_tool_rounds"], 0)
             self.assertEqual(first_kwargs["settings"].cloud_chat_model, "qwen3.6-flash-2026-04-16")
             self.assertEqual(first_kwargs["settings"].local_chat_model, "")
             self.assertTrue(
@@ -362,6 +381,14 @@ class AskAnswerBenchmarkOrchestrationTests(unittest.TestCase):
             first_request = mocked_invoke.call_args_list[0].args[0]
             first_kwargs = mocked_invoke.call_args_list[0].kwargs
             self.assertEqual(first_request.provider_preference, "cloud")
+            self.assertEqual(first_request.metadata["max_tool_rounds"], 0)
+            tool_allowed_case_ids = {case.case_id for case in dataset.cases if case.allow_tool}
+            tool_allowed_request = next(
+                call.args[0]
+                for call in mocked_invoke.call_args_list
+                if call.args[0].metadata["case_id"] in tool_allowed_case_ids
+            )
+            self.assertNotIn("max_tool_rounds", tool_allowed_request.metadata)
             self.assertEqual(first_kwargs["settings"].cloud_chat_model, "qwen3.6-flash-2026-04-16")
             self.assertEqual(first_kwargs["settings"].local_chat_model, "")
             self.assertTrue(

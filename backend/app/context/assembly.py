@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 import json
+import re
 
 from app.context.safety import detect_safety_flags
 from app.contracts.workflow import (
@@ -21,6 +22,8 @@ ASK_PER_SOURCE_LIMIT = 2
 ASK_FULL_TEXT_CHAR_BUDGET = 900
 ASK_SUMMARY_CHAR_BUDGET = 280
 ASK_FULL_TEXT_EVIDENCE_COUNT = 2
+ASCII_QUERY_TERM_RE = re.compile(r"[a-z0-9][a-z0-9._-]*", re.IGNORECASE)
+CJK_QUERY_SEQUENCE_RE = re.compile(r"[\u4e00-\u9fff]+")
 
 
 def _title_from_source_path(source_path: str) -> str:
@@ -99,6 +102,7 @@ def _trim_candidates_to_budget(
 def _apply_weighted_budget(
     candidates: list[RetrievedChunkCandidate],
     token_budget: int,
+    user_query: str,
 ) -> tuple[list[tuple[RetrievedChunkCandidate, str]], int]:
     if token_budget <= 0:
         return [], len(candidates)
@@ -122,7 +126,11 @@ def _apply_weighted_budget(
             if candidate.chunk_id in full_text_chunk_ids
             else ASK_SUMMARY_CHAR_BUDGET
         )
-        visible_text = candidate.text[:char_limit]
+        visible_text = _select_query_focused_text(
+            candidate.text,
+            user_query=user_query,
+            char_limit=char_limit,
+        )
         candidate_chars = len(candidate.path) + len(candidate.heading_path or "") + len(
             visible_text
         )
@@ -137,6 +145,69 @@ def _apply_weighted_budget(
             continue
         kept.append((candidate, visible_text))
     return kept, dropped
+
+
+def _select_query_focused_text(
+    text: str,
+    *,
+    user_query: str,
+    char_limit: int,
+) -> str:
+    if char_limit <= 0:
+        return ""
+    if len(text) <= char_limit:
+        return text
+
+    query_terms = _extract_query_focus_terms(user_query)
+    if not query_terms:
+        return text[:char_limit]
+
+    lower_text = text.casefold()
+    text_len = len(text)
+    max_start = max(0, text_len - char_limit)
+    window_starts = {0}
+    for term in query_terms:
+        search_from = 0
+        while True:
+            match_index = lower_text.find(term, search_from)
+            if match_index < 0:
+                break
+            centered_start = match_index - max(0, (char_limit - len(term)) // 2)
+            window_starts.add(min(max(0, centered_start), max_start))
+            search_from = match_index + 1
+
+    best_start = 0
+    best_score = (0, 0)
+    for window_start in sorted(window_starts):
+        window_text = lower_text[window_start:window_start + char_limit]
+        matched_terms = [term for term in query_terms if term in window_text]
+        score = (
+            sum(len(term) for term in matched_terms),
+            len(matched_terms),
+        )
+        if score > best_score:
+            best_score = score
+            best_start = window_start
+
+    return text[best_start:best_start + char_limit]
+
+
+def _extract_query_focus_terms(user_query: str) -> tuple[str, ...]:
+    normalized_query = user_query.casefold()
+    terms: set[str] = set()
+    for term in ASCII_QUERY_TERM_RE.findall(normalized_query):
+        if len(term) >= 2:
+            terms.add(term)
+
+    for sequence in CJK_QUERY_SEQUENCE_RE.findall(normalized_query):
+        if len(sequence) < 2:
+            continue
+        max_ngram_size = min(6, len(sequence))
+        for ngram_size in range(2, max_ngram_size + 1):
+            for start_index in range(0, len(sequence) - ngram_size + 1):
+                terms.add(sequence[start_index:start_index + ngram_size])
+
+    return tuple(sorted(terms, key=lambda term: (-len(term), term)))
 
 
 def _build_source_notes(
@@ -212,6 +283,7 @@ def build_ask_context_bundle(
     shadow_weighted_candidates, _ = _apply_weighted_budget(
         deduped,
         token_budget,
+        user_query,
     )
     suspicious_visible_texts: list[str] = []
     suspicious_chunk_ids: set[str] = set()
@@ -231,6 +303,7 @@ def build_ask_context_bundle(
     weighted_candidates, weighted_removed = _apply_weighted_budget(
         diversified,
         token_budget,
+        user_query,
     )
     visible_candidates: list[tuple[RetrievedChunkCandidate, str]] = []
     post_weight_suspicious_texts: list[str] = []

@@ -85,8 +85,9 @@ def build_answer_benchmark_metadata(
     case_id: str,
     variant: AskAnswerBenchmarkVariant,
     smoke_subset: bool,
+    allow_tool: bool,
 ) -> dict[str, Any]:
-    return {
+    metadata: dict[str, Any] = {
         "benchmark_kind": "ask_answer",
         "case_id": case_id,
         "variant_id": variant.variant_id,
@@ -95,6 +96,9 @@ def build_answer_benchmark_metadata(
         "smoke_subset": smoke_subset,
         "prompt_version": resolve_answer_benchmark_prompt_version(),
     }
+    if not allow_tool:
+        metadata["max_tool_rounds"] = 0
+    return metadata
 
 
 def resolve_answer_benchmark_prompt_version() -> str:
