@@ -408,6 +408,50 @@
   - `small: 在真实历史 SQLite 数据上抽样观察 canonical migration 覆盖率，必要时补离线修复脚本`
 - `notes`: 本任务是 `SES-20260402-02` 在 finishing 阶段暴露出的 scope drift，现以 retroactive completed medium 回填，不作为治理示范。根因是 `TASK-045` 之后路径语义在后端生成 proposal、静态校验、持久化、插件执行与旧测试之间长期并存了三种格式，导致全量测试在 `/vault/...` 伪路径上断裂。当前已新增 [backend/app/path_semantics.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/app/path_semantics.py) 作为后端 canonical 路径语义层，在 [backend/app/services/proposal_validation.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/app/services/proposal_validation.py)、[backend/app/indexing/store.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/app/indexing/store.py)、[backend/app/indexing/ingest.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/app/indexing/ingest.py)、[backend/app/services/ingest_proposal.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/app/services/ingest_proposal.py)、[backend/app/services/rollback_workflow.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/app/services/rollback_workflow.py)、[backend/app/tools/ask_tools.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/app/tools/ask_tools.py) 与 [backend/app/retrieval/sqlite_fts.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/app/retrieval/sqlite_fts.py) 中统一做了 canonicalization 与 vault 内绝对路径兼容；插件侧也新增 [plugin/src/writeback/pathSemantics.ts](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/plugin/src/writeback/pathSemantics.ts)，并在 [plugin/src/writeback/applyProposalWriteback.ts](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/plugin/src/writeback/applyProposalWriteback.ts) 中保证 writeback / rollback 结果持续输出 canonical `target_note_path`。验收期内已通过 backend 全量 179 tests，后续与 `TASK-053` 合流后继续通过 backend 全量 180 tests 与 plugin 20 tests。
 
+### TASK-060
+
+- `task_id`: `TASK-060`
+- `session_id`:
+- `title`: 为 ask answer benchmark 接入 LLM-as-judge 语义正确性评分
+- `category`: `Eval`
+- `priority`: `P1`
+- `status`: `planned`
+- `scope`: `medium`
+- `goal`: 在现有 deterministic rule score 旁边新增可选的 LLM-as-judge 语义正确性评分，让 answer benchmark 能区分“语义答对但字符串未连续命中”和“确实答错 / 漏答 / 编造”。最终 artifact 同时保留 `rule_correctness` 与 `judge_correctness`，用 rule score 做低成本漂移保护，用 judge score 作为分析装配层、检索策略和 runtime gate 改进价值的主要质量信号。
+- `out_of_scope`:
+  - 不把 LLM judge 接入 ask runtime 主链路或用户请求路径
+  - 不删除现有规则判分，rule score 继续服务 CI smoke 与可重复基线
+  - 不把 judge 扩展到 ingest / digest 场景
+  - 不在本任务内调优检索、context assembly 或 runtime faithfulness gate
+  - 不强制 full benchmark 每次都调用 judge；需要保留成本可控的开关
+- `acceptance_criteria`:
+  - 新增 judge prompt 与 prompt version，输入至少包含 `user_query`、`expected_facts`、`forbidden_claims`、`answer_text` 和可见 citations / snippets
+  - judge 返回结构化 JSON，字段至少包含 `verdict: correct|partial|incorrect`、`matched_facts`、`missed_facts`、`unsupported_claims`、`reason`
+  - benchmark artifact 同时输出规则判分与 judge 判分，variant aggregate 同时汇总 `rule_answer_correctness` 和 `judge_answer_correctness`
+  - judge provider / model 可配置，并默认与生成模型解耦；本地无 key 或显式关闭 judge 时 benchmark 仍可只跑 rule score
+  - judge JSON 解析失败、超时或 provider 不可用时 fail-soft，记录 `judge_status` 和原因，不覆盖 rule score
+  - smoke 模式支持小样本 judge 验证；full 模式支持显式开关，避免无意产生高成本调用
+  - 至少补齐 scoring / artifact / CLI / preflight 的单元测试，覆盖 judge 成功、partial、unsupported、parse failure 和 disabled 分支
+  - 用 3～5 条既有 smoke case 人工抽样校准 judge 输出，确认它能修正规则判分的明显误伤
+- `depends_on`:
+  - `TASK-053`
+- `related_files`:
+  - `backend/app/benchmark/ask_answer_benchmark.py`
+  - `backend/app/benchmark/ask_answer_benchmark_scoring.py`
+  - `backend/app/benchmark/ask_answer_benchmark_preflight.py`
+  - `backend/app/benchmark/ask_answer_benchmark_variants.py`
+  - `eval/benchmark/run_answer_benchmark.py`
+  - `eval/benchmark/ask_benchmark_cases.json`
+  - `backend/tests/test_ask_answer_benchmark.py`
+  - `backend/tests/test_ask_answer_benchmark_scoring.py`
+  - `backend/tests/test_ask_answer_benchmark_preflight.py`
+  - `backend/tests/test_ask_answer_benchmark_cli.py`
+- `derived_tasks`:
+  - `small: 建立 10 条以内的人审校准集，用于比较 rule score 与 judge score 的偏差`
+  - `small: 对比 qwen-max / qwen-flash / deepseek judge 在同一 artifact 上的一致性和成本`
+  - `small: 为 judge reason 增加稳定分类标签，便于后续定位装配层、检索层或模型生成层问题`
+- `notes`: 当前 answer benchmark 的 `answer_correctness` 仍主要依赖 normalized substring match。TASK-059 smoke 已暴露两个问题：(1) 模型语义答对但因引号、插入短语或 expected fact 粒度过粗而被判错；(2) `hybrid` 与 `hybrid_assembly` 的正确率差异可能混入规则误伤，难以判断装配层是否真负收益。因此本任务应作为独立 `medium` 处理：保留规则判分的确定性，同时新增 judge 判分作为分析指标。judge 必须是离线 benchmark 能力，不应进入 runtime gate；否则会把评测成本、稳定性和用户请求路径耦合在一起。
+
 ### TASK-049
 
 - `task_id`: `TASK-049`
