@@ -1216,7 +1216,7 @@ class AskWorkflowTests(unittest.TestCase):
             )
             self.assertIn("[1]", result.answer)
 
-    def test_invoke_ask_graph_downgrades_semantic_overclaim_answer(self) -> None:
+    def test_invoke_ask_graph_keeps_low_confidence_overclaim_as_signal(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             db_path = self._build_index_fixture(Path(temp_dir))
             settings = replace(
@@ -1240,6 +1240,44 @@ class AskWorkflowTests(unittest.TestCase):
                     settings=settings,
                     thread_id="thread_overclaim_runtime",
                     run_id="run_overclaim_runtime",
+                )
+
+            self.assertEqual(execution.ask_result.mode, AskResultMode.GENERATED_ANSWER)
+            self.assertEqual(
+                execution.ask_result.guardrail_action,
+                GuardrailAction.ALLOW,
+            )
+            self.assertIsNotNone(execution.ask_result.runtime_faithfulness)
+            self.assertEqual(
+                execution.ask_result.runtime_faithfulness.outcome,
+                RuntimeFaithfulnessOutcome.LOW_CONFIDENCE,
+            )
+            self.assertIn("Roadmap 会自动写回知识库", execution.ask_result.answer)
+
+    def test_invoke_ask_graph_downgrades_contradicted_answer(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            db_path = self._build_index_fixture(Path(temp_dir))
+            settings = replace(
+                get_settings(),
+                index_db_path=db_path,
+                cloud_base_url="https://example.com",
+                cloud_chat_model="gpt-test",
+                local_chat_model="",
+            )
+
+            with patch(
+                "app.services.ask._request_grounded_answer",
+                return_value="Roadmap 没有拆成检索与 ask 两段实现。[1]",
+            ):
+                execution = invoke_ask_graph(
+                    WorkflowInvokeRequest(
+                        thread_id="thread_contradicted_runtime",
+                        action_type=WorkflowAction.ASK_QA,
+                        user_query="Roadmap",
+                    ),
+                    settings=settings,
+                    thread_id="thread_contradicted_runtime",
+                    run_id="run_contradicted_runtime",
                 )
 
             self.assertEqual(execution.ask_result.mode, AskResultMode.RETRIEVAL_ONLY)

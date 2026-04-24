@@ -309,25 +309,12 @@ def build_runtime_faithfulness_signal(
         settings=settings,
         provider_preference=provider_preference,
     )
-    verdict_breakdown = report.get("verdict_breakdown", {})
-    contradicted_count = int(verdict_breakdown.get("contradicted", 0) or 0)
-    neutral_count = int(verdict_breakdown.get("neutral", 0) or 0)
-    unsupported_claim_count = contradicted_count + neutral_count
-    claim_count = int(report.get("claim_count", 0) or 0)
-    score = report.get("score")
     outcome = RuntimeFaithfulnessOutcome.ALLOW
+    score = report.get("score")
     if score is not None and score < RUNTIME_FAITHFULNESS_SCORE_THRESHOLD:
         outcome = failure_outcome
 
-    return RuntimeFaithfulnessSignal(
-        outcome=outcome,
-        score=float(score) if score is not None else None,
-        threshold=RUNTIME_FAITHFULNESS_SCORE_THRESHOLD,
-        backend=str(report.get("backend", "not_applicable") or "not_applicable"),
-        reason=str(report.get("reason", "")),
-        claim_count=claim_count,
-        unsupported_claim_count=unsupported_claim_count,
-    )
+    return _build_runtime_signal_from_report(report, outcome=outcome)
 
 
 def build_runtime_ask_faithfulness_signal(
@@ -354,13 +341,24 @@ def build_runtime_ask_faithfulness_signal(
         if candidate.text.strip()
     ]
 
-    return build_runtime_faithfulness_signal(
+    report = build_claim_faithfulness_report(
         _strip_citation_markers(ask_result.answer),
         evidence_texts=evidence_texts,
-        failure_outcome=RuntimeFaithfulnessOutcome.DOWNGRADE_TO_RETRIEVAL_ONLY,
         settings=settings,
         provider_preference=provider_preference,
     )
+    verdict_breakdown = report.get("verdict_breakdown", {})
+    contradicted_count = int(verdict_breakdown.get("contradicted", 0) or 0)
+    score = report.get("score")
+
+    if contradicted_count:
+        outcome = RuntimeFaithfulnessOutcome.DOWNGRADE_TO_RETRIEVAL_ONLY
+    elif score is not None and score < RUNTIME_FAITHFULNESS_SCORE_THRESHOLD:
+        outcome = RuntimeFaithfulnessOutcome.LOW_CONFIDENCE
+    else:
+        outcome = RuntimeFaithfulnessOutcome.ALLOW
+
+    return _build_runtime_signal_from_report(report, outcome=outcome)
 
 
 def _find_unsupported_answer_terms(
@@ -406,6 +404,26 @@ def _extract_semantic_terms(text: str) -> list[str]:
 
 def _strip_citation_markers(text: str) -> str:
     return CITATION_PATTERN.sub("", text).strip()
+
+
+def _build_runtime_signal_from_report(
+    report: dict[str, Any],
+    *,
+    outcome: RuntimeFaithfulnessOutcome,
+) -> RuntimeFaithfulnessSignal:
+    verdict_breakdown = report.get("verdict_breakdown", {})
+    contradicted_count = int(verdict_breakdown.get("contradicted", 0) or 0)
+    neutral_count = int(verdict_breakdown.get("neutral", 0) or 0)
+    score = report.get("score")
+    return RuntimeFaithfulnessSignal(
+        outcome=outcome,
+        score=float(score) if score is not None else None,
+        threshold=RUNTIME_FAITHFULNESS_SCORE_THRESHOLD,
+        backend=str(report.get("backend", "not_applicable") or "not_applicable"),
+        reason=str(report.get("reason", "")),
+        claim_count=int(report.get("claim_count", 0) or 0),
+        unsupported_claim_count=contradicted_count + neutral_count,
+    )
 
 
 def _normalize_claim_fragment(text: str) -> str:

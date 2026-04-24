@@ -315,6 +315,67 @@ class ClaimFaithfulnessCoreTests(unittest.TestCase):
         self.assertEqual(signal.score, 1.0)
         self.assertEqual(signal.unsupported_claim_count, 0)
 
+    def test_build_runtime_ask_faithfulness_signal_marks_neutral_as_low_confidence(
+        self,
+    ) -> None:
+        ask_result = _build_generated_ask_result(
+            answer="Roadmap 会自动写回知识库。[1]",
+            evidence_text="Roadmap 已拆成检索与 ask 两段实现。",
+        )
+
+        signal = build_runtime_ask_faithfulness_signal(ask_result)
+
+        self.assertEqual(signal.outcome, RuntimeFaithfulnessOutcome.LOW_CONFIDENCE)
+        self.assertEqual(signal.score, 0.0)
+        self.assertEqual(signal.unsupported_claim_count, 1)
+
+    def test_build_runtime_ask_faithfulness_signal_downgrades_contradictions(
+        self,
+    ) -> None:
+        ask_result = _build_generated_ask_result(
+            answer="Roadmap 没有拆成检索与 ask 两段实现。[1]",
+            evidence_text="Roadmap 已拆成检索与 ask 两段实现。",
+        )
+
+        signal = build_runtime_ask_faithfulness_signal(ask_result)
+
+        self.assertEqual(
+            signal.outcome,
+            RuntimeFaithfulnessOutcome.DOWNGRADE_TO_RETRIEVAL_ONLY,
+        )
+        self.assertEqual(signal.score, 0.0)
+        self.assertEqual(signal.unsupported_claim_count, 1)
+
+
+def _build_generated_ask_result(
+    *,
+    answer: str,
+    evidence_text: str,
+) -> AskWorkflowResult:
+    return AskWorkflowResult(
+        mode=AskResultMode.GENERATED_ANSWER,
+        query="Roadmap",
+        answer=answer,
+        retrieved_candidates=[
+            RetrievedChunkCandidate(
+                chunk_id="chunk-roadmap",
+                note_id="note-roadmap",
+                path="Roadmap.md",
+                title="Roadmap",
+                heading_path="Roadmap",
+                note_type="summary_note",
+                template_family="plain",
+                daily_note_date=None,
+                source_mtime_ns=1,
+                start_line=1,
+                end_line=3,
+                score=1.0,
+                snippet=evidence_text,
+                text=evidence_text,
+            )
+        ],
+    )
+
 
 if __name__ == "__main__":
     unittest.main()
