@@ -49,8 +49,6 @@
 
 ## 默认下一任务
 
-- 若继续 answer benchmark 质量评估主线，优先进入 `TASK-060`
-  - 主题：为 ask answer benchmark 接入 LLM-as-judge 语义正确性评分，保留规则判分作为 deterministic smoke，同时新增 judge correctness 作为分析装配层 / 检索 / runtime gate 改进价值的主质量信号。
 - 默认进入 `TASK-049`
   - 主题：将 ask 链路的工具调用从 prompt-based JSON 约定迁移到 OpenAI Function Calling 协议，并为不支持 Function Calling 的 provider 保留结构化 fallback。
 - 若回溯刚完成的 `TASK-054`
@@ -88,7 +86,6 @@
 - `TASK-051` 已完成，但 claim 拆解的中文停用词 / allowlist 仍未落地；运行时阈值、score 与 low-confidence trace 已由 `TASK-052` 的 shared runtime signal 在 ask / digest 链路先补齐。
 - note path contract 已收敛为 `vault-relative`，但历史 `/vault/...` 样例、旧 eval artifact 或外部旧库仍可能残留伪绝对路径；新增 fixture / API payload 不应再重新写回这种格式。
 - `TASK-054` 已完成，但仍留有两个 `small` 尾项：Patch Safety 的违规项分类标签还不稳定，digest coverage 的关键事实抽取标注规范也还未收敛。
-- answer benchmark 的规则正确性评分仍依赖字符串命中，容易把语义正确但表述不完全连续的回答判错；若继续优化装配层 / 检索 / runtime gate，应先推进 `TASK-060` 引入离线 LLM-as-judge 语义评分。
 - 控制面与副作用面仍有断口：本地写回成功但后端记账失败时，当前还没有跨会话恢复入口，对应 `TASK-031`。
 - scoped ingest 仍会整库重建 `chunk_fts`，一旦 approval 高频触发，成本会持续放大，对应 `TASK-032`。
 
@@ -149,15 +146,6 @@
 - [backend/app/context/render.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/app/context/render.py)
 - [backend/app/graphs/ask_graph.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/app/graphs/ask_graph.py)
 - [backend/app/contracts/workflow.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/app/contracts/workflow.py)
-
-### 若继续 `TASK-060`
-
-- [backend/app/benchmark/ask_answer_benchmark.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/app/benchmark/ask_answer_benchmark.py)
-- [backend/app/benchmark/ask_answer_benchmark_scoring.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/app/benchmark/ask_answer_benchmark_scoring.py)
-- [backend/app/benchmark/ask_answer_benchmark_preflight.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/app/benchmark/ask_answer_benchmark_preflight.py)
-- [eval/benchmark/run_answer_benchmark.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/eval/benchmark/run_answer_benchmark.py)
-- [backend/tests/test_ask_answer_benchmark.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/tests/test_ask_answer_benchmark.py)
-- [backend/tests/test_ask_answer_benchmark_scoring.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/tests/test_ask_answer_benchmark_scoring.py)
 
 ### 若回溯已完成的 `TASK-051`
 
