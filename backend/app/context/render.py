@@ -5,6 +5,10 @@ import json
 from app.contracts.workflow import ContextBundle
 
 
+ASK_TOOL_SELECTION_PROMPT_VERSION = "2026-04-22-tool-v1"
+ASK_GROUNDED_ANSWER_PROMPT_VERSION = "2026-04-22-grounded-v1"
+
+
 def render_tool_selection_prompt(bundle: ContextBundle) -> str:
     return "\n".join(
         [

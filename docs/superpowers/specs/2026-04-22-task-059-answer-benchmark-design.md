@@ -33,7 +33,7 @@ and reporting into one mixed-purpose runner.
 Create an independent answer benchmark path that:
 
 - uses the fixed `TASK-057` dataset
-- runs the real ask path against canonical cloud model `qwen-max`
+- runs the real ask path against canonical cloud model `qwen3.6-flash-2026-04-16`
 - compares three explicit variants:
   - `hybrid`
   - `hybrid + context assembly`
@@ -112,7 +112,7 @@ The canonical benchmark target for v1 is fixed:
 
 - provider class: cloud
 - provider family: `qwen`
-- model id: `qwen-max`
+- model id: `qwen3.6-flash-2026-04-16`
 
 This canonical target should be recorded in the result metadata and treated as a
 required part of the benchmark identity.
@@ -247,7 +247,7 @@ The benchmark run should be linear and explicit:
 2. load the fixed smoke subset definition
 3. select either smoke or full case ids
 4. expand the selected case ids across the three variants
-5. run each `case x variant` through the real ask path under `qwen-max`
+5. run each `case x variant` through the real ask path under `qwen3.6-flash-2026-04-16`
 6. score each result with deterministic rules
 7. aggregate metrics per variant
 8. write a dedicated result artifact
@@ -415,7 +415,7 @@ They should verify:
 
 ### 8.3 Manual Provider Verification
 
-Real `qwen-max` runs remain manual.
+Real `qwen3.6-flash-2026-04-16` runs remain manual.
 
 The expected operator sequence is:
 
@@ -436,7 +436,7 @@ demonstrate all of the following:
 - there is an answer benchmark entrypoint independent from the regression runner
 - the same selected cases can be compared across the three defined variants
 - the benchmark runs through the real ask path under canonical cloud model
-  `qwen-max`
+  `qwen3.6-flash-2026-04-16`
 - result artifacts include the required benchmark metadata
 - per-variant aggregates include at least:
   - `answer_correctness`

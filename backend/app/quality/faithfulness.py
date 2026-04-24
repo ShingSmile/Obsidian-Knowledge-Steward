@@ -12,10 +12,17 @@ from app.contracts.workflow import RuntimeFaithfulnessOutcome, RuntimeFaithfulne
 
 
 CITATION_PATTERN = re.compile(r"\[(\d+)\]")
-CLAIM_SPLIT_PATTERN = re.compile(r"[。！？!?；;，,\n]+")
+CLAIM_SPLIT_PATTERN = re.compile(r"[。！？!?；;\n]+")
 LEADING_BULLET_PATTERN = re.compile(r"^\s*(?:[-*+]\s+|\d+[.)]\s+|#+\s*)")
 LATIN_TOKEN_PATTERN = re.compile(r"[a-z0-9_]{3,}")
 CJK_SEQUENCE_PATTERN = re.compile(r"[\u4e00-\u9fff]{2,}")
+INLINE_MARKUP_PATTERN = re.compile(r"[*_`~]+")
+CLAIM_PREAMBLE_PATTERN = re.compile(
+    r"^\s*(?:根据(?:检索证据|[^，,:：]{0,40}(?:记录|笔记|内容|总结|结果|显示|可知))[,，:：]?\s*)+"
+)
+PHRASE_SPLIT_PATTERN = re.compile(r"[：:，,、/（）()\[\]-]+")
+PHRASE_CONNECTOR_PATTERN = re.compile(r"(?:以及|及|与|并|和)")
+PURE_NUMBER_PATTERN = re.compile(r"^\d+$")
 NEGATION_TOKENS = (
     "不",
     "不是",
@@ -30,7 +37,45 @@ EMBEDDING_ENTAILMENT_THRESHOLD = 0.82
 EMBEDDING_SUPPORT_THRESHOLD = 0.68
 LEXICAL_ENTAILMENT_THRESHOLD = 0.72
 LEXICAL_CONTRADICTION_THRESHOLD = 0.5
+PHRASE_SUPPORT_THRESHOLD = 0.67
 RUNTIME_FAITHFULNESS_SCORE_THRESHOLD = 0.67
+GENERIC_PHRASE_PREFIXES = (
+    "根据",
+    "包括",
+    "包含",
+    "涵盖",
+    "主要",
+    "重点",
+    "明确",
+    "总结了",
+    "总结",
+    "提到",
+    "说明",
+    "配置",
+    "功能点",
+    "注意点",
+)
+GENERIC_PHRASE_SUFFIXES = (
+    "等展示内容",
+    "展示内容",
+    "等内容",
+    "等功能点",
+    "功能点",
+    "等功能",
+    "功能",
+    "等注意点",
+    "注意点",
+)
+CONTEXTUAL_PHRASE_MARKERS = (
+    "今日总结",
+    "今日进程",
+    "工作任务",
+    "待完成事项",
+    "未完成事项",
+    "以下模块",
+    "以下四个模块",
+    "根据检索证据",
+)
 
 
 @dataclass(frozen=True)
@@ -139,11 +184,19 @@ def build_ask_groundedness_snapshot(
 
 def split_atomic_claims(text: str) -> list[str]:
     normalized_text = _strip_citation_markers(text)
-    claims: list[str] = []
-
+    normalized_fragments: list[str] = []
     for raw_fragment in CLAIM_SPLIT_PATTERN.split(normalized_text):
-        fragment = LEADING_BULLET_PATTERN.sub("", raw_fragment).strip()
+        fragment = _normalize_claim_fragment(raw_fragment)
         if len(fragment) < 2:
+            continue
+        normalized_fragments.append(fragment)
+
+    claims: list[str] = []
+    for index, fragment in enumerate(normalized_fragments):
+        if _should_skip_claim_fragment(
+            fragment,
+            has_following_fragment=index < len(normalized_fragments) - 1,
+        ):
             continue
         if fragment not in claims:
             claims.append(fragment)
@@ -256,25 +309,12 @@ def build_runtime_faithfulness_signal(
         settings=settings,
         provider_preference=provider_preference,
     )
-    verdict_breakdown = report.get("verdict_breakdown", {})
-    contradicted_count = int(verdict_breakdown.get("contradicted", 0) or 0)
-    neutral_count = int(verdict_breakdown.get("neutral", 0) or 0)
-    unsupported_claim_count = contradicted_count + neutral_count
-    claim_count = int(report.get("claim_count", 0) or 0)
-    score = report.get("score")
     outcome = RuntimeFaithfulnessOutcome.ALLOW
+    score = report.get("score")
     if score is not None and score < RUNTIME_FAITHFULNESS_SCORE_THRESHOLD:
         outcome = failure_outcome
 
-    return RuntimeFaithfulnessSignal(
-        outcome=outcome,
-        score=float(score) if score is not None else None,
-        threshold=RUNTIME_FAITHFULNESS_SCORE_THRESHOLD,
-        backend=str(report.get("backend", "not_applicable") or "not_applicable"),
-        reason=str(report.get("reason", "")),
-        claim_count=claim_count,
-        unsupported_claim_count=unsupported_claim_count,
-    )
+    return _build_runtime_signal_from_report(report, outcome=outcome)
 
 
 def build_runtime_ask_faithfulness_signal(
@@ -291,25 +331,34 @@ def build_runtime_ask_faithfulness_signal(
             reason="runtime_semantic_gate:not_generated_answer",
         )
 
-    citation_numbers = _dedupe_preserve_order(
-        int(match.group(1))
-        for match in CITATION_PATTERN.finditer(ask_result.answer)
-    )
-    evidence_texts: list[str] = []
-    for citation_number in citation_numbers:
-        if citation_number < 1 or citation_number > len(ask_result.retrieved_candidates):
-            continue
-        evidence_texts.append(
-            ask_result.retrieved_candidates[citation_number - 1].text
-        )
+    # Citation alignment is enforced elsewhere. The runtime semantic gate should judge
+    # support against the full prompt-visible evidence set; otherwise a model that
+    # reuses `[1]` across sibling chunks from the same note gets downgraded even when
+    # the answer is grounded in the provided context.
+    evidence_texts = [
+        candidate.text.strip()
+        for candidate in ask_result.retrieved_candidates
+        if candidate.text.strip()
+    ]
 
-    return build_runtime_faithfulness_signal(
+    report = build_claim_faithfulness_report(
         _strip_citation_markers(ask_result.answer),
         evidence_texts=evidence_texts,
-        failure_outcome=RuntimeFaithfulnessOutcome.DOWNGRADE_TO_RETRIEVAL_ONLY,
         settings=settings,
         provider_preference=provider_preference,
     )
+    verdict_breakdown = report.get("verdict_breakdown", {})
+    contradicted_count = int(verdict_breakdown.get("contradicted", 0) or 0)
+    score = report.get("score")
+
+    if contradicted_count:
+        outcome = RuntimeFaithfulnessOutcome.DOWNGRADE_TO_RETRIEVAL_ONLY
+    elif score is not None and score < RUNTIME_FAITHFULNESS_SCORE_THRESHOLD:
+        outcome = RuntimeFaithfulnessOutcome.LOW_CONFIDENCE
+    else:
+        outcome = RuntimeFaithfulnessOutcome.ALLOW
+
+    return _build_runtime_signal_from_report(report, outcome=outcome)
 
 
 def _find_unsupported_answer_terms(
@@ -355,6 +404,114 @@ def _extract_semantic_terms(text: str) -> list[str]:
 
 def _strip_citation_markers(text: str) -> str:
     return CITATION_PATTERN.sub("", text).strip()
+
+
+def _build_runtime_signal_from_report(
+    report: dict[str, Any],
+    *,
+    outcome: RuntimeFaithfulnessOutcome,
+) -> RuntimeFaithfulnessSignal:
+    verdict_breakdown = report.get("verdict_breakdown", {})
+    contradicted_count = int(verdict_breakdown.get("contradicted", 0) or 0)
+    neutral_count = int(verdict_breakdown.get("neutral", 0) or 0)
+    score = report.get("score")
+    return RuntimeFaithfulnessSignal(
+        outcome=outcome,
+        score=float(score) if score is not None else None,
+        threshold=RUNTIME_FAITHFULNESS_SCORE_THRESHOLD,
+        backend=str(report.get("backend", "not_applicable") or "not_applicable"),
+        reason=str(report.get("reason", "")),
+        claim_count=int(report.get("claim_count", 0) or 0),
+        unsupported_claim_count=contradicted_count + neutral_count,
+    )
+
+
+def _normalize_claim_fragment(text: str) -> str:
+    normalized = INLINE_MARKUP_PATTERN.sub("", text)
+    normalized = LEADING_BULLET_PATTERN.sub("", normalized).strip()
+    normalized = CLAIM_PREAMBLE_PATTERN.sub("", normalized).strip()
+    return normalized
+
+
+def _should_skip_claim_fragment(
+    fragment: str,
+    *,
+    has_following_fragment: bool,
+) -> bool:
+    if has_following_fragment and fragment.endswith(("：", ":")):
+        return True
+    return False
+
+
+def _extract_semantic_phrases(text: str) -> list[str]:
+    phrases: list[str] = []
+
+    for raw_piece in CLAIM_SPLIT_PATTERN.split(_strip_citation_markers(text)):
+        piece = _normalize_claim_fragment(raw_piece)
+        if not piece:
+            continue
+
+        split_chunks: list[str] = []
+        for chunk in PHRASE_SPLIT_PATTERN.split(piece):
+            if not chunk:
+                continue
+            split_chunks.extend(
+                candidate for candidate in PHRASE_CONNECTOR_PATTERN.split(chunk) if candidate
+            )
+
+        for raw_phrase in split_chunks:
+            phrase = _normalize_semantic_phrase(raw_phrase)
+            if not phrase:
+                continue
+            if _is_contextual_phrase(phrase):
+                continue
+            if phrase not in phrases:
+                phrases.append(phrase)
+
+    return phrases
+
+
+def _normalize_semantic_phrase(text: str) -> str:
+    phrase = INLINE_MARKUP_PATTERN.sub("", text).strip()
+    phrase = phrase.replace("以展示", "展示")
+    phrase = phrase.strip("，,：:；;。.!?\"'“”‘’ ")
+    if PURE_NUMBER_PATTERN.fullmatch(phrase):
+        return ""
+
+    changed = True
+    while changed:
+        changed = False
+        for prefix in GENERIC_PHRASE_PREFIXES:
+            if phrase.startswith(prefix) and len(phrase) > len(prefix) + 1:
+                phrase = phrase[len(prefix) :].strip()
+                changed = True
+        for suffix in GENERIC_PHRASE_SUFFIXES:
+            if phrase.endswith(suffix) and len(phrase) > len(suffix) + 1:
+                phrase = phrase[: -len(suffix)].strip()
+                changed = True
+
+    if len(phrase) < 2:
+        return ""
+    return phrase
+
+
+def _is_contextual_phrase(phrase: str) -> bool:
+    if PURE_NUMBER_PATTERN.fullmatch(phrase):
+        return True
+    return any(marker in phrase for marker in CONTEXTUAL_PHRASE_MARKERS)
+
+
+def _phrase_support_ratio(claim: str, evidence_fragments: Sequence[str]) -> float:
+    claim_phrases = _extract_semantic_phrases(claim)
+    if not claim_phrases:
+        return 0.0
+
+    normalized_evidence = "\n".join(
+        INLINE_MARKUP_PATTERN.sub("", fragment)
+        for fragment in evidence_fragments
+    )
+    supported_count = sum(1 for phrase in claim_phrases if phrase in normalized_evidence)
+    return supported_count / len(claim_phrases)
 
 
 def _dedupe_preserve_order(values: Any) -> list[Any]:
@@ -425,6 +582,7 @@ def _classify_claim(
 ) -> _ClaimVerdict:
     claim_terms = set(_extract_semantic_terms(claim))
     claim_has_negation = _contains_negation(claim)
+    phrase_support = _phrase_support_ratio(claim, evidence_fragments)
     best_fragment: str | None = None
     best_overlap = 0.0
     best_similarity: float | None = None
@@ -467,6 +625,16 @@ def _classify_claim(
             best_evidence=None,
             lexical_overlap=0.0,
             similarity=None,
+        )
+
+    if phrase_support >= PHRASE_SUPPORT_THRESHOLD:
+        return _ClaimVerdict(
+            claim=claim,
+            verdict="entailed",
+            reason="high_phrase_support",
+            best_evidence=best_fragment,
+            lexical_overlap=round(best_overlap, 4),
+            similarity=best_similarity,
         )
 
     if best_contradiction:

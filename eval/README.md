@@ -45,10 +45,18 @@
 
 `eval/benchmark/run_retrieval_benchmark.py` 是 retrieval-only benchmark 入口，只跑 ask retrieval benchmark；它支持 `--output` 显式指定结果文件，也支持 `--dataset` 覆盖数据集路径做 smoke test。`--output` 省略时，结果会落到 `eval/results/` 下的默认时间戳文件。
 
+`eval/benchmark/run_answer_benchmark.py` 是 answer benchmark 入口，只跑 ask answer benchmark；它支持 `--mode smoke|full`，也支持 `--output` 和 `--dataset`。运行前会先做 cloud provider / canonical model / 数据集 / smoke subset 的 preflight 检查，失败会直接退出，不会发起 benchmark。
+
 示例：
 
 ```bash
 /Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/.conda/knowledge-steward/bin/python eval/benchmark/run_retrieval_benchmark.py --output /tmp/retrieval-benchmark.json
+```
+
+```bash
+set -a; source backend/.env; set +a
+./.conda/knowledge-steward/bin/python eval/benchmark/run_answer_benchmark.py --mode smoke --output /tmp/task-059-smoke.json
+./.conda/knowledge-steward/bin/python eval/benchmark/run_answer_benchmark.py --mode full --output /tmp/task-059-full.json
 ```
 
 ## Ask Benchmark Dataset Workflow

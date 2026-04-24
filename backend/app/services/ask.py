@@ -16,6 +16,7 @@ from app.contracts.workflow import (
     AskResultMode,
     AskWorkflowResult,
     ContextBundle,
+    ContextEvidenceItem,
     GuardrailAction,
     GuardrailOutcome,
     RetrievedChunkCandidate,
@@ -77,6 +78,12 @@ class AskTurnContext:
     prompt_tool_results: list[ToolExecutionResult]
 
 
+@dataclass(frozen=True)
+class AskBenchmarkRuntimeConfig:
+    context_assembly_enabled: bool = True
+    runtime_faithfulness_gate_enabled: bool = True
+
+
 def build_initial_ask_turn(
     request: WorkflowInvokeRequest,
     *,
@@ -107,6 +114,7 @@ def build_initial_ask_turn(
             tool_call_rounds=0,
         )
 
+    benchmark_runtime_config = _resolve_ask_benchmark_runtime_config(request.metadata)
     return _build_ask_turn_context(
         query=query,
         workflow_action=request.action_type,
@@ -116,6 +124,7 @@ def build_initial_ask_turn(
         retrieval_fallback_used=retrieval_response.fallback_used,
         retrieval_fallback_reason=retrieval_response.fallback_reason,
         allowed_tool_names=allowed_tool_names,
+        benchmark_runtime_config=benchmark_runtime_config,
     )
 
 
@@ -144,6 +153,7 @@ def apply_ask_tool_turn(
     decision: ToolCallDecision,
     workflow_action: WorkflowAction,
     settings: Settings,
+    request_metadata: dict[str, object] | None = None,
 ) -> AskTurnContext | AskWorkflowResult:
     if not decision.requested:
         return turn
@@ -221,6 +231,7 @@ def apply_ask_tool_turn(
         retrieval_fallback_used=turn.retrieval_fallback_used,
         retrieval_fallback_reason=turn.retrieval_fallback_reason,
         allowed_tool_names=turn.allowed_tool_names,
+        benchmark_runtime_config=_resolve_ask_benchmark_runtime_config(request_metadata),
     )
 
 
@@ -232,7 +243,9 @@ def generate_ask_result(
     tool_call_attempted: bool,
     tool_call_used: str | None,
     tool_call_rounds: int,
+    request_metadata: dict[str, object] | None = None,
 ) -> AskWorkflowResult:
+    benchmark_runtime_config = _resolve_ask_benchmark_runtime_config(request_metadata)
     generated_answer, provider_target, model_fallback_reason = _try_generate_grounded_answer(
         query=turn.query,
         bundle=turn.bundle,
@@ -313,6 +326,9 @@ def generate_ask_result(
     generated_result = generated_result.model_copy(
         update={"runtime_faithfulness": runtime_faithfulness}
     )
+    if not benchmark_runtime_config.runtime_faithfulness_gate_enabled:
+        return generated_result
+
     faithfulness_guardrail = evaluate_runtime_ask_faithfulness(runtime_faithfulness)
     if faithfulness_guardrail.applied:
         return _build_retrieval_only_result(
@@ -351,14 +367,25 @@ def _build_ask_turn_context(
     retrieval_fallback_used: bool,
     retrieval_fallback_reason: str | None,
     allowed_tool_names: list[str],
+    benchmark_runtime_config: AskBenchmarkRuntimeConfig,
 ) -> AskTurnContext | AskWorkflowResult:
-    bundle = build_ask_context_bundle(
-        user_query=query,
-        candidates=candidates,
-        tool_results=prompt_tool_results,
-        token_budget=ASK_CONTEXT_TOKEN_BUDGET,
-        allowed_tool_names=allowed_tool_names,
-    )
+    if benchmark_runtime_config.context_assembly_enabled:
+        bundle = build_ask_context_bundle(
+            user_query=query,
+            candidates=candidates,
+            tool_results=prompt_tool_results,
+            token_budget=ASK_CONTEXT_TOKEN_BUDGET,
+            allowed_tool_names=allowed_tool_names,
+        )
+    else:
+        bundle = _build_raw_ask_context_bundle(
+            user_query=query,
+            workflow_action=workflow_action,
+            candidates=candidates,
+            tool_results=prompt_tool_results,
+            token_budget=ASK_CONTEXT_TOKEN_BUDGET,
+            allowed_tool_names=allowed_tool_names,
+        )
     prompt_candidates = _select_prompt_candidates(candidates=candidates, bundle=bundle)
     citations = _build_citations(prompt_candidates)
     if bundle.safety_flags and not prompt_candidates:
@@ -389,6 +416,141 @@ def _build_ask_turn_context(
         raw_tool_results=raw_tool_results,
         prompt_tool_results=prompt_tool_results,
     )
+
+
+def _resolve_ask_benchmark_runtime_config(
+    metadata: dict[str, object] | None,
+) -> AskBenchmarkRuntimeConfig:
+    if not isinstance(metadata, dict):
+        return AskBenchmarkRuntimeConfig()
+
+    variant_metadata = metadata.get("answer_benchmark_variant")
+    config_source: dict[str, object] | None = None
+    if isinstance(variant_metadata, dict):
+        config_source = variant_metadata
+    elif metadata.get("benchmark_kind") == "ask_answer":
+        config_source = metadata
+
+    if config_source is None:
+        return AskBenchmarkRuntimeConfig()
+
+    return AskBenchmarkRuntimeConfig(
+        context_assembly_enabled=_coerce_benchmark_toggle(
+            config_source.get("context_assembly_enabled"),
+            default=True,
+        ),
+        runtime_faithfulness_gate_enabled=_coerce_benchmark_toggle(
+            config_source.get("runtime_faithfulness_gate_enabled"),
+            default=True,
+        ),
+    )
+
+
+def _coerce_benchmark_toggle(value: object, *, default: bool) -> bool:
+    return value if isinstance(value, bool) else default
+
+
+def _build_raw_ask_context_bundle(
+    *,
+    user_query: str,
+    workflow_action: WorkflowAction,
+    candidates: list[RetrievedChunkCandidate],
+    tool_results: list[ToolExecutionResult],
+    token_budget: int,
+    allowed_tool_names: list[str],
+) -> ContextBundle:
+    evidence_items, trimmed_for_budget = _build_raw_retrieval_evidence_items(
+        candidates,
+        token_budget=token_budget,
+    )
+    assembly_notes = ["benchmark_variant:raw_retrieval_candidates"]
+    if trimmed_for_budget:
+        assembly_notes.append(f"trimmed_for_budget:{trimmed_for_budget}")
+    return ContextBundle(
+        user_intent=user_query,
+        workflow_action=workflow_action,
+        evidence_items=evidence_items,
+        tool_results=tool_results,
+        allowed_tool_names=allowed_tool_names,
+        token_budget=token_budget,
+        safety_flags=_collect_raw_bundle_safety_flags(evidence_items, tool_results),
+        assembly_notes=assembly_notes,
+    )
+
+
+def _build_raw_retrieval_evidence_items(
+    candidates: list[RetrievedChunkCandidate],
+    *,
+    token_budget: int,
+) -> tuple[list[ContextEvidenceItem], int]:
+    total_by_path: dict[str, int] = {}
+    for candidate in candidates:
+        total_by_path[candidate.path] = total_by_path.get(candidate.path, 0) + 1
+
+    seen_by_path: dict[str, int] = {}
+    evidence_items: list[ContextEvidenceItem] = []
+    consumed = 0
+    trimmed_for_budget = 0
+    for candidate in candidates:
+        seen_by_path[candidate.path] = seen_by_path.get(candidate.path, 0) + 1
+        position_hint = (
+            f"第 {seen_by_path[candidate.path]} 条 / "
+            f"共 {total_by_path[candidate.path]} 条"
+        )
+        metadata_chars = (
+            len(candidate.path)
+            + len(candidate.title)
+            + len(candidate.heading_path or "")
+            + len(position_hint)
+        )
+        remaining_chars = token_budget - consumed - metadata_chars
+        if remaining_chars <= 0:
+            trimmed_for_budget += 1
+            continue
+        visible_text = candidate.text[:remaining_chars]
+        if len(visible_text) < len(candidate.text):
+            trimmed_for_budget += 1
+        evidence_items.append(
+            ContextEvidenceItem(
+                source_path=candidate.path,
+                chunk_id=candidate.chunk_id,
+                source_note_title=candidate.title,
+                heading_path=candidate.heading_path,
+                position_hint=position_hint,
+                text=visible_text,
+                score=candidate.score,
+                source_kind="retrieval",
+            )
+        )
+        consumed += metadata_chars + len(visible_text)
+    return evidence_items, trimmed_for_budget
+
+
+def _collect_raw_bundle_safety_flags(
+    evidence_items: list[ContextEvidenceItem],
+    tool_results: list[ToolExecutionResult],
+) -> list[str]:
+    flags: list[str] = []
+    seen: set[str] = set()
+
+    for evidence_item in evidence_items:
+        for flag in detect_safety_flags(evidence_item.text):
+            if flag in seen:
+                continue
+            seen.add(flag)
+            flags.append(flag)
+
+    for result in tool_results:
+        if not result.ok or not result.allow_context_reentry or not result.data:
+            continue
+        payload = json.dumps(result.data, ensure_ascii=False, sort_keys=True)
+        for flag in detect_safety_flags(payload):
+            if flag in seen:
+                continue
+            seen.add(flag)
+            flags.append(flag)
+
+    return flags
 
 
 def _build_citations(candidates: list[RetrievedChunkCandidate]) -> list[AskCitation]:

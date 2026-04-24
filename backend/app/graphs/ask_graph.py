@@ -369,6 +369,7 @@ def _tool_node(
         decision=decision,
         workflow_action=state["action_type"],
         settings=settings,
+        request_metadata=dict(state.get("request_metadata", {})),
     )
     updates: StewardState = {
         "ask_tool_call_rounds": state.get("ask_tool_call_rounds", 0) + 1,
@@ -433,6 +434,7 @@ def _finalize_ask_node(
             tool_call_attempted=state.get("ask_tool_call_attempted", False),
             tool_call_used=state.get("ask_tool_call_used"),
             tool_call_rounds=state.get("ask_tool_call_rounds", 0),
+            request_metadata=dict(state.get("request_metadata", {})),
         )
     trace_events = append_trace_event(
         state,
