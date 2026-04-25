@@ -93,10 +93,12 @@ The operator surface should be explicit:
 python eval/benchmark/run_answer_benchmark.py \
   --mode smoke \
   --judge enabled \
+  --judge-model qwen3.6-max-preview \
   --output /tmp/answer-smoke-judged.json
 
 python eval/benchmark/judge_answer_benchmark_artifact.py \
   --input /tmp/task-059-answer-benchmark-smoke-final-20260424.json \
+  --judge-model qwen3.6-max-preview \
   --output /tmp/task-059-answer-benchmark-smoke-judged.json
 ```
 
@@ -165,7 +167,7 @@ artifact should include a separate block:
   "judge_run_metadata": {
     "judge_enabled": true,
     "judge_provider_name": "openai-compatible",
-    "judge_model_name": "qwen3.6-flash-2026-04-16",
+    "judge_model_name": "qwen3.6-max-preview",
     "judge_prompt_version": "2026-04-25-answer-judge-v1",
     "judge_run_timestamp": "2026-04-25T12:00:00",
     "source_artifact_path": "/tmp/task-059-answer-benchmark-smoke-final-20260424.json"
@@ -242,7 +244,7 @@ The required judge response is:
 
 ```json
 {
-  "verdict": "correct|partial|incorrect",
+  "verdict": "correct|mostly_correct|partial|mostly_incorrect|incorrect",
   "matched_facts": ["..."],
   "missed_facts": ["..."],
   "unsupported_claims": ["..."],
@@ -253,8 +255,23 @@ The required judge response is:
 Verdict mapping:
 
 - `correct` -> `1.0`
+- `mostly_correct` -> `0.75`
 - `partial` -> `0.5`
+- `mostly_incorrect` -> `0.25`
 - `incorrect` -> `0.0`
+
+The five levels should be interpreted as:
+
+- `correct`: all required facts are covered, and there are no unsupported or
+  forbidden claims.
+- `mostly_correct`: the answer covers the central facts but has a minor omission
+  or imprecise wording that does not change the final meaning.
+- `partial`: the answer covers some required facts but misses material facts or
+  gives an incomplete answer.
+- `mostly_incorrect`: the answer contains a small amount of relevant material
+  but misses the main answer, or the useful content is outweighed by omissions.
+- `incorrect`: the answer is mostly wrong, unsupported, refuses when it should
+  answer, or contains forbidden/unsupported claims that change the answer.
 
 The prompt must instruct the judge to mark unsupported claims when the answer
 adds claims that are not supported by the visible citations, even if those claims
@@ -265,8 +282,11 @@ are not explicitly listed in `forbidden_claims`.
 Judge provider/model should be configurable and decoupled from the generation
 model.
 
-The first implementation can reuse `KS_CLOUD_*` as defaults, but the CLI should
-allow explicit judge overrides:
+The recommended default judge model for `TASK-062` is
+`qwen3.6-max-preview`, while the answer-generation benchmark can continue to use
+the `TASK-059` canonical answer model. The first implementation can reuse
+`KS_CLOUD_*` connection settings as defaults, but the CLI should allow explicit
+judge overrides:
 
 - `--judge-provider-name`
 - `--judge-base-url`
@@ -315,7 +335,8 @@ Pure judge tests:
 - prompt payload includes query, expected facts, forbidden claims, answer text,
   and citations
 - valid JSON parses into `judge_score`
-- `correct`, `partial`, and `incorrect` map to the expected points
+- `correct`, `mostly_correct`, `partial`, `mostly_incorrect`, and `incorrect`
+  map to the expected points
 - invalid JSON returns `parse_error`
 - missing fields return `invalid_schema`
 - unsupported claims are preserved in the structured result
@@ -344,10 +365,12 @@ Manual verification can use real provider calls:
 python eval/benchmark/run_answer_benchmark.py \
   --mode smoke \
   --judge enabled \
+  --judge-model qwen3.6-max-preview \
   --output /tmp/answer-smoke-judged.json
 
 python eval/benchmark/judge_answer_benchmark_artifact.py \
   --input /tmp/task-059-answer-benchmark-smoke-final-20260424.json \
+  --judge-model qwen3.6-max-preview \
   --output /tmp/task-059-answer-benchmark-smoke-judged.json
 ```
 
@@ -362,8 +385,12 @@ python eval/benchmark/judge_answer_benchmark_artifact.py \
   `judge_answer_correctness`.
 - Judge provider/model metadata is recorded separately from the original
   answer-generation metadata.
+- The recommended judge model is `qwen3.6-max-preview`, configurable separately
+  from the `TASK-059` answer-generation model.
+- Judge correctness uses five scoring levels: `correct=1.0`,
+  `mostly_correct=0.75`, `partial=0.5`, `mostly_incorrect=0.25`, and
+  `incorrect=0.0`.
 - Judge disabled mode remains the default and does not require provider
   readiness.
-- Unit tests cover judge success, partial, unsupported claims, parse failure,
-  invalid schema, disabled mode, and artifact replay.
-
+- Unit tests cover all five judge verdict levels, unsupported claims, parse
+  failure, invalid schema, disabled mode, and artifact replay.
