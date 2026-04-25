@@ -159,6 +159,33 @@ When judge scoring is enabled, each record also gets `judge_score`:
 }
 ```
 
+For non-scored judge attempts, `judge_score` must keep the same top-level shape
+so tests and downstream readers can rely on stable fields:
+
+```json
+{
+  "judge_score": {
+    "judge_status": "parse_error",
+    "verdict": null,
+    "correctness_points": null,
+    "matched_facts": [],
+    "missed_facts": [],
+    "unsupported_claims": [],
+    "reason": null,
+    "error_reason": "judge_response_not_json",
+    "raw_response_excerpt": "{not json..."
+  }
+}
+```
+
+`raw_response_excerpt` is only required for `parse_error` and `invalid_schema`;
+other failure statuses can omit it or set it to `null`. `error_reason` should be
+a stable machine-readable string, not a long provider exception dump.
+
+When judge is disabled, per-record `judge_score` is omitted entirely. The
+artifact-level `judge_run_metadata` records `judge_enabled=false`. Disabled
+runs do not emit judge aggregates.
+
 Judge metadata must not overwrite original answer-generation metadata. The
 artifact should include a separate block:
 
@@ -177,14 +204,43 @@ artifact should include a separate block:
 
 Variant aggregates should report both rule and judge metrics:
 
+- `answer_correctness`
+- `unsupported_claim_rate`
 - `rule_answer_correctness`
+- `rule_unsupported_claim_rate`
 - `judge_answer_correctness`
 - `judge_unsupported_claim_rate`
+- `judge_case_count`
+- `judge_scored_count`
+- `judge_failed_count`
 - `judge_scored_rate`
 - `judge_failed_rate`
 
-The existing answer-rate and latency metrics remain variant-level runtime
-metrics and should not be renamed by this task.
+For compatibility, existing aggregate fields remain in place:
+
+- `answer_correctness` remains as a legacy alias for
+  `rule_answer_correctness`.
+- `unsupported_claim_rate` remains as a legacy alias for
+  `rule_unsupported_claim_rate`.
+- `generated_answer_rate`, `retrieval_only_rate`, `p50_latency_ms`,
+  `p95_latency_ms`, and tool subset metrics keep their existing names.
+
+Judge aggregate formulas:
+
+- `judge_case_count = total case_variant_records for that variant`
+- `judge_scored_count = count(judge_status == "scored")`
+- `judge_failed_count = judge_case_count - judge_scored_count`
+- `judge_scored_rate = judge_scored_count / judge_case_count`
+- `judge_failed_rate = judge_failed_count / judge_case_count`
+- `judge_answer_correctness = average(correctness_points)` over scored records
+  only
+- `judge_unsupported_claim_rate = scored records with one or more
+  `unsupported_claims` divided by `judge_scored_count`
+
+All ratios should be rounded to four decimals. If `judge_case_count` is zero,
+all judge counts are zero and rates are `0.0`. If `judge_scored_count` is zero,
+`judge_answer_correctness` and `judge_unsupported_claim_rate` are `0.0`; the
+low `judge_scored_rate` makes the result explicitly non-authoritative.
 
 ## 3. Data Flow
 
@@ -293,6 +349,28 @@ judge overrides:
 - `--judge-api-key`
 - `--judge-model`
 
+Both `run_answer_benchmark.py` and `judge_answer_benchmark_artifact.py` should
+support the same judge configuration flags. The resolution precedence is:
+
+1. explicit CLI flag
+2. judge-specific environment variable:
+   - `KS_JUDGE_PROVIDER_NAME`
+   - `KS_JUDGE_BASE_URL`
+   - `KS_JUDGE_API_KEY`
+   - `KS_JUDGE_MODEL`
+3. cloud connection fallback for provider name, base URL, and API key:
+   - `KS_CLOUD_PROVIDER_NAME`
+   - `KS_CLOUD_BASE_URL`
+   - `KS_CLOUD_API_KEY`
+4. model fallback: `qwen3.6-max-preview`
+
+`KS_CLOUD_CHAT_MODEL` is not the default judge model, because judge and answer
+generation are intentionally decoupled. A missing judge base URL or judge model
+when judge is enabled is a startup preflight failure. A missing API key is not a
+startup failure, because some OpenAI-compatible endpoints may not require one;
+provider authentication failures are recorded per record as
+`provider_unavailable`.
+
 When judge is disabled, no judge provider readiness check should run. When judge
 is enabled, preflight should verify that a base URL and model are available.
 
@@ -307,7 +385,6 @@ should not erase rule scores.
 Recommended statuses:
 
 - `scored`
-- `disabled`
 - `provider_unavailable`
 - `timeout`
 - `parse_error`
@@ -347,6 +424,10 @@ Artifact replay tests:
   fields
 - original artifact metadata is preserved
 - `judge_run_metadata` is added
+- non-scored judge results preserve the stable `judge_score` shape with
+  `verdict=null` and `correctness_points=null`
+- disabled judge runs omit per-record `judge_score` and judge aggregates
+- legacy aggregate fields remain as aliases for rule aggregates
 - dataset version mismatch records a warning
 - missing per-record fields produce skipped records, not a failed replay
 
@@ -355,6 +436,9 @@ CLI and preflight tests:
 - `run_answer_benchmark.py --judge disabled` does not require judge provider
   settings
 - `run_answer_benchmark.py --judge enabled` checks judge settings
+- both judge-capable CLIs use the same judge provider precedence:
+  CLI > `KS_JUDGE_*` > `KS_CLOUD_*` connection fallback, with model fallback to
+  `qwen3.6-max-preview`
 - `judge_answer_benchmark_artifact.py` rejects missing, invalid, or wrong-kind
   artifacts
 - both CLIs return non-zero for startup failures
@@ -383,6 +467,11 @@ python eval/benchmark/judge_answer_benchmark_artifact.py \
 - Rule correctness remains available and is not overwritten by judge failures.
 - Variant aggregates include both `rule_answer_correctness` and
   `judge_answer_correctness`.
+- Judge aggregate formulas define exact denominators and zero-scored behavior.
+- Non-scored judge attempts use a stable `judge_score` schema with nullable
+  verdict and points plus a machine-readable `error_reason`.
+- Disabled judge runs omit per-record `judge_score` and judge aggregates.
+- Legacy aggregate fields remain as aliases for rule aggregate fields.
 - Judge provider/model metadata is recorded separately from the original
   answer-generation metadata.
 - The recommended judge model is `qwen3.6-max-preview`, configurable separately
