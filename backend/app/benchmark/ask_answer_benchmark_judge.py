@@ -148,6 +148,12 @@ def parse_judge_response_payload(payload: str) -> JudgeScore:
         return build_non_scored_judge_score("invalid_schema", "invalid_missed_facts")
     if not isinstance(unsupported_claims, list):
         return build_non_scored_judge_score("invalid_schema", "invalid_unsupported_claims")
+    if not _is_string_list(matched_facts):
+        return build_non_scored_judge_score("invalid_schema", "invalid_matched_facts")
+    if not _is_string_list(missed_facts):
+        return build_non_scored_judge_score("invalid_schema", "invalid_missed_facts")
+    if not _is_string_list(unsupported_claims):
+        return build_non_scored_judge_score("invalid_schema", "invalid_unsupported_claims")
     if not isinstance(reason, str) or not reason.strip():
         return build_non_scored_judge_score("invalid_schema", "invalid_reason")
 
@@ -181,19 +187,22 @@ def build_non_scored_judge_score(
 
 
 def score_answer_with_judge(judge_input: JudgeInput, provider_config: JudgeProviderConfig) -> JudgeScore:
+    if not provider_config.base_url.strip():
+        return build_non_scored_judge_score("provider_unavailable", "missing_judge_base_url")
+
     payload = {
         "model": provider_config.model_name,
         "temperature": 0,
         "messages": build_judge_messages(judge_input),
     }
-    request = urllib_request.Request(
-        _build_chat_completions_url(provider_config.base_url),
-        data=json.dumps(payload, ensure_ascii=False).encode("utf-8"),
-        headers=_build_headers(provider_config.api_key),
-        method="POST",
-    )
 
     try:
+        request = urllib_request.Request(
+            _build_chat_completions_url(provider_config.base_url),
+            data=json.dumps(payload, ensure_ascii=False).encode("utf-8"),
+            headers=_build_headers(provider_config.api_key),
+            method="POST",
+        )
         with urllib_request.urlopen(request, timeout=JUDGE_TIMEOUT_SECONDS) as response:
             response_payload = json.loads(response.read().decode("utf-8"))
     except TimeoutError as exc:
@@ -203,6 +212,8 @@ def score_answer_with_judge(judge_input: JudgeInput, provider_config: JudgeProvi
         urllib_error.URLError,
         OSError,
         json.JSONDecodeError,
+        UnicodeError,
+        ValueError,
     ) as exc:
         return build_non_scored_judge_score("provider_unavailable", str(exc) or "provider_error")
 
@@ -266,6 +277,10 @@ def _extract_chat_completion_text(response_payload: object) -> str | None:
 
 def _excerpt(value: str, limit: int = 500) -> str:
     return value.strip()[:limit]
+
+
+def _is_string_list(value: list[object]) -> bool:
+    return all(isinstance(item, str) for item in value)
 
 
 def _json_compatible(value: object | None) -> object | None:

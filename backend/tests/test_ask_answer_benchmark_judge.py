@@ -229,6 +229,42 @@ class AskAnswerBenchmarkJudgeTest(unittest.TestCase):
                 self.assertIsNone(score.verdict)
                 self.assertIsNone(score.correctness_points)
 
+    def test_non_string_list_elements_return_invalid_schema_score(self) -> None:
+        invalid_payloads = [
+            {
+                "verdict": "correct",
+                "matched_facts": [{"text": "not a string"}],
+                "missed_facts": [],
+                "unsupported_claims": [],
+                "reason": "bad matched element",
+            },
+            {
+                "verdict": "correct",
+                "matched_facts": [],
+                "missed_facts": [7],
+                "unsupported_claims": [],
+                "reason": "bad missed element",
+            },
+            {
+                "verdict": "correct",
+                "matched_facts": [],
+                "missed_facts": [],
+                "unsupported_claims": [None],
+                "reason": "bad unsupported element",
+            },
+        ]
+
+        for payload in invalid_payloads:
+            with self.subTest(payload=payload):
+                score = parse_judge_response_payload(json.dumps(payload, ensure_ascii=False))
+
+                self.assertEqual(score.judge_status, "invalid_schema")
+                self.assertIsNone(score.verdict)
+                self.assertIsNone(score.correctness_points)
+                self.assertEqual(score.matched_facts, [])
+                self.assertEqual(score.missed_facts, [])
+                self.assertEqual(score.unsupported_claims, [])
+
     def test_openai_compatible_provider_sends_expected_payload_and_extracts_content(self) -> None:
         response_text = json.dumps(
             {
@@ -304,7 +340,9 @@ class AskAnswerBenchmarkJudgeTest(unittest.TestCase):
         failures = [
             urllib_error.URLError("connection refused"),
             OSError("network unavailable"),
+            ValueError("bad url"),
             _Response(b"{not json"),
+            _Response(b"\xff\xfe\xfa"),
             _Response(json.dumps({"choices": []}).encode("utf-8")),
         ]
         provider_config = JudgeProviderConfig(
@@ -328,6 +366,23 @@ class AskAnswerBenchmarkJudgeTest(unittest.TestCase):
                 self.assertEqual(score.judge_status, "provider_unavailable")
                 self.assertIsNone(score.verdict)
                 self.assertIsNone(score.correctness_points)
+
+    def test_missing_base_url_maps_to_provider_unavailable_without_urlopen(self) -> None:
+        provider_config = JudgeProviderConfig(
+            provider_name="openai-compatible",
+            base_url="",
+            api_key="",
+            model_name="judge-model",
+        )
+
+        with patch("app.benchmark.ask_answer_benchmark_judge.urllib_request.urlopen") as urlopen:
+            score = score_answer_with_judge(_judge_input(), provider_config)
+
+        self.assertEqual(score.judge_status, "provider_unavailable")
+        self.assertEqual(score.error_reason, "missing_judge_base_url")
+        self.assertIsNone(score.verdict)
+        self.assertIsNone(score.correctness_points)
+        urlopen.assert_not_called()
 
     def test_provider_timeout_maps_to_timeout(self) -> None:
         provider_config = JudgeProviderConfig(
