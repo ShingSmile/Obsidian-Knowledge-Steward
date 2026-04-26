@@ -34,6 +34,8 @@ def _settings(**overrides: object) -> Settings:
 
 def _judge_input() -> JudgeInput:
     return JudgeInput(
+        case_id="ask_case_001",
+        variant_id="hybrid_assembly_gate",
         user_query="What changed in Alpha?",
         expected_facts=["Alpha shipped the new indexer.", "Beta remains disabled."],
         forbidden_claims=["Gamma was deleted."],
@@ -50,6 +52,12 @@ def _judge_input() -> JudgeInput:
                 snippet="Beta remains disabled pending review.",
             ),
         ],
+        ask_result_mode="generated_answer",
+        runtime_faithfulness={
+            "outcome": "allow",
+            "score": 0.91,
+            "backend": "runtime",
+        },
     )
 
 
@@ -99,9 +107,10 @@ class AskAnswerBenchmarkJudgeTest(unittest.TestCase):
                 provider_name="cli-provider",
                 base_url="https://cli.example",
                 api_key="cli-key",
-                model="cli-model",
+                model_name="cli-model",
             ),
         )
+        self.assertEqual(cli_config.model_name, "cli-model")
 
         settings_config = resolve_judge_provider_config(settings, JudgeConfigOverrides())
 
@@ -111,9 +120,10 @@ class AskAnswerBenchmarkJudgeTest(unittest.TestCase):
                 provider_name="judge-provider",
                 base_url="https://judge.example",
                 api_key="judge-key",
-                model="judge-model",
+                model_name="judge-model",
             ),
         )
+        self.assertEqual(settings_config.model_name, "judge-model")
 
         fallback_config = resolve_judge_provider_config(
             _settings(
@@ -132,15 +142,28 @@ class AskAnswerBenchmarkJudgeTest(unittest.TestCase):
                 provider_name="cloud-provider",
                 base_url="https://cloud.example",
                 api_key="cloud-key",
-                model=DEFAULT_JUDGE_MODEL,
+                model_name=DEFAULT_JUDGE_MODEL,
             ),
         )
-        self.assertNotEqual(fallback_config.model, "must-not-be-used")
+        self.assertEqual(fallback_config.model_name, DEFAULT_JUDGE_MODEL)
+        self.assertNotEqual(fallback_config.model_name, "must-not-be-used")
 
     def test_prompt_message_construction_includes_case_data_and_citation_snippets(self) -> None:
         messages = build_judge_messages(_judge_input())
 
         self.assertEqual([message["role"] for message in messages], ["system", "user"])
+        user_payload = json.loads(messages[1]["content"])
+        self.assertEqual(user_payload["case_id"], "ask_case_001")
+        self.assertEqual(user_payload["variant_id"], "hybrid_assembly_gate")
+        self.assertEqual(user_payload["ask_result_mode"], "generated_answer")
+        self.assertEqual(
+            user_payload["runtime_faithfulness"],
+            {
+                "outcome": "allow",
+                "score": 0.91,
+                "backend": "runtime",
+            },
+        )
         rendered = "\n".join(message["content"] for message in messages)
         self.assertIn("What changed in Alpha?", rendered)
         self.assertIn("Alpha shipped the new indexer.", rendered)
@@ -221,7 +244,7 @@ class AskAnswerBenchmarkJudgeTest(unittest.TestCase):
             provider_name="openai-compatible",
             base_url="https://judge.example/v1",
             api_key="secret-key",
-            model="judge-model",
+            model_name="judge-model",
         )
 
         with patch(
@@ -263,7 +286,7 @@ class AskAnswerBenchmarkJudgeTest(unittest.TestCase):
             provider_name="openai-compatible",
             base_url="https://judge.example/chat/completions",
             api_key="",
-            model="judge-model",
+            model_name="judge-model",
         )
 
         with patch(
@@ -288,7 +311,7 @@ class AskAnswerBenchmarkJudgeTest(unittest.TestCase):
             provider_name="openai-compatible",
             base_url="https://judge.example",
             api_key="",
-            model="judge-model",
+            model_name="judge-model",
         )
 
         for failure in failures:
@@ -311,7 +334,7 @@ class AskAnswerBenchmarkJudgeTest(unittest.TestCase):
             provider_name="openai-compatible",
             base_url="https://judge.example",
             api_key="",
-            model="judge-model",
+            model_name="judge-model",
         )
 
         with patch(

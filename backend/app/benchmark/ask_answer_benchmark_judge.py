@@ -31,7 +31,7 @@ class JudgeProviderConfig:
     provider_name: str
     base_url: str
     api_key: str
-    model: str
+    model_name: str
 
 
 @dataclass(frozen=True)
@@ -43,11 +43,15 @@ class JudgeCitation:
 
 @dataclass(frozen=True)
 class JudgeInput:
+    case_id: str
+    variant_id: str
     user_query: str
     expected_facts: list[str]
     forbidden_claims: list[str]
     answer_text: str
     citations: list[JudgeCitation]
+    ask_result_mode: str
+    runtime_faithfulness: object | None
 
 
 @dataclass(frozen=True)
@@ -76,13 +80,15 @@ def resolve_judge_provider_config(settings: object, overrides: JudgeConfigOverri
         provider_name=provider_name,
         base_url=base_url,
         api_key=api_key,
-        model=model,
+        model_name=model,
     )
 
 
 def build_judge_messages(judge_input: JudgeInput) -> list[dict[str, str]]:
     case_payload = {
         "prompt_version": JUDGE_PROMPT_VERSION,
+        "case_id": judge_input.case_id,
+        "variant_id": judge_input.variant_id,
         "user_query": judge_input.user_query,
         "expected_facts": judge_input.expected_facts,
         "forbidden_claims": judge_input.forbidden_claims,
@@ -95,6 +101,8 @@ def build_judge_messages(judge_input: JudgeInput) -> list[dict[str, str]]:
             }
             for citation in judge_input.citations
         ],
+        "ask_result_mode": judge_input.ask_result_mode,
+        "runtime_faithfulness": _json_compatible(judge_input.runtime_faithfulness),
     }
     return [
         {
@@ -174,7 +182,7 @@ def build_non_scored_judge_score(
 
 def score_answer_with_judge(judge_input: JudgeInput, provider_config: JudgeProviderConfig) -> JudgeScore:
     payload = {
-        "model": provider_config.model,
+        "model": provider_config.model_name,
         "temperature": 0,
         "messages": build_judge_messages(judge_input),
     }
@@ -258,3 +266,14 @@ def _extract_chat_completion_text(response_payload: object) -> str | None:
 
 def _excerpt(value: str, limit: int = 500) -> str:
     return value.strip()[:limit]
+
+
+def _json_compatible(value: object | None) -> object | None:
+    if value is None:
+        return None
+    if isinstance(value, dict):
+        return value
+    model_dump = getattr(value, "model_dump", None)
+    if callable(model_dump):
+        return model_dump(mode="json")
+    return value
