@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from math import ceil
 from statistics import median
 import re
@@ -48,6 +48,23 @@ class AskAnswerBenchmarkVariantAggregate:
     tool_trigger_rate: float
     expected_tool_hit_rate: float
     tool_case_answer_correctness: float
+
+
+def build_rule_score_payload(case_score: AskAnswerBenchmarkCaseScore) -> dict[str, object]:
+    return {
+        "verdict": case_score.verdict,
+        "correctness_points": case_score.correctness_points,
+        "matched_expected_facts": list(case_score.matched_expected_facts),
+        "missed_expected_facts": list(case_score.missed_expected_facts),
+        "forbidden_claim_hits": list(case_score.forbidden_claim_hits),
+    }
+
+
+def build_rule_variant_aggregate_payload(aggregate: AskAnswerBenchmarkVariantAggregate) -> dict[str, object]:
+    payload: dict[str, object] = asdict(aggregate)
+    payload["rule_answer_correctness"] = aggregate.answer_correctness
+    payload["rule_unsupported_claim_rate"] = aggregate.unsupported_claim_rate
+    return payload
 
 
 def score_answer_benchmark_case(

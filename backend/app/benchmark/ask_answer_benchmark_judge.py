@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import json
+from typing import Sequence
 from urllib import error as urllib_error
 from urllib import request as urllib_request
 
@@ -65,6 +66,61 @@ class JudgeScore:
     reason: str | None
     error_reason: str | None = None
     raw_response_excerpt: str | None = None
+
+
+def judge_score_to_payload(score: JudgeScore) -> dict[str, object]:
+    return {
+        "judge_status": score.judge_status,
+        "verdict": score.verdict,
+        "correctness_points": score.correctness_points,
+        "matched_facts": list(score.matched_facts),
+        "missed_facts": list(score.missed_facts),
+        "unsupported_claims": list(score.unsupported_claims),
+        "reason": score.reason,
+        "error_reason": score.error_reason,
+        "raw_response_excerpt": score.raw_response_excerpt,
+    }
+
+
+def aggregate_judge_scores(scores: Sequence[JudgeScore]) -> dict[str, object]:
+    judge_case_count = len(scores)
+    if judge_case_count == 0:
+        return {
+            "judge_case_count": 0,
+            "judge_scored_count": 0,
+            "judge_failed_count": 0,
+            "judge_answer_correctness": 0.0,
+            "judge_unsupported_claim_rate": 0.0,
+            "judge_scored_rate": 0.0,
+            "judge_failed_rate": 0.0,
+        }
+
+    scored = [score for score in scores if score.judge_status == "scored"]
+    judge_scored_count = len(scored)
+    judge_failed_count = judge_case_count - judge_scored_count
+
+    if judge_scored_count == 0:
+        judge_answer_correctness = 0.0
+        judge_unsupported_claim_rate = 0.0
+    else:
+        judge_answer_correctness = round(
+            sum(score.correctness_points or 0.0 for score in scored) / judge_scored_count,
+            4,
+        )
+        judge_unsupported_claim_rate = round(
+            sum(1 for score in scored if score.unsupported_claims) / judge_scored_count,
+            4,
+        )
+
+    return {
+        "judge_case_count": judge_case_count,
+        "judge_scored_count": judge_scored_count,
+        "judge_failed_count": judge_failed_count,
+        "judge_answer_correctness": judge_answer_correctness,
+        "judge_unsupported_claim_rate": judge_unsupported_claim_rate,
+        "judge_scored_rate": round(judge_scored_count / judge_case_count, 4),
+        "judge_failed_rate": round(judge_failed_count / judge_case_count, 4),
+    }
 
 
 def resolve_judge_provider_config(settings: object, overrides: JudgeConfigOverrides) -> JudgeProviderConfig:

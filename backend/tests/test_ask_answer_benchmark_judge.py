@@ -13,7 +13,10 @@ from app.benchmark.ask_answer_benchmark_judge import (
     JudgeConfigOverrides,
     JudgeInput,
     JudgeProviderConfig,
+    JudgeScore,
+    aggregate_judge_scores,
     build_judge_messages,
+    judge_score_to_payload,
     parse_judge_response_payload,
     resolve_judge_provider_config,
     score_answer_with_judge,
@@ -264,6 +267,134 @@ class AskAnswerBenchmarkJudgeTest(unittest.TestCase):
                 self.assertEqual(score.matched_facts, [])
                 self.assertEqual(score.missed_facts, [])
                 self.assertEqual(score.unsupported_claims, [])
+
+    def test_judge_score_payload_returns_stable_schema_for_scored_and_non_scored(self) -> None:
+        scored = parse_judge_response_payload(
+            json.dumps(
+                {
+                    "verdict": "correct",
+                    "matched_facts": ["fact-a"],
+                    "missed_facts": [],
+                    "unsupported_claims": ["claim-a"],
+                    "reason": "The answer is correct.",
+                },
+                ensure_ascii=False,
+            )
+        )
+        non_scored = parse_judge_response_payload("{not json")
+
+        self.assertEqual(
+            judge_score_to_payload(scored),
+            {
+                "judge_status": "scored",
+                "verdict": "correct",
+                "correctness_points": 1.0,
+                "matched_facts": ["fact-a"],
+                "missed_facts": [],
+                "unsupported_claims": ["claim-a"],
+                "reason": "The answer is correct.",
+                "error_reason": None,
+                "raw_response_excerpt": None,
+            },
+        )
+        self.assertEqual(
+            judge_score_to_payload(non_scored),
+            {
+                "judge_status": "parse_error",
+                "verdict": None,
+                "correctness_points": None,
+                "matched_facts": [],
+                "missed_facts": [],
+                "unsupported_claims": [],
+                "reason": None,
+                "error_reason": "invalid_json",
+                "raw_response_excerpt": "{not json",
+            },
+        )
+
+    def test_aggregate_judge_scores_counts_all_records_and_averages_scored_only(self) -> None:
+        scores = [
+            JudgeScore(
+                judge_status="scored",
+                verdict="correct",
+                correctness_points=1.0,
+                matched_facts=["fact-a"],
+                missed_facts=[],
+                unsupported_claims=["claim-a"],
+                reason="correct with unsupported claim",
+            ),
+            JudgeScore(
+                judge_status="scored",
+                verdict="mostly_correct",
+                correctness_points=0.75,
+                matched_facts=["fact-b"],
+                missed_facts=[],
+                unsupported_claims=[],
+                reason="mostly correct",
+            ),
+            JudgeScore(
+                judge_status="parse_error",
+                verdict=None,
+                correctness_points=None,
+                matched_facts=[],
+                missed_facts=[],
+                unsupported_claims=[],
+                reason=None,
+                error_reason="invalid_json",
+            ),
+        ]
+
+        self.assertEqual(
+            aggregate_judge_scores(scores),
+            {
+                "judge_case_count": 3,
+                "judge_scored_count": 2,
+                "judge_failed_count": 1,
+                "judge_answer_correctness": 0.875,
+                "judge_unsupported_claim_rate": 0.5,
+                "judge_scored_rate": 0.6667,
+                "judge_failed_rate": 0.3333,
+            },
+        )
+
+    def test_aggregate_judge_scores_handles_zero_scored_and_zero_total(self) -> None:
+        non_scored_scores = [
+            JudgeScore(
+                judge_status="parse_error",
+                verdict=None,
+                correctness_points=None,
+                matched_facts=[],
+                missed_facts=[],
+                unsupported_claims=[],
+                reason=None,
+                error_reason="invalid_json",
+            )
+        ]
+
+        self.assertEqual(
+            aggregate_judge_scores(non_scored_scores),
+            {
+                "judge_case_count": 1,
+                "judge_scored_count": 0,
+                "judge_failed_count": 1,
+                "judge_answer_correctness": 0.0,
+                "judge_unsupported_claim_rate": 0.0,
+                "judge_scored_rate": 0.0,
+                "judge_failed_rate": 1.0,
+            },
+        )
+        self.assertEqual(
+            aggregate_judge_scores([]),
+            {
+                "judge_case_count": 0,
+                "judge_scored_count": 0,
+                "judge_failed_count": 0,
+                "judge_answer_correctness": 0.0,
+                "judge_unsupported_claim_rate": 0.0,
+                "judge_scored_rate": 0.0,
+                "judge_failed_rate": 0.0,
+            },
+        )
 
     def test_openai_compatible_provider_sends_expected_payload_and_extracts_content(self) -> None:
         response_text = json.dumps(

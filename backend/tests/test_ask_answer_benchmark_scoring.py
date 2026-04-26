@@ -4,6 +4,8 @@ import unittest
 
 from app.benchmark.ask_answer_benchmark_scoring import (
     aggregate_answer_benchmark_variant_scores,
+    build_rule_score_payload,
+    build_rule_variant_aggregate_payload,
     score_answer_benchmark_case,
 )
 from app.benchmark.ask_dataset import AskBenchmarkCase, AskBenchmarkLocator
@@ -81,6 +83,32 @@ class AskAnswerBenchmarkScoringTest(unittest.TestCase):
         self.assertEqual(score.matched_expected_facts, ["Alpha 已完成", "Beta 已同步"])
         self.assertEqual(score.missed_expected_facts, [])
         self.assertEqual(score.forbidden_claim_hits, [])
+
+    def test_rule_score_payload_returns_stable_rule_score_object(self) -> None:
+        score = score_answer_benchmark_case(
+            case=_case(
+                case_id="case-correct",
+                expected_facts=["Alpha 已完成", "Beta 已同步"],
+            ),
+            ask_result=_ask_result(
+                mode=AskResultMode.GENERATED_ANSWER,
+                answer="Alpha 已完成，并且 Beta 已同步。",
+            ),
+            latency_ms=420,
+        )
+
+        payload = build_rule_score_payload(score)
+
+        self.assertEqual(
+            payload,
+            {
+                "verdict": "correct",
+                "correctness_points": 1.0,
+                "matched_expected_facts": ["Alpha 已完成", "Beta 已同步"],
+                "missed_expected_facts": [],
+                "forbidden_claim_hits": [],
+            },
+        )
 
     def test_score_case_marks_partial_fact_coverage_as_partial(self) -> None:
         case = _case(
@@ -224,6 +252,40 @@ class AskAnswerBenchmarkScoringTest(unittest.TestCase):
         self.assertEqual(aggregate.tool_trigger_rate, 1.0)
         self.assertEqual(aggregate.expected_tool_hit_rate, 1.0)
         self.assertEqual(aggregate.tool_case_answer_correctness, 1.0)
+
+    def test_rule_variant_aggregate_payload_keeps_legacy_keys_and_adds_aliases(self) -> None:
+        scores = [
+            score_answer_benchmark_case(
+                case=_case(case_id="case-1", expected_facts=["Alpha 已完成"]),
+                ask_result=_ask_result(
+                    mode=AskResultMode.GENERATED_ANSWER,
+                    answer="Alpha 已完成。",
+                ),
+                latency_ms=100,
+            ),
+            score_answer_benchmark_case(
+                case=_case(
+                    case_id="case-2",
+                    expected_facts=["Alpha 已完成"],
+                    forbidden_claims=["Beta 已部署"],
+                ),
+                ask_result=_ask_result(
+                    mode=AskResultMode.GENERATED_ANSWER,
+                    answer="Alpha 已完成，但 Beta 已部署。",
+                ),
+                latency_ms=200,
+            ),
+        ]
+        aggregate = aggregate_answer_benchmark_variant_scores(variant_id="hybrid", case_scores=scores)
+
+        payload = build_rule_variant_aggregate_payload(aggregate)
+
+        self.assertIn("answer_correctness", payload)
+        self.assertIn("unsupported_claim_rate", payload)
+        self.assertIn("rule_answer_correctness", payload)
+        self.assertIn("rule_unsupported_claim_rate", payload)
+        self.assertEqual(payload["rule_answer_correctness"], payload["answer_correctness"])
+        self.assertEqual(payload["rule_unsupported_claim_rate"], payload["unsupported_claim_rate"])
 
 
 if __name__ == "__main__":
