@@ -89,6 +89,11 @@ Add `backend/tests/test_ask_answer_benchmark_judge.py` with focused tests for:
 - all five verdicts parse with expected points
 - invalid JSON returns `judge_status="parse_error"` with `verdict is None` and `correctness_points is None`
 - missing required fields returns `judge_status="invalid_schema"`
+- OpenAI-compatible provider calls send the expected `model`, `temperature=0`,
+  and judge messages payload; extract response text from `choices[0].message.content`
+- provider calls use a finite `urlopen(..., timeout=JUDGE_TIMEOUT_SECONDS)` value
+- provider connection failures map to `judge_status="provider_unavailable"` and
+  timeout failures map to `judge_status="timeout"`
 
 Use real data objects and mock only provider IO. Example test shape:
 
@@ -103,6 +108,8 @@ from app.benchmark.ask_answer_benchmark_judge import (
     build_judge_messages,
     parse_judge_response_payload,
     resolve_judge_provider_config,
+    score_answer_with_judge,
+    JUDGE_TIMEOUT_SECONDS,
 )
 from app.config import get_settings
 
@@ -127,6 +134,64 @@ class AskAnswerBenchmarkJudgeTests(unittest.TestCase):
         self.assertEqual(config.base_url, "https://judge.example/v1")
         self.assertEqual(config.api_key, "judge-key")
         self.assertEqual(config.model_name, DEFAULT_JUDGE_MODEL)
+```
+
+Add a provider-call test that patches URL opening instead of calling the network:
+
+```python
+def test_score_answer_with_judge_posts_openai_compatible_payload_and_parses_response(self) -> None:
+    judge_input = JudgeInput(
+        case_id="case-1",
+        variant_id="hybrid",
+        user_query="Alpha 状态是什么？",
+        expected_facts=["Alpha 已完成"],
+        forbidden_claims=[],
+        answer_text="Alpha 已完成。",
+        citations=[],
+        ask_result_mode="generated_answer",
+        runtime_faithfulness=None,
+    )
+    provider_config = JudgeProviderConfig(
+        provider_name="openai-compatible",
+        base_url="https://judge.example/v1",
+        api_key="judge-key",
+        model_name=DEFAULT_JUDGE_MODEL,
+    )
+    response_payload = {
+        "choices": [
+            {
+                "message": {
+                    "content": json.dumps(
+                        {
+                            "verdict": "correct",
+                            "matched_facts": ["Alpha 已完成"],
+                            "missed_facts": [],
+                            "unsupported_claims": [],
+                            "reason": "Covers the expected fact.",
+                        },
+                        ensure_ascii=False,
+                    )
+                }
+            }
+        ]
+    }
+
+    with patch("app.benchmark.ask_answer_benchmark_judge.urllib_request.urlopen") as mocked_urlopen:
+        mocked_urlopen.return_value.__enter__.return_value.read.return_value = json.dumps(
+            response_payload,
+            ensure_ascii=False,
+        ).encode("utf-8")
+        score = score_answer_with_judge(judge_input=judge_input, provider_config=provider_config)
+
+    self.assertEqual(score.judge_status, "scored")
+    request = mocked_urlopen.call_args.args[0]
+    payload = json.loads(request.data.decode("utf-8"))
+    self.assertEqual(payload["model"], DEFAULT_JUDGE_MODEL)
+    self.assertEqual(payload["temperature"], 0)
+    self.assertIn("messages", payload)
+    self.assertEqual(mocked_urlopen.call_args.kwargs["timeout"], JUDGE_TIMEOUT_SECONDS)
+    self.assertEqual(request.headers["Content-type"], "application/json")
+    self.assertEqual(request.headers["Authorization"], "Bearer judge-key")
 ```
 
 - [ ] **Step 2: Run the new tests and verify RED**
@@ -157,6 +222,7 @@ Create `backend/app/benchmark/ask_answer_benchmark_judge.py` with:
 ```python
 DEFAULT_JUDGE_MODEL = "qwen3.6-max-preview"
 JUDGE_PROMPT_VERSION = "2026-04-25-answer-judge-v1"
+JUDGE_TIMEOUT_SECONDS = 30
 JUDGE_VERDICT_POINTS = {
     "correct": 1.0,
     "mostly_correct": 0.75,
@@ -180,6 +246,7 @@ Add functions:
 - `build_judge_messages(judge_input) -> list[dict[str, str]]`
 - `parse_judge_response_payload(payload) -> JudgeScore`
 - `build_non_scored_judge_score(status, error_reason, raw_response_excerpt=None) -> JudgeScore`
+- `score_answer_with_judge(judge_input, provider_config) -> JudgeScore`
 
 Parser rules:
 
@@ -188,6 +255,21 @@ Parser rules:
 - Missing or empty `reason` returns `invalid_schema`.
 - Invalid JSON returns `parse_error` and preserves a short `raw_response_excerpt`.
 - Non-scored scores always include `verdict=None`, `correctness_points=None`, empty fact lists, `reason=None`, and `error_reason`.
+- `score_answer_with_judge(...)` uses an OpenAI-compatible
+  `/v1/chat/completions` request with `temperature=0`, the configured judge
+  model, and `build_judge_messages(...)`.
+- `score_answer_with_judge(...)` must call `urllib_request.urlopen` with
+  `timeout=JUDGE_TIMEOUT_SECONDS`; judge calls must never wait indefinitely.
+- Request headers must include `Content-Type: application/json`, and include
+  `Authorization: Bearer <api_key>` when an API key is configured.
+- Reuse the existing URL normalization approach from `backend/app/services/ask.py`:
+  if the base URL ends with `/chat/completions`, use it as-is; if it ends with
+  `/v1`, append `/chat/completions`; otherwise append `/v1/chat/completions`.
+- Extract text from `choices[0].message.content`; if content is a list, join
+  text parts where `type == "text"`.
+- Map `TimeoutError` to `judge_status="timeout"`.
+- Map `urllib_error.HTTPError`, `urllib_error.URLError`, `OSError`, and invalid
+  provider response shapes to `judge_status="provider_unavailable"`.
 
 - [ ] **Step 4: Run judge unit tests and verify GREEN**
 
@@ -285,8 +367,19 @@ def test_judge_aggregate_averages_only_scored_records_and_counts_failures(self) 
                 correctness_points=1.0,
                 matched_facts=["Alpha"],
                 missed_facts=[],
-                unsupported_claims=[],
+                unsupported_claims=["unsupported beta"],
                 reason="Covers the answer.",
+                error_reason=None,
+                raw_response_excerpt=None,
+            ),
+            JudgeScore(
+                judge_status="scored",
+                verdict="mostly_correct",
+                correctness_points=0.75,
+                matched_facts=["Gamma"],
+                missed_facts=[],
+                unsupported_claims=[],
+                reason="Mostly covers the answer.",
                 error_reason=None,
                 raw_response_excerpt=None,
             ),
@@ -304,11 +397,12 @@ def test_judge_aggregate_averages_only_scored_records_and_counts_failures(self) 
         ]
     )
 
-    self.assertEqual(aggregate["judge_case_count"], 2)
-    self.assertEqual(aggregate["judge_scored_count"], 1)
+    self.assertEqual(aggregate["judge_case_count"], 3)
+    self.assertEqual(aggregate["judge_scored_count"], 2)
     self.assertEqual(aggregate["judge_failed_count"], 1)
-    self.assertEqual(aggregate["judge_answer_correctness"], 1.0)
-    self.assertEqual(aggregate["judge_scored_rate"], 0.5)
+    self.assertEqual(aggregate["judge_answer_correctness"], 0.875)
+    self.assertEqual(aggregate["judge_unsupported_claim_rate"], 0.5)
+    self.assertEqual(aggregate["judge_scored_rate"], 0.6667)
 ```
 
 - [ ] **Step 2: Run tests and verify RED**
@@ -349,6 +443,8 @@ Formula requirements:
 
 - count every record in `judge_case_count`
 - average `correctness_points` over `judge_status == "scored"` only
+- compute `judge_unsupported_claim_rate` as scored records with one or more
+  `unsupported_claims` divided by `judge_scored_count`
 - if zero scored records, set `judge_answer_correctness=0.0`
 - round all ratios to four decimals
 
@@ -606,10 +702,19 @@ Create minimal legacy artifact fixtures in tests. Cover:
 - rejects artifact when `benchmark_kind != "ask_answer"`
 - adds `judge_score` to valid legacy records
 - preserves original top-level metadata
-- adds `judge_run_metadata` with `source_artifact_path`
-- records dataset version mismatch warning
+- adds `judge_run_metadata` with `judge_enabled`, judge provider/model, prompt
+  version, run timestamp, and `source_artifact_path`
+- records dataset version mismatch warning in
+  `judge_run_metadata["warnings"]` as
+  `{"code": "dataset_version_mismatch", "artifact_dataset_version": ..., "current_dataset_version": ...}`
+- initializes `judge_run_metadata["warnings"]` as an empty list when there are no
+  warnings
+- backfills `rule_answer_correctness` and `rule_unsupported_claim_rate` aliases
+  for legacy variant aggregates
 - skips records missing `case_id`, `variant_id`, `answer_text`, or `citations`
 - skipped records get `judge_status="skipped_missing_record_fields"` and stable non-scored schema
+- mocks `score_answer_with_judge(...)` so replay service tests never make real
+  provider calls
 
 Example replay assertion:
 
@@ -625,6 +730,11 @@ result = judge_answer_benchmark_artifact(
 record = result["case_variant_records"][0]
 self.assertEqual(record["judge_score"]["judge_status"], "scored")
 self.assertEqual(result["judge_run_metadata"]["source_artifact_path"], str(input_path))
+self.assertTrue(result["judge_run_metadata"]["judge_enabled"])
+self.assertEqual(result["judge_run_metadata"]["judge_provider_name"], "openai-compatible")
+self.assertEqual(result["judge_run_metadata"]["judge_model_name"], "qwen3.6-max-preview")
+self.assertEqual(result["judge_run_metadata"]["judge_prompt_version"], "2026-04-25-answer-judge-v1")
+self.assertIn("judge_run_timestamp", result["judge_run_metadata"])
 self.assertEqual(result["variant_aggregates"]["hybrid"]["judge_scored_rate"], 1.0)
 ```
 
@@ -636,6 +746,9 @@ Cover:
 
 - missing input returns exit code `1`
 - wrong artifact kind returns exit code `1`
+- missing judge base URL returns exit code `1`
+- missing resolved judge model returns exit code `1`
+- `--judge-model qwen3.6-max-preview` is accepted and forwarded
 - valid input forwards `--input`, `--output`, `--dataset`, and judge config flags
 
 - [ ] **Step 3: Run replay tests and verify RED**
@@ -668,7 +781,23 @@ Rules:
 - Match by `case_id`.
 - For missing dataset cases, emit `judge_status="skipped_missing_dataset_case"`.
 - Preserve original artifact metadata and existing record fields.
-- Recompute only judge aggregate keys; keep existing rule and runtime aggregate fields intact.
+- Add `judge_run_metadata` with:
+  - `judge_enabled: true`
+  - `judge_provider_name`
+  - `judge_model_name`
+  - `judge_prompt_version`
+  - `judge_run_timestamp`
+  - `source_artifact_path`
+  - `warnings`, always present as a list
+- Recompute judge aggregate keys while keeping existing runtime aggregate fields
+  intact.
+- Ensure every variant aggregate also has `rule_answer_correctness` and
+  `rule_unsupported_claim_rate`; when replaying legacy artifacts, backfill those
+  from existing `answer_correctness` and `unsupported_claim_rate` if rule-prefixed
+  keys are absent.
+- Use `judge_run_metadata["warnings"]` as a list of objects. For dataset version
+  mismatch, append:
+  `{"code": "dataset_version_mismatch", "artifact_dataset_version": <artifact>, "current_dataset_version": <dataset>}`.
 
 - [ ] **Step 5: Implement replay CLI**
 
@@ -680,6 +809,13 @@ Create `eval/benchmark/judge_answer_benchmark_artifact.py`:
   - `--dataset`
   - same judge flags as `run_answer_benchmark.py`
 - Load settings and resolve judge config.
+- Validate that resolved judge config has a non-empty base URL and model before
+  invoking replay. Missing base URL/model is a startup error with exit code `1`.
+  Missing API key is allowed.
+- Add separate CLI tests for missing base URL and missing model. The missing
+  model test can patch config resolution to return `JudgeProviderConfig` with
+  `model_name=""`, then assert exit code `1` and that replay service is not
+  called.
 - Return exit code `1` for startup errors.
 - Print concise `ERROR: ...` to stderr on failure.
 
