@@ -95,7 +95,7 @@ def aggregate_judge_scores(scores: Sequence[JudgeScore]) -> dict[str, object]:
             "judge_failed_rate": 0.0,
         }
 
-    scored = [score for score in scores if score.judge_status == "scored"]
+    scored = [score for score in scores if _has_numeric_correctness_points(score)]
     judge_scored_count = len(scored)
     judge_failed_count = judge_case_count - judge_scored_count
 
@@ -137,6 +137,14 @@ def resolve_judge_provider_config(settings: object, overrides: JudgeConfigOverri
         base_url=base_url,
         api_key=api_key,
         model_name=model,
+    )
+
+
+def _has_numeric_correctness_points(score: JudgeScore) -> bool:
+    return (
+        score.judge_status == "scored"
+        and isinstance(score.correctness_points, (int, float))
+        and not isinstance(score.correctness_points, bool)
     )
 
 

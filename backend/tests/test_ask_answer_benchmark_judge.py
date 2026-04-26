@@ -396,6 +396,51 @@ class AskAnswerBenchmarkJudgeTest(unittest.TestCase):
             },
         )
 
+    def test_aggregate_judge_scores_treats_malformed_scored_without_points_as_failed(self) -> None:
+        malformed_score = JudgeScore(
+            judge_status="scored",
+            verdict="correct",
+            correctness_points=None,
+            matched_facts=["fact-a"],
+            missed_facts=[],
+            unsupported_claims=[],
+            reason="malformed scored record",
+        )
+        incorrect_score = JudgeScore(
+            judge_status="scored",
+            verdict="incorrect",
+            correctness_points=0.0,
+            matched_facts=[],
+            missed_facts=["fact-a"],
+            unsupported_claims=[],
+            reason="valid incorrect score",
+        )
+
+        self.assertEqual(
+            aggregate_judge_scores([malformed_score]),
+            {
+                "judge_case_count": 1,
+                "judge_scored_count": 0,
+                "judge_failed_count": 1,
+                "judge_answer_correctness": 0.0,
+                "judge_unsupported_claim_rate": 0.0,
+                "judge_scored_rate": 0.0,
+                "judge_failed_rate": 1.0,
+            },
+        )
+        self.assertEqual(
+            aggregate_judge_scores([incorrect_score]),
+            {
+                "judge_case_count": 1,
+                "judge_scored_count": 1,
+                "judge_failed_count": 0,
+                "judge_answer_correctness": 0.0,
+                "judge_unsupported_claim_rate": 0.0,
+                "judge_scored_rate": 1.0,
+                "judge_failed_rate": 0.0,
+            },
+        )
+
     def test_openai_compatible_provider_sends_expected_payload_and_extracts_content(self) -> None:
         response_text = json.dumps(
             {
