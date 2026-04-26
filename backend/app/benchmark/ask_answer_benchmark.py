@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import asdict, replace
+from dataclasses import replace
 from datetime import datetime
 import json
 import subprocess
@@ -9,8 +9,20 @@ from time import perf_counter
 from typing import Any, Literal
 from uuid import uuid4
 
+from app.benchmark.ask_answer_benchmark_judge import (
+    JUDGE_PROMPT_VERSION,
+    JudgeCitation,
+    JudgeInput,
+    JudgeProviderConfig,
+    JudgeScore,
+    aggregate_judge_scores,
+    judge_score_to_payload,
+    score_answer_with_judge,
+)
 from app.benchmark.ask_answer_benchmark_scoring import (
     aggregate_answer_benchmark_variant_scores,
+    build_rule_score_payload,
+    build_rule_variant_aggregate_payload,
     score_answer_benchmark_case,
 )
 from app.benchmark.ask_answer_benchmark_variants import (
@@ -51,9 +63,14 @@ def run_ask_answer_benchmark(
     mode: Literal["smoke", "full"],
     dataset_path: Path | None = None,
     output_path: Path | None = None,
+    *,
+    judge_enabled: bool = False,
+    judge_provider_config: JudgeProviderConfig | None = None,
 ) -> dict[str, Any]:
     if mode not in ANSWER_BENCHMARK_MODES:
         raise ValueError(f"unsupported answer benchmark mode: {mode!r}")
+    if judge_enabled and judge_provider_config is None:
+        raise ValueError("judge_provider_config is required when judge_enabled=True")
 
     dataset = load_ask_benchmark_dataset(dataset_path)
     selected_cases = _select_cases(dataset, mode)
@@ -71,6 +88,9 @@ def run_ask_answer_benchmark(
 
     case_variant_records: list[dict[str, Any]] = []
     variant_scores: dict[str, list[Any]] = {variant.variant_id: [] for variant in ANSWER_BENCHMARK_VARIANTS}
+    variant_judge_scores: dict[str, list[JudgeScore]] = {
+        variant.variant_id: [] for variant in ANSWER_BENCHMARK_VARIANTS
+    }
     provider_name: str | None = None
     model_name: str | None = None
 
@@ -114,35 +134,52 @@ def run_ask_answer_benchmark(
                 variant_id=variant.variant_id,
             )
             variant_scores[variant.variant_id].append(case_score)
-            case_variant_records.append(
-                {
-                    "case_id": case.case_id,
-                    "bucket": case.bucket,
-                    "allow_tool": case.allow_tool,
-                    "variant_id": variant.variant_id,
-                    "ask_result_mode": ask_result.mode.value,
-                    "answer_text": ask_result.answer,
-                    "citations": [
-                        citation.model_dump(mode="json", exclude_none=True)
-                        for citation in ask_result.citations
-                    ],
-                    "guardrail_action": (
-                        ask_result.guardrail_action.value if ask_result.guardrail_action is not None else None
-                    ),
-                    "runtime_faithfulness": (
-                        ask_result.runtime_faithfulness.model_dump(mode="json", exclude_none=True)
-                        if ask_result.runtime_faithfulness is not None
-                        else None
-                    ),
-                    "provider_name": ask_result.provider_name,
-                    "model_name": ask_result.model_name,
-                    "latency_ms": latency_ms,
-                    "matched_expected_facts": case_score.matched_expected_facts,
-                    "missed_expected_facts": case_score.missed_expected_facts,
-                    "forbidden_claim_hits": case_score.forbidden_claim_hits,
-                    "final_verdict": case_score.verdict,
-                }
+            runtime_faithfulness = (
+                ask_result.runtime_faithfulness.model_dump(mode="json", exclude_none=True)
+                if ask_result.runtime_faithfulness is not None
+                else None
             )
+            citations = [
+                citation.model_dump(mode="json", exclude_none=True)
+                for citation in ask_result.citations
+            ]
+            record: dict[str, Any] = {
+                "case_id": case.case_id,
+                "bucket": case.bucket,
+                "allow_tool": case.allow_tool,
+                "variant_id": variant.variant_id,
+                "ask_result_mode": ask_result.mode.value,
+                "answer_text": ask_result.answer,
+                "citations": citations,
+                "guardrail_action": (
+                    ask_result.guardrail_action.value if ask_result.guardrail_action is not None else None
+                ),
+                "runtime_faithfulness": runtime_faithfulness,
+                "provider_name": ask_result.provider_name,
+                "model_name": ask_result.model_name,
+                "latency_ms": latency_ms,
+                "matched_expected_facts": case_score.matched_expected_facts,
+                "missed_expected_facts": case_score.missed_expected_facts,
+                "forbidden_claim_hits": case_score.forbidden_claim_hits,
+                "final_verdict": case_score.verdict,
+                "rule_score": build_rule_score_payload(case_score),
+            }
+            if judge_enabled:
+                judge_input = JudgeInput(
+                    case_id=case.case_id,
+                    variant_id=variant.variant_id,
+                    user_query=case.user_query,
+                    expected_facts=list(case.expected_facts),
+                    forbidden_claims=list(case.forbidden_claims),
+                    answer_text=ask_result.answer,
+                    citations=_build_judge_citations(ask_result.citations),
+                    ask_result_mode=ask_result.mode.value,
+                    runtime_faithfulness=runtime_faithfulness,
+                )
+                judge_score = score_answer_with_judge(judge_input, judge_provider_config)
+                variant_judge_scores[variant.variant_id].append(judge_score)
+                record["judge_score"] = judge_score_to_payload(judge_score)
+            case_variant_records.append(record)
 
     variant_aggregates: dict[str, dict[str, Any]] = {}
     for variant in ANSWER_BENCHMARK_VARIANTS:
@@ -150,7 +187,7 @@ def run_ask_answer_benchmark(
             variant_id=variant.variant_id,
             case_scores=variant_scores[variant.variant_id],
         )
-        aggregate_payload = asdict(aggregate)
+        aggregate_payload = build_rule_variant_aggregate_payload(aggregate)
         if smoke_subset:
             aggregate_payload.pop("tool_trigger_rate", None)
             aggregate_payload.pop("expected_tool_hit_rate", None)
@@ -180,6 +217,8 @@ def run_ask_answer_benchmark(
                     len(tool_case_scores),
                 ),
             }
+        if judge_enabled:
+            aggregate_payload.update(aggregate_judge_scores(variant_judge_scores[variant.variant_id]))
         variant_aggregates[variant.variant_id] = aggregate_payload
 
     result: dict[str, Any] = {
@@ -197,6 +236,17 @@ def run_ask_answer_benchmark(
         "selected_case_ids": selected_case_ids,
         "case_variant_records": case_variant_records,
         "variant_aggregates": variant_aggregates,
+        "judge_run_metadata": (
+            {
+                "judge_enabled": True,
+                "judge_provider_name": judge_provider_config.provider_name,
+                "judge_model_name": judge_provider_config.model_name,
+                "judge_prompt_version": JUDGE_PROMPT_VERSION,
+                "judge_run_timestamp": datetime.now().isoformat(timespec="seconds"),
+            }
+            if judge_enabled
+            else {"judge_enabled": False}
+        ),
         "run_status": "passed",
     }
     if smoke_subset:
@@ -241,6 +291,17 @@ def _select_cases(dataset: AskBenchmarkDataset, mode: str) -> list[AskBenchmarkC
             f"{missing_case_ids}"
         )
     return selected_cases
+
+
+def _build_judge_citations(citations: list[Any]) -> list[JudgeCitation]:
+    return [
+        JudgeCitation(
+            citation_id=str(getattr(citation, "chunk_id", None) or index),
+            source_path=str(getattr(citation, "path", "") or ""),
+            snippet=str(getattr(citation, "snippet", "") or ""),
+        )
+        for index, citation in enumerate(citations, start=1)
+    ]
 
 
 def _get_git_commit() -> str:
