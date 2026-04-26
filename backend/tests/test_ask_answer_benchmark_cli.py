@@ -8,6 +8,7 @@ import tempfile
 import unittest
 from unittest.mock import Mock, patch
 
+from app.benchmark.ask_answer_benchmark_judge import JudgeConfigOverrides, JudgeProviderConfig
 from app.benchmark.ask_answer_benchmark_preflight import AskAnswerBenchmarkPreflightResult
 
 
@@ -90,6 +91,218 @@ class AskAnswerBenchmarkCliTests(unittest.TestCase):
         self.assertEqual(kwargs["mode"], "full")
         self.assertEqual(kwargs["output_path"], Path("/tmp/answer-benchmark.json"))
         self.assertEqual(kwargs["dataset_path"], Path("/tmp/ask-benchmark.json"))
+
+    def test_default_judge_is_disabled_and_does_not_require_judge_flags(self) -> None:
+        module = load_cli_module()
+        mocked_settings = Mock()
+        judge_config = JudgeProviderConfig(
+            provider_name="judge-provider",
+            base_url="https://judge.example",
+            api_key="judge-key",
+            model_name="judge-model",
+        )
+
+        with patch.object(module, "get_settings", return_value=mocked_settings):
+            with patch.object(
+                module,
+                "resolve_judge_provider_config",
+                return_value=judge_config,
+            ) as mocked_resolve:
+                with patch.object(
+                    module,
+                    "run_answer_benchmark_preflight",
+                    return_value=AskAnswerBenchmarkPreflightResult(
+                        status="ok",
+                        provider_name="openai-compatible",
+                        model_name="qwen3.6-flash-2026-04-16",
+                        message="Answer benchmark preflight passed.",
+                    ),
+                ) as mocked_preflight:
+                    with patch.object(
+                        module,
+                        "run_ask_answer_benchmark",
+                        return_value={"run_status": "passed"},
+                    ) as mocked_run_benchmark:
+                        exit_code = module.main(["--mode", "smoke", "--output", "/tmp/answer-benchmark.json"])
+
+        self.assertEqual(exit_code, 0)
+        mocked_resolve.assert_called_once_with(mocked_settings, JudgeConfigOverrides())
+        _, preflight_kwargs = mocked_preflight.call_args
+        self.assertFalse(preflight_kwargs["judge_enabled"])
+        self.assertIs(preflight_kwargs["judge_provider_config"], judge_config)
+        _, runner_kwargs = mocked_run_benchmark.call_args
+        self.assertFalse(runner_kwargs["judge_enabled"])
+        self.assertIs(runner_kwargs["judge_provider_config"], judge_config)
+
+    def test_judge_enabled_resolves_config_and_passes_it_to_preflight_and_runner(self) -> None:
+        module = load_cli_module()
+        mocked_settings = Mock()
+        judge_config = JudgeProviderConfig(
+            provider_name="judge-provider",
+            base_url="https://judge.example",
+            api_key="judge-key",
+            model_name="judge-model",
+        )
+
+        with patch.object(module, "get_settings", return_value=mocked_settings):
+            with patch.object(
+                module,
+                "resolve_judge_provider_config",
+                return_value=judge_config,
+            ) as mocked_resolve:
+                with patch.object(
+                    module,
+                    "run_answer_benchmark_preflight",
+                    return_value=AskAnswerBenchmarkPreflightResult(
+                        status="ok",
+                        provider_name="openai-compatible",
+                        model_name="qwen3.6-flash-2026-04-16",
+                        message="Answer benchmark preflight passed.",
+                    ),
+                ) as mocked_preflight:
+                    with patch.object(
+                        module,
+                        "run_ask_answer_benchmark",
+                        return_value={"run_status": "passed"},
+                    ) as mocked_run_benchmark:
+                        exit_code = module.main(
+                            [
+                                "--mode",
+                                "smoke",
+                                "--output",
+                                "/tmp/answer-benchmark.json",
+                                "--judge",
+                                "enabled",
+                            ]
+                        )
+
+        self.assertEqual(exit_code, 0)
+        mocked_resolve.assert_called_once_with(mocked_settings, JudgeConfigOverrides())
+        _, preflight_kwargs = mocked_preflight.call_args
+        self.assertTrue(preflight_kwargs["judge_enabled"])
+        self.assertIs(preflight_kwargs["judge_provider_config"], judge_config)
+        _, runner_kwargs = mocked_run_benchmark.call_args
+        self.assertTrue(runner_kwargs["judge_enabled"])
+        self.assertIs(runner_kwargs["judge_provider_config"], judge_config)
+
+    def test_judge_cli_flags_override_settings_derived_config(self) -> None:
+        module = load_cli_module()
+        mocked_settings = Mock()
+        judge_config = JudgeProviderConfig(
+            provider_name="cli-provider",
+            base_url="https://cli-judge.example",
+            api_key="cli-key",
+            model_name="cli-model",
+        )
+
+        with patch.object(module, "get_settings", return_value=mocked_settings):
+            with patch.object(
+                module,
+                "resolve_judge_provider_config",
+                return_value=judge_config,
+            ) as mocked_resolve:
+                with patch.object(
+                    module,
+                    "run_answer_benchmark_preflight",
+                    return_value=AskAnswerBenchmarkPreflightResult(
+                        status="ok",
+                        provider_name="openai-compatible",
+                        model_name="qwen3.6-flash-2026-04-16",
+                        message="Answer benchmark preflight passed.",
+                    ),
+                ) as mocked_preflight:
+                    with patch.object(
+                        module,
+                        "run_ask_answer_benchmark",
+                        return_value={"run_status": "passed"},
+                    ) as mocked_run_benchmark:
+                        exit_code = module.main(
+                            [
+                                "--mode",
+                                "smoke",
+                                "--output",
+                                "/tmp/answer-benchmark.json",
+                                "--judge",
+                                "enabled",
+                                "--judge-provider-name",
+                                "cli-provider",
+                                "--judge-base-url",
+                                "https://cli-judge.example",
+                                "--judge-api-key",
+                                "cli-key",
+                                "--judge-model",
+                                "cli-model",
+                            ]
+                        )
+
+        self.assertEqual(exit_code, 0)
+        mocked_resolve.assert_called_once_with(
+            mocked_settings,
+            JudgeConfigOverrides(
+                provider_name="cli-provider",
+                base_url="https://cli-judge.example",
+                api_key="cli-key",
+                model="cli-model",
+            ),
+        )
+        _, preflight_kwargs = mocked_preflight.call_args
+        self.assertIs(preflight_kwargs["judge_provider_config"], judge_config)
+        _, runner_kwargs = mocked_run_benchmark.call_args
+        self.assertIs(runner_kwargs["judge_provider_config"], judge_config)
+
+    def test_judge_model_default_preview_value_is_accepted_and_forwarded(self) -> None:
+        module = load_cli_module()
+        mocked_settings = Mock()
+        judge_config = JudgeProviderConfig(
+            provider_name="judge-provider",
+            base_url="https://judge.example",
+            api_key="judge-key",
+            model_name="qwen3.6-max-preview",
+        )
+
+        with patch.object(module, "get_settings", return_value=mocked_settings):
+            with patch.object(
+                module,
+                "resolve_judge_provider_config",
+                return_value=judge_config,
+            ) as mocked_resolve:
+                with patch.object(
+                    module,
+                    "run_answer_benchmark_preflight",
+                    return_value=AskAnswerBenchmarkPreflightResult(
+                        status="ok",
+                        provider_name="openai-compatible",
+                        model_name="qwen3.6-flash-2026-04-16",
+                        message="Answer benchmark preflight passed.",
+                    ),
+                ) as mocked_preflight:
+                    with patch.object(
+                        module,
+                        "run_ask_answer_benchmark",
+                        return_value={"run_status": "passed"},
+                    ) as mocked_run_benchmark:
+                        exit_code = module.main(
+                            [
+                                "--mode",
+                                "smoke",
+                                "--output",
+                                "/tmp/answer-benchmark.json",
+                                "--judge",
+                                "enabled",
+                                "--judge-model",
+                                "qwen3.6-max-preview",
+                            ]
+                        )
+
+        self.assertEqual(exit_code, 0)
+        mocked_resolve.assert_called_once_with(
+            mocked_settings,
+            JudgeConfigOverrides(model="qwen3.6-max-preview"),
+        )
+        _, preflight_kwargs = mocked_preflight.call_args
+        self.assertIs(preflight_kwargs["judge_provider_config"], judge_config)
+        _, runner_kwargs = mocked_run_benchmark.call_args
+        self.assertIs(runner_kwargs["judge_provider_config"], judge_config)
 
 
 if __name__ == "__main__":

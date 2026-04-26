@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from app.benchmark.ask_answer_benchmark import ANSWER_BENCHMARK_CANONICAL_MODEL
+from app.benchmark.ask_answer_benchmark_judge import JudgeProviderConfig
 from app.benchmark.ask_answer_benchmark_variants import load_answer_benchmark_smoke_case_ids
 from app.benchmark.ask_dataset import load_ask_benchmark_dataset
 from app.config import ROOT_DIR, Settings
@@ -23,6 +24,8 @@ def run_answer_benchmark_preflight(
     mode: str,
     dataset_path: Path | None = None,
     smoke_subset_path: Path | None = None,
+    judge_enabled: bool = False,
+    judge_provider_config: JudgeProviderConfig | None = None,
 ) -> AskAnswerBenchmarkPreflightResult:
     if not settings.cloud_base_url or not settings.cloud_chat_model:
         return AskAnswerBenchmarkPreflightResult(
@@ -45,6 +48,28 @@ def run_answer_benchmark_preflight(
                 f"{ANSWER_BENCHMARK_CANONICAL_MODEL}; got {settings.cloud_chat_model!r}."
             ),
         )
+
+    if judge_enabled:
+        if judge_provider_config is None or not judge_provider_config.base_url:
+            return AskAnswerBenchmarkPreflightResult(
+                status="judge_provider_not_configured",
+                provider_name=None if judge_provider_config is None else judge_provider_config.provider_name,
+                model_name=None if judge_provider_config is None else judge_provider_config.model_name,
+                message=(
+                    "Answer benchmark judge provider is not configured. "
+                    "Set KS_JUDGE_BASE_URL or pass --judge-base-url."
+                ),
+            )
+        if not judge_provider_config.model_name:
+            return AskAnswerBenchmarkPreflightResult(
+                status="judge_model_not_configured",
+                provider_name=judge_provider_config.provider_name,
+                model_name=None,
+                message=(
+                    "Answer benchmark judge model is not configured. "
+                    "Set KS_JUDGE_MODEL or pass --judge-model."
+                ),
+            )
 
     try:
         load_ask_benchmark_dataset(dataset_path)
