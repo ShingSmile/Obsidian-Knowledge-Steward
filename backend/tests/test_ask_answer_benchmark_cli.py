@@ -6,10 +6,12 @@ import io
 from pathlib import Path
 import tempfile
 import unittest
+from dataclasses import replace
 from unittest.mock import Mock, patch
 
 from app.benchmark.ask_answer_benchmark_judge import JudgeConfigOverrides, JudgeProviderConfig
 from app.benchmark.ask_answer_benchmark_preflight import AskAnswerBenchmarkPreflightResult
+from app.config import get_settings
 
 
 ROOT_DIR = Path(__file__).resolve().parents[2]
@@ -303,6 +305,47 @@ class AskAnswerBenchmarkCliTests(unittest.TestCase):
         self.assertIs(preflight_kwargs["judge_provider_config"], judge_config)
         _, runner_kwargs = mocked_run_benchmark.call_args
         self.assertIs(runner_kwargs["judge_provider_config"], judge_config)
+
+    def test_judge_enabled_blank_base_url_fails_real_preflight_before_runner(self) -> None:
+        module = load_cli_module()
+        settings = replace(
+            get_settings(),
+            cloud_provider_name="openai-compatible",
+            cloud_base_url="https://answer.example",
+            cloud_api_key="answer-key",
+            cloud_chat_model="qwen3.6-flash-2026-04-16",
+            judge_provider_name="judge-provider",
+            judge_base_url="https://judge.example",
+            judge_api_key="judge-key",
+            judge_model="judge-model",
+        )
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            dataset_path = Path(temp_dir) / "ask_benchmark.json"
+            dataset_path.write_text('{"schema_version": 1, "cases": []}', encoding="utf-8")
+
+            with patch.object(module, "get_settings", return_value=settings):
+                with patch.object(module, "run_ask_answer_benchmark") as mocked_run_benchmark:
+                    stderr_buffer = io.StringIO()
+                    with contextlib.redirect_stderr(stderr_buffer):
+                        exit_code = module.main(
+                            [
+                                "--mode",
+                                "smoke",
+                                "--dataset",
+                                str(dataset_path),
+                                "--judge",
+                                "enabled",
+                                "--judge-base-url",
+                                "   ",
+                            ]
+                        )
+
+        self.assertEqual(exit_code, 1)
+        mocked_run_benchmark.assert_not_called()
+        stderr = stderr_buffer.getvalue().lower()
+        self.assertIn("judge provider", stderr)
+        self.assertIn("--judge-base-url", stderr)
 
 
 if __name__ == "__main__":

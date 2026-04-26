@@ -168,6 +168,48 @@ class AskAnswerBenchmarkPreflightTests(unittest.TestCase):
         self.assertEqual(result.status, "judge_provider_not_configured")
         self.assertIn("judge", result.message.lower())
 
+    def test_enabled_judge_fails_startup_when_judge_base_url_is_blank(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            dataset_path, smoke_subset_path = _write_readable_benchmark_files(Path(temp_dir))
+
+            result = run_answer_benchmark_preflight(
+                settings=_answer_benchmark_settings(),
+                mode="smoke",
+                dataset_path=dataset_path,
+                smoke_subset_path=smoke_subset_path,
+                judge_enabled=True,
+                judge_provider_config=JudgeProviderConfig(
+                    provider_name="judge-provider",
+                    base_url="   ",
+                    api_key="judge-key",
+                    model_name="judge-model",
+                ),
+            )
+
+        self.assertEqual(result.status, "judge_provider_not_configured")
+        self.assertIn("judge", result.message.lower())
+
+    def test_enabled_judge_fails_startup_when_judge_model_is_blank(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            dataset_path, smoke_subset_path = _write_readable_benchmark_files(Path(temp_dir))
+
+            result = run_answer_benchmark_preflight(
+                settings=_answer_benchmark_settings(),
+                mode="smoke",
+                dataset_path=dataset_path,
+                smoke_subset_path=smoke_subset_path,
+                judge_enabled=True,
+                judge_provider_config=JudgeProviderConfig(
+                    provider_name="judge-provider",
+                    base_url="https://judge.example",
+                    api_key="judge-key",
+                    model_name="   ",
+                ),
+            )
+
+        self.assertEqual(result.status, "judge_model_not_configured")
+        self.assertIn("judge model", result.message.lower())
+
     def test_enabled_judge_uses_default_model_when_no_judge_model_is_configured(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             dataset_path, smoke_subset_path = _write_readable_benchmark_files(Path(temp_dir))

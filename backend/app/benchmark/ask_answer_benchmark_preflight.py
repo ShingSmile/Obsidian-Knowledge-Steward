@@ -50,7 +50,7 @@ def run_answer_benchmark_preflight(
         )
 
     if judge_enabled:
-        if judge_provider_config is None or not judge_provider_config.base_url:
+        if judge_provider_config is None or not judge_provider_config.base_url.strip():
             return AskAnswerBenchmarkPreflightResult(
                 status="judge_provider_not_configured",
                 provider_name=None if judge_provider_config is None else judge_provider_config.provider_name,
@@ -60,7 +60,7 @@ def run_answer_benchmark_preflight(
                     "Set KS_JUDGE_BASE_URL or pass --judge-base-url."
                 ),
             )
-        if not judge_provider_config.model_name:
+        if not judge_provider_config.model_name.strip():
             return AskAnswerBenchmarkPreflightResult(
                 status="judge_model_not_configured",
                 provider_name=judge_provider_config.provider_name,
