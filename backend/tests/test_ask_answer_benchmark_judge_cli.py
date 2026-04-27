@@ -38,6 +38,21 @@ def _judge_config(
 
 
 class AskAnswerBenchmarkJudgeCliTests(unittest.TestCase):
+    def test_help_returns_exit_code_0_and_skips_service(self) -> None:
+        module = load_cli_module()
+
+        stdout_buffer = io.StringIO()
+        stderr_buffer = io.StringIO()
+        with patch.object(module, "judge_answer_benchmark_artifact") as mocked_service:
+            with contextlib.redirect_stdout(stdout_buffer):
+                with contextlib.redirect_stderr(stderr_buffer):
+                    exit_code = module.main(["--help"])
+
+        self.assertEqual(exit_code, 0)
+        mocked_service.assert_not_called()
+        self.assertIn("usage:", stdout_buffer.getvalue())
+        self.assertNotIn("ERROR:", stderr_buffer.getvalue())
+
     def test_missing_input_returns_exit_code_1(self) -> None:
         module = load_cli_module()
 

@@ -71,9 +71,8 @@ def main(argv: list[str] | None = None) -> int:
             judge_provider_config=judge_provider_config,
         )
         return 0
-    except SystemExit:
-        print("ERROR: invalid arguments", file=sys.stderr)
-        return 1
+    except SystemExit as exc:
+        return 0 if exc.code == 0 else 1
     except (OSError, json.JSONDecodeError, RuntimeError, ValueError) as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
         return 1

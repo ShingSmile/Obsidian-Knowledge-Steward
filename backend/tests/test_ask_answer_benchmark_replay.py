@@ -281,6 +281,7 @@ class AskAnswerBenchmarkReplayTests(unittest.TestCase):
 
             with patch(
                 "app.benchmark.ask_answer_benchmark_replay.score_answer_with_judge",
+                return_value=_scored_judge_score(),
             ) as mocked_judge:
                 result = judge_answer_benchmark_artifact(
                     input_path=input_path,
@@ -301,6 +302,88 @@ class AskAnswerBenchmarkReplayTests(unittest.TestCase):
             self.assertIsNone(record["judge_score"]["reason"])
         self.assertEqual(result["variant_aggregates"]["hybrid"]["judge_case_count"], 3)
         self.assertEqual(result["variant_aggregates"]["hybrid"]["judge_failed_count"], 3)
+
+    def test_skips_records_with_invalid_required_values_without_calling_provider(self) -> None:
+        artifact = _legacy_artifact()
+        artifact["case_variant_records"] = [
+            {"case_id": "ask_case_001", "variant_id": None, "answer_text": "answer", "citations": []},
+            {"case_id": "ask_case_001", "variant_id": "   ", "answer_text": "answer", "citations": []},
+            {"case_id": "ask_case_001", "variant_id": "hybrid", "answer_text": None, "citations": []},
+            {"case_id": "   ", "variant_id": "hybrid", "answer_text": "answer", "citations": []},
+            {
+                "case_id": "ask_case_001",
+                "variant_id": "hybrid",
+                "answer_text": "answer",
+                "citations": {"chunk_id": "not-a-list"},
+            },
+        ]
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = Path(temp_dir)
+            dataset_path = _write_json(temp_path / "dataset.json", _dataset_payload())
+            input_path = _write_json(temp_path / "artifact.json", artifact)
+
+            with patch(
+                "app.benchmark.ask_answer_benchmark_replay.score_answer_with_judge",
+                return_value=_scored_judge_score(),
+            ) as mocked_judge:
+                result = judge_answer_benchmark_artifact(
+                    input_path=input_path,
+                    output_path=temp_path / "out.json",
+                    settings=Mock(),
+                    dataset_path=dataset_path,
+                    judge_provider_config=_judge_config(),
+                )
+
+        mocked_judge.assert_not_called()
+        for record in result["case_variant_records"]:
+            self.assertEqual(
+                record["judge_score"],
+                {
+                    "judge_status": "skipped_missing_record_fields",
+                    "verdict": None,
+                    "correctness_points": None,
+                    "matched_facts": [],
+                    "missed_facts": [],
+                    "unsupported_claims": [],
+                    "reason": None,
+                    "error_reason": "missing_record_fields",
+                    "raw_response_excerpt": None,
+                },
+            )
+        self.assertNotIn("None", result["variant_aggregates"])
+        self.assertNotIn("", result["variant_aggregates"])
+        self.assertEqual(result["variant_aggregates"]["hybrid"]["judge_case_count"], 3)
+        self.assertEqual(result["variant_aggregates"]["hybrid"]["judge_failed_count"], 3)
+
+    def test_valid_record_uses_normalized_case_and_variant_ids_for_judging_and_aggregation(self) -> None:
+        artifact = _legacy_artifact()
+        artifact["case_variant_records"][0]["case_id"] = " ask_case_001 "
+        artifact["case_variant_records"][0]["variant_id"] = " hybrid "
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = Path(temp_dir)
+            dataset_path = _write_json(temp_path / "dataset.json", _dataset_payload())
+            input_path = _write_json(temp_path / "artifact.json", artifact)
+
+            with patch(
+                "app.benchmark.ask_answer_benchmark_replay.score_answer_with_judge",
+                return_value=_scored_judge_score(),
+            ) as mocked_judge:
+                result = judge_answer_benchmark_artifact(
+                    input_path=input_path,
+                    output_path=temp_path / "out.json",
+                    settings=Mock(),
+                    dataset_path=dataset_path,
+                    judge_provider_config=_judge_config(),
+                )
+
+        mocked_judge.assert_called_once()
+        judge_input = mocked_judge.call_args.args[0]
+        self.assertEqual(judge_input.case_id, "ask_case_001")
+        self.assertEqual(judge_input.variant_id, "hybrid")
+        self.assertEqual(result["variant_aggregates"]["hybrid"]["judge_case_count"], 1)
+        self.assertNotIn(" hybrid ", result["variant_aggregates"])
 
     def test_skips_missing_dataset_case_without_calling_provider(self) -> None:
         artifact = _legacy_artifact()

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from copy import deepcopy
+from dataclasses import dataclass
 from datetime import datetime
 import json
 from pathlib import Path
@@ -25,6 +26,15 @@ from app.benchmark.ask_dataset import AskBenchmarkCase, load_ask_benchmark_datas
 
 
 _REQUIRED_RECORD_FIELDS = ("case_id", "variant_id", "answer_text", "citations")
+
+
+@dataclass(frozen=True)
+class _NormalizedRecord:
+    case_id: str | None
+    variant_id: str | None
+    answer_text: str | None
+    citations: list[Any] | None
+    has_required_values: bool
 
 
 def load_answer_benchmark_artifact(path: Path) -> dict[str, Any]:
@@ -88,16 +98,17 @@ def judge_answer_benchmark_artifact(
         if not isinstance(record, dict):
             raise ValueError("answer benchmark case_variant_records entries must be objects")
 
+        normalized_record = _normalize_record(record)
         score = _judge_record(
             record=record,
+            normalized_record=normalized_record,
             cases_by_id=cases_by_id,
             judge_provider_config=judge_provider_config,
         )
         record["judge_score"] = judge_score_to_payload(score)
 
-        variant_id = record.get("variant_id")
-        if variant_id is not None:
-            judge_scores_by_variant.setdefault(str(variant_id), []).append(score)
+        if normalized_record.variant_id is not None:
+            judge_scores_by_variant.setdefault(normalized_record.variant_id, []).append(score)
 
     for variant_id in judge_scores_by_variant:
         variant_aggregates.setdefault(variant_id, {})
@@ -115,16 +126,27 @@ def judge_answer_benchmark_artifact(
 def _judge_record(
     *,
     record: dict[str, Any],
+    normalized_record: _NormalizedRecord,
     cases_by_id: dict[str, AskBenchmarkCase],
     judge_provider_config: JudgeProviderConfig,
 ) -> JudgeScore:
-    if any(field not in record for field in _REQUIRED_RECORD_FIELDS):
+    if not normalized_record.has_required_values:
         return build_non_scored_judge_score(
             "skipped_missing_record_fields",
             "missing_record_fields",
         )
 
-    case = cases_by_id.get(str(record["case_id"]))
+    case_id = normalized_record.case_id
+    variant_id = normalized_record.variant_id
+    answer_text = normalized_record.answer_text
+    citations = normalized_record.citations
+    if case_id is None or variant_id is None or answer_text is None or citations is None:
+        return build_non_scored_judge_score(
+            "skipped_missing_record_fields",
+            "missing_record_fields",
+        )
+
+    case = cases_by_id.get(case_id)
     if case is None:
         return build_non_scored_judge_score(
             "skipped_missing_dataset_case",
@@ -132,17 +154,46 @@ def _judge_record(
         )
 
     judge_input = JudgeInput(
-        case_id=str(record["case_id"]),
-        variant_id=str(record["variant_id"]),
+        case_id=case_id,
+        variant_id=variant_id,
         user_query=case.user_query,
         expected_facts=list(case.expected_facts),
         forbidden_claims=list(case.forbidden_claims),
-        answer_text=str(record["answer_text"]),
-        citations=_build_judge_citations(record["citations"]),
+        answer_text=answer_text,
+        citations=_build_judge_citations(citations),
         ask_result_mode=str(record.get("ask_result_mode", "")),
         runtime_faithfulness=record.get("runtime_faithfulness"),
     )
     return score_answer_with_judge(judge_input, judge_provider_config)
+
+
+def _normalize_record(record: dict[str, Any]) -> _NormalizedRecord:
+    case_id = _normalized_non_blank_string(record.get("case_id"))
+    variant_id = _normalized_non_blank_string(record.get("variant_id"))
+    answer_text_value = record.get("answer_text")
+    citations_value = record.get("citations")
+    answer_text = answer_text_value if isinstance(answer_text_value, str) else None
+    citations = citations_value if isinstance(citations_value, list) else None
+    return _NormalizedRecord(
+        case_id=case_id,
+        variant_id=variant_id,
+        answer_text=answer_text,
+        citations=citations,
+        has_required_values=(
+            all(field in record for field in _REQUIRED_RECORD_FIELDS)
+            and case_id is not None
+            and variant_id is not None
+            and answer_text is not None
+            and citations is not None
+        ),
+    )
+
+
+def _normalized_non_blank_string(value: object) -> str | None:
+    if not isinstance(value, str):
+        return None
+    normalized = value.strip()
+    return normalized or None
 
 
 def _build_judge_citations(citations_payload: object) -> list[JudgeCitation]:
