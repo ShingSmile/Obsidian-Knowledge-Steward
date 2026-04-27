@@ -45,7 +45,9 @@
 
 `eval/benchmark/run_retrieval_benchmark.py` 是 retrieval-only benchmark 入口，只跑 ask retrieval benchmark；它支持 `--output` 显式指定结果文件，也支持 `--dataset` 覆盖数据集路径做 smoke test。`--output` 省略时，结果会落到 `eval/results/` 下的默认时间戳文件。
 
-`eval/benchmark/run_answer_benchmark.py` 是 answer benchmark 入口，只跑 ask answer benchmark；它支持 `--mode smoke|full`，也支持 `--output` 和 `--dataset`。运行前会先做 cloud provider / canonical model / 数据集 / smoke subset 的 preflight 检查，失败会直接退出，不会发起 benchmark。
+`eval/benchmark/run_answer_benchmark.py` 是 answer benchmark 入口，只跑 ask answer benchmark；它支持 `--mode smoke|full`，也支持 `--output` 和 `--dataset`。运行前会先做 cloud provider / canonical model / 数据集 / smoke subset 的 preflight 检查，失败会直接退出，不会发起 benchmark。judge 默认关闭；显式传 `--judge enabled` 时会在 answer 生成后追加 judge score，不会进入 ask runtime，也不会影响 `eval/run_eval.py`。
+
+`eval/benchmark/judge_answer_benchmark_artifact.py` 是 answer benchmark artifact replay 入口，用于对已有 `ask_answer` artifact 离线补跑 judge，不重新生成答案。judge 失败会写入每条记录的非 scored `judge_score`，不会覆盖 deterministic rule score。
 
 示例：
 
@@ -57,6 +59,20 @@
 set -a; source backend/.env; set +a
 ./.conda/knowledge-steward/bin/python eval/benchmark/run_answer_benchmark.py --mode smoke --output /tmp/task-059-smoke.json
 ./.conda/knowledge-steward/bin/python eval/benchmark/run_answer_benchmark.py --mode full --output /tmp/task-059-full.json
+```
+
+```bash
+set -a; source backend/.env; set +a
+./.conda/knowledge-steward/bin/python eval/benchmark/run_answer_benchmark.py \
+  --mode smoke \
+  --judge enabled \
+  --judge-model qwen3.6-max-preview \
+  --output /tmp/task-062-smoke-judged.json
+
+./.conda/knowledge-steward/bin/python eval/benchmark/judge_answer_benchmark_artifact.py \
+  --input /tmp/task-059-answer-benchmark-smoke-final-20260424.json \
+  --output /tmp/task-059-answer-benchmark-smoke-judged.json \
+  --judge-model qwen3.6-max-preview
 ```
 
 ## Ask Benchmark Dataset Workflow
