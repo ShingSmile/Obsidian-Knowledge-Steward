@@ -215,6 +215,25 @@ class AskAnswerBenchmarkJudgeTest(unittest.TestCase):
         self.assertEqual(score.error_reason, "invalid_json")
         self.assertEqual(score.raw_response_excerpt, "{not json")
 
+    def test_fenced_json_response_parses_as_score(self) -> None:
+        score = parse_judge_response_payload(
+            """```json
+{
+  "verdict": "correct",
+  "matched_facts": ["fact-a"],
+  "missed_facts": [],
+  "unsupported_claims": [],
+  "reason": "The answer matches the expected facts."
+}
+```"""
+        )
+
+        self.assertEqual(score.judge_status, "scored")
+        self.assertEqual(score.verdict, "correct")
+        self.assertEqual(score.correctness_points, 1.0)
+        self.assertEqual(score.matched_facts, ["fact-a"])
+        self.assertEqual(score.reason, "The answer matches the expected facts.")
+
     def test_missing_required_fields_returns_invalid_schema_score(self) -> None:
         invalid_payloads = [
             {"matched_facts": [], "missed_facts": [], "unsupported_claims": [], "reason": "missing verdict"},

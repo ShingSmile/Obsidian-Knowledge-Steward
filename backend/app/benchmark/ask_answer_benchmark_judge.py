@@ -187,7 +187,7 @@ def build_judge_messages(judge_input: JudgeInput) -> list[dict[str, str]]:
 
 def parse_judge_response_payload(payload: str) -> JudgeScore:
     try:
-        parsed = json.loads(payload)
+        parsed = json.loads(_strip_json_code_fence(payload))
     except json.JSONDecodeError:
         return build_non_scored_judge_score(
             "parse_error",
@@ -341,6 +341,23 @@ def _extract_chat_completion_text(response_payload: object) -> str | None:
 
 def _excerpt(value: str, limit: int = 500) -> str:
     return value.strip()[:limit]
+
+
+def _strip_json_code_fence(value: str) -> str:
+    stripped = value.strip()
+    lines = stripped.splitlines()
+    if len(lines) < 3 or lines[-1].strip() != "```":
+        return stripped
+
+    opening_fence = lines[0].strip()
+    if not opening_fence.startswith("```"):
+        return stripped
+
+    fence_language = opening_fence[3:].strip().lower()
+    if fence_language not in {"", "json"}:
+        return stripped
+
+    return "\n".join(lines[1:-1]).strip()
 
 
 def _is_string_list(value: list[object]) -> bool:
