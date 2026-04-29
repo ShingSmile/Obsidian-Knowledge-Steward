@@ -9,7 +9,7 @@ from urllib import request as urllib_request
 
 DEFAULT_JUDGE_MODEL = "qwen3.6-max-preview"
 JUDGE_PROMPT_VERSION = "2026-04-25-answer-judge-v1"
-JUDGE_TIMEOUT_SECONDS = 30
+JUDGE_TIMEOUT_SECONDS = 90
 JUDGE_VERDICT_POINTS = {
     "correct": 1.0,
     "mostly_correct": 0.75,

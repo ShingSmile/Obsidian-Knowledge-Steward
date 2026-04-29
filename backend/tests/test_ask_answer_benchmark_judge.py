@@ -86,6 +86,9 @@ class _Response:
 
 
 class AskAnswerBenchmarkJudgeTest(unittest.TestCase):
+    def test_default_judge_timeout_is_ninety_seconds(self) -> None:
+        self.assertEqual(JUDGE_TIMEOUT_SECONDS, 90)
+
     def test_provider_config_precedence_uses_cli_then_judge_settings_then_cloud_without_cloud_model(self) -> None:
         settings = _settings(
             judge_provider_name="judge-provider",
