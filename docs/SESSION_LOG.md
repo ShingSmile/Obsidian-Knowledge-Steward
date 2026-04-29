@@ -12,6 +12,7 @@
 
 | 会话 ID | 日期 | 主题 | 类型 | 状态 | 对应任务 |
 | --- | --- | --- | --- | --- | --- |
+| `SES-20260426-01` | 2026-04-26 | 拆分 `2026-04-26 skill mechanism` 主线为 `TASK-063` ~ `TASK-067` 五个 medium 并落 spec | `Docs / Backend Governance` | `已完成` | 治理拆分（无单一代码 task） |
 | `SES-20260424-02` | 2026-04-24 | 完成 `TASK-059` 真实 provider answer benchmark v1 并收口 smoke 结论 | `Eval` | `已完成` | `TASK-059` |
 | `SES-20260424-01` | 2026-04-24 | 清理治理主文件、删除旧 `TASK-060` 并登记 `TASK-062` | `Docs` | `已完成` | `TASK-043` small tail |
 | `SES-20260422-01` | 2026-04-22 | 完成 `TASK-058` retrieval benchmark、local preflight 与 FTS baseline 修复并收口治理同步 | `Retrieval / Eval` | `已完成` | `TASK-058` |
@@ -27,6 +28,102 @@
 - 当前 2026-03 历史快照位于：
   [docs/archive/session_logs/SESSION_LOG_2026-03.md](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/docs/archive/session_logs/SESSION_LOG_2026-03.md)
 - 更早历史会话、旧索引与旧任务阶段记录，请优先查 archive，再按 `task_id` 回溯。
+
+## [SES-20260426-01] 拆分 `2026-04-26 skill mechanism` 主线为 `TASK-063` ~ `TASK-067` 五个 medium 并落 spec
+
+- 日期：2026-04-26
+- task_id：治理拆分会话（无单一代码 task）
+- 类型：`Docs / Backend Governance`
+- 状态：`已完成`
+- 验收结论：`完成 spec 落盘 + TASK_QUEUE / CURRENT_STATE 同步`
+- 对应任务：新主线 `2026-04-26 skill mechanism` 的 5 个 medium 登记
+- 本会话唯一目标：把上一会话 `/brainstorming` 收口的 skill mechanism v1+v2 设计落成可执行 spec，并按 `project-session-governor` 的 `medium` 颗粒度规范拆分到 `TASK-063` ~ `TASK-067`，让后续每个会话只绑定其中一个任务。
+
+### 1. 本次目标
+
+- 把已经达成共识的 v1（无工具 skill + summary 双产出）和 v2（工具白名单 + 1 条 tool-using skill + 旧 INGEST_STEWARD 迁移）整理为单一 spec，作为后续多会话执行的稳定来源。
+- 按 `project-session-governor` 的 `medium` 颗粒度拆分为 5 个任务，并把原拟的 `small`（trace + eval）字段并入对应 medium，避免单独留 small。
+- 同步 `TASK_QUEUE.md`、`CURRENT_STATE.md`、`SESSION_LOG.md`，让后续新会话先读 governance 文档就能拿到完整入口。
+
+### 2. 本次完成内容
+
+- 落地 spec：[docs/superpowers/specs/2026-04-26-skill-mechanism-design.md](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/docs/superpowers/specs/2026-04-26-skill-mechanism-design.md)，含 problem / goals / non-goals / approaches considered / architecture / 5 段 task breakdown / cross-cutting concerns / open questions / 跨会话执行手册（spec §9 明确每个 task 启动会话先读哪些文件）。
+- 在 `docs/TASK_QUEUE.md` 中追加 `TASK-063` ~ `TASK-067` 五个 medium，依赖关系串联：063 → 064 → 065 → 066 → 067。每个 task 的 `related_files` 都指向本 spec。
+- 在 `docs/CURRENT_STATE.md` 中：
+  - 在“当前阶段”追加 skill mechanism 主线注册说明；
+  - 在“默认下一任务”增加新主线条目，明确仍排在 `TASK-062` / `TASK-031` 之后，不抢占当前默认链；
+  - 在“当前风险”追加“`TASK-063` 完成前不要先在 ingest / digest 链路实现 skill 节点”的硬约束；
+  - 在“建议先读文件”新增 `2026-04-26 skill mechanism` block。
+- 在 `docs/SESSION_LOG.md` 中追加本次会话索引与 handoff 摘要。
+
+### 3. 本次未完成内容
+
+- 没有写代码：未抽 `LLMWithToolsRunner`，未引入 `SkillSpec` / loader / registry，未新增 skill_apply / governance_summary 节点。
+- 没有迁移既有 `backend/app/services/ingest_proposal.py` 中的硬编码 governance finding。
+- 没有更新 `docs/PROJECT_MASTER_PLAN.md` 中关于 INGEST_STEWARD governance 来源的描述（已登记到 `TASK-067` 的 acceptance criteria 中）。
+- 没有处理 main 工作区内已有的、与本轮无关的未提交 docs / eval artifact 改动。
+
+### 4. 关键决策
+
+- 采用 spec §4 方案 3：共享 `LLMWithToolsRunner` + skill 数据 + skill_apply 节点，三者职责分离；不上 subgraph，不上规则化 governance。
+- v1 不引入用户自定义 skill 加载入口、不引入 skill selector LLM、不放开工具调用，所有 skill name 由调用方显式传入；v2 才放开 `allowed_tools` 与 1 条 tool-using skill。
+- summary 节点采用 dedup（S1）+ LLM 二次筛（S3）的组合：raw findings 仍然是 proposal builder 的真值来源，markdown 报告只作为展示层；LLM 失败时 fail-soft 不阻塞 proposal 流程。
+- 不单独保留 `small` 任务承载 trace 与 eval 字段：trace 字段并入 `TASK-064`（skill_apply 节点诞生时一并落），governance skill benchmark 数据集并入 `TASK-067`（迁移完成时同步落 dataset）。
+- 默认下一任务保持为 `TASK-062`，新主线在当前默认链路之后排队；spec 中明确 `TASK-063` 完成前不允许在 ingest / digest 实现 skill 节点。
+- spec 中加入“后续会话使用说明”与 §9“跨会话执行手册”，作为多会话执行时不必再开 brainstorming 的入口。
+
+### 5. 修改过的文件
+
+- [docs/superpowers/specs/2026-04-26-skill-mechanism-design.md](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/docs/superpowers/specs/2026-04-26-skill-mechanism-design.md)
+- [docs/TASK_QUEUE.md](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/docs/TASK_QUEUE.md)
+- [docs/CURRENT_STATE.md](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/docs/CURRENT_STATE.md)
+- [docs/SESSION_LOG.md](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/docs/SESSION_LOG.md)
+
+### 6. 验证与测试
+
+- 跑了什么命令
+  - 仅做 docs-only 改动；未跑 backend / plugin 测试。
+- 结果如何
+  - 所有 governance 文档已落盘；spec 自查项（placeholder / 内部一致性 / scope / ambiguity）均已 inline 修正。
+- 哪些没法验证
+  - 因为没有写代码，spec 中关于「runner trace hook 必须支持 caller 注入元数据」「LLM summary fail-soft」等 acceptance 字段的真实可行性需要在对应 task 实现阶段验证。
+
+### 7. 范围偏移
+
+- 用户原本提到的「small：trace + eval」单独任务被合并进 medium，未单独登记 `TASK-068`。
+- 没有顺手清理 main 工作区内既有的 docs / eval artifact 未提交改动；这与本轮治理拆分无关，留到对应任务再看。
+
+### 8. 未解决问题
+
+- skill description 是否需要双语？（已写入 spec §8 open questions）
+- 多 skill 是否要支持并发执行？（v1 串行；spec §8 已留 open question）
+- 是否引入用户自定义 skill 加载入口？（v1 不支持；spec §8 已写入安全审计要求）
+
+### 9. 新增风险 / 技术债 / 假设
+
+- 风险：spec 中假设 ask 现有 ReAct 代码可以「等价迁移」为 runner，但实际抽离时可能发现 ask 有未文档化的隐式状态依赖；如果出现，请在 `TASK-063` 的 SESSION_LOG 中标 `tail_sync_item`，并在 spec §9 之外单独发起 spec 修订小任务。
+- 技术债：summary 节点的 LLM model 选型未固定（spec 7.3 留空），上线前需要在 config 层确认默认 model。
+- 假设：`SkillSpec.allowed_tools` 与既有 `ToolSpec.allowed_workflows` 是正交关系（前者按 skill 限定，后者按 workflow 限定，runner 取交集）；`TASK-066` 实现时需要 explicitly 验证这一假设。
+
+### 10. 下一步最优先任务
+
+- 默认仍进入 `TASK-062`（原 default next，不被新主线打断）。
+- `TASK-062` 完成后再回到 `TASK-031`。
+- skill mechanism 主线任意时间想启动时，从 `TASK-063` 开始，按依赖顺序串行。
+
+### 11. 下一次新会话应该先读哪些文件
+
+- [docs/TASK_QUEUE.md](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/docs/TASK_QUEUE.md)
+- [docs/CURRENT_STATE.md](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/docs/CURRENT_STATE.md)
+- [docs/SESSION_LOG.md](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/docs/SESSION_LOG.md)
+- 若启动新主线 `TASK-063`，再读 [docs/superpowers/specs/2026-04-26-skill-mechanism-design.md](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/docs/superpowers/specs/2026-04-26-skill-mechanism-design.md) 中 §5.3 与 §6.TASK-063 + [backend/app/graphs/ask_graph.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/app/graphs/ask_graph.py) + [backend/app/services/ask.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/app/services/ask.py)。
+
+### 12. 当前最容易被追问的点
+
+- 为什么不引入 skill selector LLM？（v1 显式传入 skill name 列表的成本与风险都更低；spec §5.2 已写入升级路径）
+- 为什么 summary 节点要做 LLM 二次筛而不是直接把 raw findings 给 proposal builder？（dedup + LLM 二次筛是为了 governance 报告，而不是为了改变 proposal 输入；raw findings 才是真值来源）
+- 为什么 trace + eval 没有单独 small 任务？（trace 与 skill_apply 节点同生命周期、eval dataset 必须等迁移完成才有意义，分别合并到 `TASK-064` / `TASK-067`）
+- 为什么默认下一任务不切到新主线？（按用户 Q1=B 决策：当前 `TASK-062` / `TASK-031` 主线不被打断；新主线只是登记，等当前默认链消化后再上）
 
 ## [SES-20260424-02] 完成 `TASK-059` 真实 provider answer benchmark v1 并收口 smoke 结论
 

@@ -1,0 +1,947 @@
+{
+  "schema_version": "1.3",
+  "generated_at": "2026-04-18T09:18:32.791743+00:00",
+  "backend_version": "0.1.0",
+  "selected_case_ids": [
+    "ask_sample_v640_section_lookup",
+    "ask_sample_v640_retro_improvement_points",
+    "ask_sample_ad_tracking_december_only",
+    "ask_sample_prestore_compatibility_september_only",
+    "ask_sample_ad_ctr_no_hits",
+    "ask_sample_filter_fallback_missing_prefix_v2",
+    "ask_sample_transaction_proxy_lookup"
+  ],
+  "summary": {
+    "selected_case_count": 7,
+    "passed_case_count": 7,
+    "failed_case_count": 0,
+    "metric_overview": {
+      "answer_relevancy": {
+        "case_count": 7,
+        "average_score": 1.0,
+        "min_score": 1.0,
+        "max_score": 1.0
+      },
+      "context_precision": {
+        "case_count": 6,
+        "average_score": 0.8333,
+        "min_score": 0.0,
+        "max_score": 1.0
+      },
+      "context_recall": {
+        "case_count": 5,
+        "average_score": 1.0,
+        "min_score": 1.0,
+        "max_score": 1.0
+      },
+      "faithfulness": {
+        "case_count": 7,
+        "average_score": 1.0,
+        "min_score": 1.0,
+        "max_score": 1.0
+      },
+      "relevancy": {
+        "case_count": 7,
+        "average_score": 1.0,
+        "min_score": 1.0,
+        "max_score": 1.0
+      }
+    },
+    "benchmark_overview": {
+      "question_answering": {
+        "display_name": "Question Answering",
+        "scenario_names": [
+          "ask",
+          "tool_and_guardrail"
+        ],
+        "selected_case_count": 7,
+        "passed_case_count": 7,
+        "failed_case_count": 0,
+        "metric_overview": {
+          "answer_relevancy": {
+            "case_count": 7,
+            "average_score": 1.0,
+            "min_score": 1.0,
+            "max_score": 1.0
+          },
+          "context_precision": {
+            "case_count": 6,
+            "average_score": 0.8333,
+            "min_score": 0.0,
+            "max_score": 1.0
+          },
+          "context_recall": {
+            "case_count": 5,
+            "average_score": 1.0,
+            "min_score": 1.0,
+            "max_score": 1.0
+          },
+          "faithfulness": {
+            "case_count": 7,
+            "average_score": 1.0,
+            "min_score": 1.0,
+            "max_score": 1.0
+          },
+          "relevancy": {
+            "case_count": 7,
+            "average_score": 1.0,
+            "min_score": 1.0,
+            "max_score": 1.0
+          }
+        },
+        "failure_type_breakdown": {
+          "model_fallback:no_available_chat_provider": 6,
+          "ask:no_hits": 1,
+          "retrieval_fallback:metadata_filters_too_strict": 1
+        },
+        "scenario_overview": {
+          "ask": {
+            "display_name": "Ask QA",
+            "selected_case_count": 7,
+            "passed_case_count": 7,
+            "failed_case_count": 0,
+            "metric_overview": {
+              "answer_relevancy": {
+                "case_count": 7,
+                "average_score": 1.0,
+                "min_score": 1.0,
+                "max_score": 1.0
+              },
+              "context_precision": {
+                "case_count": 6,
+                "average_score": 0.8333,
+                "min_score": 0.0,
+                "max_score": 1.0
+              },
+              "context_recall": {
+                "case_count": 5,
+                "average_score": 1.0,
+                "min_score": 1.0,
+                "max_score": 1.0
+              },
+              "faithfulness": {
+                "case_count": 7,
+                "average_score": 1.0,
+                "min_score": 1.0,
+                "max_score": 1.0
+              },
+              "relevancy": {
+                "case_count": 7,
+                "average_score": 1.0,
+                "min_score": 1.0,
+                "max_score": 1.0
+              }
+            },
+            "failure_type_breakdown": {
+              "model_fallback:no_available_chat_provider": 6,
+              "ask:no_hits": 1,
+              "retrieval_fallback:metadata_filters_too_strict": 1
+            },
+            "core_metrics": {
+              "generated_answer_rate": 0.0,
+              "retrieval_only_rate": 0.8571,
+              "no_hits_rate": 0.1429,
+              "unsupported_claim_rate": 0.0,
+              "ask_result_mode_breakdown": {
+                "retrieval_only": 6,
+                "no_hits": 1
+              },
+              "groundedness_bucket_breakdown": {
+                "not_generated_answer": 7
+              }
+            }
+          }
+        }
+      },
+      "governance": {
+        "display_name": "Governance",
+        "scenario_names": [
+          "governance",
+          "digest",
+          "resume_workflow"
+        ],
+        "selected_case_count": 0,
+        "passed_case_count": 0,
+        "failed_case_count": 0,
+        "metric_overview": {},
+        "failure_type_breakdown": {},
+        "scenario_overview": {}
+      }
+    }
+  },
+  "cases": [
+    {
+      "case_id": "ask_sample_v640_section_lookup",
+      "benchmark": "question_answering",
+      "suite": "ask",
+      "suite_file": "eval/golden/ask_cases.json",
+      "scenario": "ask",
+      "fixture": "sample_vault",
+      "description": "真实 sample_vault 下查询 v6.4.0 迭代任务中“买家采购分析报表”所在部分时，应命中目标任务文档并返回 retrieval_only 证据结果。",
+      "started_at": "2026-04-18T09:18:31.435356+00:00",
+      "duration_ms": 214.67,
+      "outcome": "passed",
+      "expected": {
+        "http_status": 200,
+        "workflow_status": "completed",
+        "message_contains": "retrieval-only fallback",
+        "approval_required": false,
+        "ask_result": {
+          "mode": "retrieval_only",
+          "model_fallback_used": true,
+          "model_fallback_reason": "no_available_chat_provider",
+          "retrieval_fallback_used": false,
+          "min_citation_count": 1,
+          "min_retrieved_candidate_count": 1,
+          "citation_path_suffixes": [
+            "v6.4.0迭代任务.md"
+          ],
+          "answer_contains": [
+            "当前未使用模型生成答案"
+          ]
+        }
+      },
+      "actual": {
+        "http_status": 200,
+        "workflow_status": "completed",
+        "message": "Ask workflow completed with retrieval-only fallback.",
+        "approval_required": false,
+        "run_id": "run_126dd7ce8c82430d9bd1a1ce30a14bf7",
+        "thread_id": "thread_f87fd32bccfa42ad956a4fdc38ec9d7b",
+        "fixture_id": "sample_vault",
+        "fixture_vault_path": "/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/sample_vault",
+        "fixture_db_path": "/var/folders/k1/fyz1kmds28dbvwxxbrrxt4rw0000gn/T/ks_eval_ask_sample_v640_section_lookup_aghr10_n/knowledge_steward.sqlite3",
+        "trace_path_exists": true,
+        "ask_result": {
+          "mode": "retrieval_only",
+          "answer": "当前未使用模型生成答案，先返回与问题“买家采购分析报表”最相关的检索证据。\n[1] v6.4.0迭代任务.md / 三、买家采购分析报表 (lines 152-153): 三、[买家采购分析报表]\n[2] v6.4.0迭代任务.md / 三、买家采购分析报表 > （三）开发阶段 (lines 177-182): 三、[买家采购分析报表] > （三）开发阶段",
+          "citation_count": 2,
+          "retrieved_candidate_count": 2,
+          "retrieval_fallback_used": false,
+          "retrieval_fallback_reason": null,
+          "model_fallback_used": true,
+          "model_fallback_reason": "no_available_chat_provider",
+          "provider_name": null,
+          "model_name": null,
+          "tool_call_attempted": false,
+          "tool_call_used": null,
+          "guardrail_action": null,
+          "citation_paths": [
+            "日常/2023-08/v6.4.0迭代任务.md",
+            "日常/2023-08/v6.4.0迭代任务.md"
+          ],
+          "citation_retrieval_sources": [
+            "sqlite_fts",
+            "sqlite_fts"
+          ],
+          "retrieved_candidate_paths": [
+            "日常/2023-08/v6.4.0迭代任务.md",
+            "日常/2023-08/v6.4.0迭代任务.md"
+          ],
+          "retrieved_candidate_retrieval_sources": [
+            "sqlite_fts",
+            "sqlite_fts"
+          ]
+        },
+        "ask_groundedness": {
+          "bucket": "not_generated_answer",
+          "consistent": null,
+          "reason": "ask_result_not_generated_answer",
+          "citation_numbers": [],
+          "cited_candidate_count": 0,
+          "unsupported_terms": [],
+          "answer_text": "当前未使用模型生成答案，先返回与问题“买家采购分析报表”最相关的检索证据。\n v6.4.0迭代任务.md / 三、买家采购分析报表 (lines 152-153): 三、[买家采购分析报表]\n v6.4.0迭代任务.md / 三、买家采购分析报表 > （三）开发阶段 (lines 177-182): 三、[买家采购分析报表] > （三）开发阶段"
+        },
+        "ingest_result": null,
+        "analysis_result": null,
+        "digest_result": null,
+        "proposal": null,
+        "quality_metrics": {
+          "faithfulness": {
+            "score": 1.0,
+            "reason": "ask_groundedness:not_generated_answer"
+          },
+          "answer_relevancy": {
+            "score": 1.0,
+            "matched_output_hint_count": 2,
+            "expected_output_hint_count": 2
+          },
+          "relevancy": {
+            "score": 1.0,
+            "matched_output_hint_count": 2,
+            "expected_output_hint_count": 2
+          },
+          "context_precision": {
+            "score": 1.0,
+            "matched_context_count": 1,
+            "actual_context_count": 1
+          },
+          "context_recall": {
+            "score": 1.0,
+            "matched_context_count": 1,
+            "reference_context_count": 1
+          }
+        }
+      },
+      "error": null
+    },
+    {
+      "case_id": "ask_sample_v640_retro_improvement_points",
+      "benchmark": "question_answering",
+      "suite": "ask",
+      "suite_file": "eval/golden/ask_cases.json",
+      "scenario": "ask",
+      "fixture": "sample_vault",
+      "description": "真实 sample_vault 下查询 v6.4.0 复盘总结中的“其他可提升的”时，应命中复盘文档并返回 retrieval_only 证据结果。",
+      "started_at": "2026-04-18T09:18:31.650331+00:00",
+      "duration_ms": 201.68,
+      "outcome": "passed",
+      "expected": {
+        "http_status": 200,
+        "workflow_status": "completed",
+        "message_contains": "retrieval-only fallback",
+        "approval_required": false,
+        "ask_result": {
+          "mode": "retrieval_only",
+          "model_fallback_used": true,
+          "model_fallback_reason": "no_available_chat_provider",
+          "retrieval_fallback_used": false,
+          "min_citation_count": 1,
+          "min_retrieved_candidate_count": 1,
+          "citation_path_suffixes": [
+            "v6.4.0复盘总结.md"
+          ],
+          "answer_contains": [
+            "当前未使用模型生成答案"
+          ]
+        }
+      },
+      "actual": {
+        "http_status": 200,
+        "workflow_status": "completed",
+        "message": "Ask workflow completed with retrieval-only fallback.",
+        "approval_required": false,
+        "run_id": "run_b60ca67f025b4ea29e8766e6bc90c55f",
+        "thread_id": "thread_b221997212a24e0c9d466fc38c8140bd",
+        "fixture_id": "sample_vault",
+        "fixture_vault_path": "/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/sample_vault",
+        "fixture_db_path": "/var/folders/k1/fyz1kmds28dbvwxxbrrxt4rw0000gn/T/ks_eval_ask_sample_v640_retro_improvement_points_rjwxj_4x/knowledge_steward.sqlite3",
+        "trace_path_exists": true,
+        "ask_result": {
+          "mode": "retrieval_only",
+          "answer": "当前未使用模型生成答案，先返回与问题“其他可提升的”最相关的检索证据。\n[1] v6.4.0复盘总结.md / 三、其他可提升的 (lines 77-85): 三、[其他可提升的]",
+          "citation_count": 1,
+          "retrieved_candidate_count": 1,
+          "retrieval_fallback_used": false,
+          "retrieval_fallback_reason": null,
+          "model_fallback_used": true,
+          "model_fallback_reason": "no_available_chat_provider",
+          "provider_name": null,
+          "model_name": null,
+          "tool_call_attempted": false,
+          "tool_call_used": null,
+          "guardrail_action": null,
+          "citation_paths": [
+            "日常/2023-08/v6.4.0复盘总结.md"
+          ],
+          "citation_retrieval_sources": [
+            "sqlite_fts"
+          ],
+          "retrieved_candidate_paths": [
+            "日常/2023-08/v6.4.0复盘总结.md"
+          ],
+          "retrieved_candidate_retrieval_sources": [
+            "sqlite_fts"
+          ]
+        },
+        "ask_groundedness": {
+          "bucket": "not_generated_answer",
+          "consistent": null,
+          "reason": "ask_result_not_generated_answer",
+          "citation_numbers": [],
+          "cited_candidate_count": 0,
+          "unsupported_terms": [],
+          "answer_text": "当前未使用模型生成答案，先返回与问题“其他可提升的”最相关的检索证据。\n v6.4.0复盘总结.md / 三、其他可提升的 (lines 77-85): 三、[其他可提升的]"
+        },
+        "ingest_result": null,
+        "analysis_result": null,
+        "digest_result": null,
+        "proposal": null,
+        "quality_metrics": {
+          "faithfulness": {
+            "score": 1.0,
+            "reason": "ask_groundedness:not_generated_answer"
+          },
+          "answer_relevancy": {
+            "score": 1.0,
+            "matched_output_hint_count": 2,
+            "expected_output_hint_count": 2
+          },
+          "relevancy": {
+            "score": 1.0,
+            "matched_output_hint_count": 2,
+            "expected_output_hint_count": 2
+          },
+          "context_precision": {
+            "score": 1.0,
+            "matched_context_count": 1,
+            "actual_context_count": 1
+          },
+          "context_recall": {
+            "score": 1.0,
+            "matched_context_count": 1,
+            "reference_context_count": 1
+          }
+        }
+      },
+      "error": null
+    },
+    {
+      "case_id": "ask_sample_ad_tracking_december_only",
+      "benchmark": "question_answering",
+      "suite": "ask",
+      "suite_file": "eval/golden/ask_cases.json",
+      "scenario": "ask",
+      "fixture": "sample_vault",
+      "description": "仅在 2023-12 路径前缀下查询“买家采购分析埋点”时，应命中 2023-12-20 日报并返回 retrieval_only 证据结果。",
+      "started_at": "2026-04-18T09:18:31.852026+00:00",
+      "duration_ms": 183.82,
+      "outcome": "passed",
+      "expected": {
+        "http_status": 200,
+        "workflow_status": "completed",
+        "message_contains": "retrieval-only fallback",
+        "approval_required": false,
+        "ask_result": {
+          "mode": "retrieval_only",
+          "model_fallback_used": true,
+          "model_fallback_reason": "no_available_chat_provider",
+          "retrieval_fallback_used": false,
+          "min_citation_count": 1,
+          "min_retrieved_candidate_count": 1,
+          "citation_path_suffixes": [
+            "2023-12-20_星期三.md"
+          ],
+          "answer_contains": [
+            "当前未使用模型生成答案"
+          ]
+        }
+      },
+      "actual": {
+        "http_status": 200,
+        "workflow_status": "completed",
+        "message": "Ask workflow completed with retrieval-only fallback.",
+        "approval_required": false,
+        "run_id": "run_9cd665426c244d37a0247b3f24e67d36",
+        "thread_id": "thread_9495cd04ca4441238c94595040e1e973",
+        "fixture_id": "sample_vault",
+        "fixture_vault_path": "/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/sample_vault",
+        "fixture_db_path": "/var/folders/k1/fyz1kmds28dbvwxxbrrxt4rw0000gn/T/ks_eval_ask_sample_ad_tracking_december_only_btgapi5w/knowledge_steward.sqlite3",
+        "trace_path_exists": true,
+        "ask_result": {
+          "mode": "retrieval_only",
+          "answer": "当前未使用模型生成答案，先返回与问题“买家采购分析埋点”最相关的检索证据。\n[1] 2023-12-20_星期三.md / Summary (lines 20-30): # Summary\n\n* 刚开始广告跳转是写死的页面，后面希望提供可以更换图片的功能，加上了之后就是延申成独立页面，需要在管理处既维护增值服务的数据，又维护广告的数据保持一致\n* 有几个低级bug\n\t* 到期时间标识\n\t* 批次销售表货品查询条件\n\t* [买家采购分析埋点]\n* 自测的时候需要带全部查询参数\n* 接口需要前期前后端一起确认清楚...",
+          "citation_count": 1,
+          "retrieved_candidate_count": 1,
+          "retrieval_fallback_used": false,
+          "retrieval_fallback_reason": null,
+          "model_fallback_used": true,
+          "model_fallback_reason": "no_available_chat_provider",
+          "provider_name": null,
+          "model_name": null,
+          "tool_call_attempted": false,
+          "tool_call_used": null,
+          "guardrail_action": null,
+          "citation_paths": [
+            "日常/2023-12-20_星期三.md"
+          ],
+          "citation_retrieval_sources": [
+            "sqlite_fts"
+          ],
+          "retrieved_candidate_paths": [
+            "日常/2023-12-20_星期三.md"
+          ],
+          "retrieved_candidate_retrieval_sources": [
+            "sqlite_fts"
+          ]
+        },
+        "ask_groundedness": {
+          "bucket": "not_generated_answer",
+          "consistent": null,
+          "reason": "ask_result_not_generated_answer",
+          "citation_numbers": [],
+          "cited_candidate_count": 0,
+          "unsupported_terms": [],
+          "answer_text": "当前未使用模型生成答案，先返回与问题“买家采购分析埋点”最相关的检索证据。\n 2023-12-20_星期三.md / Summary (lines 20-30): # Summary\n\n* 刚开始广告跳转是写死的页面，后面希望提供可以更换图片的功能，加上了之后就是延申成独立页面，需要在管理处既维护增值服务的数据，又维护广告的数据保持一致\n* 有几个低级bug\n\t* 到期时间标识\n\t* 批次销售表货品查询条件\n\t* [买家采购分析埋点]\n* 自测的时候需要带全部查询参数\n* 接口需要前期前后端一起确认清楚..."
+        },
+        "ingest_result": null,
+        "analysis_result": null,
+        "digest_result": null,
+        "proposal": null,
+        "quality_metrics": {
+          "faithfulness": {
+            "score": 1.0,
+            "reason": "ask_groundedness:not_generated_answer"
+          },
+          "answer_relevancy": {
+            "score": 1.0,
+            "matched_output_hint_count": 2,
+            "expected_output_hint_count": 2
+          },
+          "relevancy": {
+            "score": 1.0,
+            "matched_output_hint_count": 2,
+            "expected_output_hint_count": 2
+          },
+          "context_precision": {
+            "score": 1.0,
+            "matched_context_count": 1,
+            "actual_context_count": 1
+          },
+          "context_recall": {
+            "score": 1.0,
+            "matched_context_count": 1,
+            "reference_context_count": 1
+          }
+        }
+      },
+      "error": null
+    },
+    {
+      "case_id": "ask_sample_prestore_compatibility_september_only",
+      "benchmark": "question_answering",
+      "suite": "ask",
+      "suite_file": "eval/golden/ask_cases.json",
+      "scenario": "ask",
+      "fixture": "sample_vault",
+      "description": "仅在 2023-09 路径前缀下查询“新老版本兼容”时，应命中 2023-09-07 日报并返回 retrieval_only 证据结果。",
+      "started_at": "2026-04-18T09:18:32.035852+00:00",
+      "duration_ms": 173.27,
+      "outcome": "passed",
+      "expected": {
+        "http_status": 200,
+        "workflow_status": "completed",
+        "message_contains": "retrieval-only fallback",
+        "approval_required": false,
+        "ask_result": {
+          "mode": "retrieval_only",
+          "model_fallback_used": true,
+          "model_fallback_reason": "no_available_chat_provider",
+          "retrieval_fallback_used": false,
+          "min_citation_count": 1,
+          "min_retrieved_candidate_count": 1,
+          "citation_path_suffixes": [
+            "2023-09-07_星期四.md"
+          ],
+          "answer_contains": [
+            "当前未使用模型生成答案"
+          ]
+        }
+      },
+      "actual": {
+        "http_status": 200,
+        "workflow_status": "completed",
+        "message": "Ask workflow completed with retrieval-only fallback.",
+        "approval_required": false,
+        "run_id": "run_76f017cfb1654ab591f1b35627033265",
+        "thread_id": "thread_5c7e6c847bde4f2885285716e824cfe6",
+        "fixture_id": "sample_vault",
+        "fixture_vault_path": "/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/sample_vault",
+        "fixture_db_path": "/var/folders/k1/fyz1kmds28dbvwxxbrrxt4rw0000gn/T/ks_eval_ask_sample_prestore_compatibility_september_only_2mio3hk_/knowledge_steward.sqlite3",
+        "trace_path_exists": true,
+        "ask_result": {
+          "mode": "retrieval_only",
+          "answer": "当前未使用模型生成答案，先返回与问题“新老版本兼容”最相关的检索证据。\n[1] 2023-09-07_星期四.md / Summary (lines 22-40): ...no则计入当前统计\n* 策略模式\n* 预存变化\n* 还款-经营总表\n* [新老版本兼容]\n\n* 从下单赊欠后还款，找到订单、赊欠、还款之间的联系\n\t* 作废还款\n* 然后再综合预存...",
+          "citation_count": 1,
+          "retrieved_candidate_count": 1,
+          "retrieval_fallback_used": false,
+          "retrieval_fallback_reason": null,
+          "model_fallback_used": true,
+          "model_fallback_reason": "no_available_chat_provider",
+          "provider_name": null,
+          "model_name": null,
+          "tool_call_attempted": false,
+          "tool_call_used": null,
+          "guardrail_action": null,
+          "citation_paths": [
+            "日常/2023-09/2023-09-07_星期四.md"
+          ],
+          "citation_retrieval_sources": [
+            "sqlite_fts"
+          ],
+          "retrieved_candidate_paths": [
+            "日常/2023-09/2023-09-07_星期四.md"
+          ],
+          "retrieved_candidate_retrieval_sources": [
+            "sqlite_fts"
+          ]
+        },
+        "ask_groundedness": {
+          "bucket": "not_generated_answer",
+          "consistent": null,
+          "reason": "ask_result_not_generated_answer",
+          "citation_numbers": [],
+          "cited_candidate_count": 0,
+          "unsupported_terms": [],
+          "answer_text": "当前未使用模型生成答案，先返回与问题“新老版本兼容”最相关的检索证据。\n 2023-09-07_星期四.md / Summary (lines 22-40): ...no则计入当前统计\n* 策略模式\n* 预存变化\n* 还款-经营总表\n* [新老版本兼容]\n\n* 从下单赊欠后还款，找到订单、赊欠、还款之间的联系\n\t* 作废还款\n* 然后再综合预存..."
+        },
+        "ingest_result": null,
+        "analysis_result": null,
+        "digest_result": null,
+        "proposal": null,
+        "quality_metrics": {
+          "faithfulness": {
+            "score": 1.0,
+            "reason": "ask_groundedness:not_generated_answer"
+          },
+          "answer_relevancy": {
+            "score": 1.0,
+            "matched_output_hint_count": 2,
+            "expected_output_hint_count": 2
+          },
+          "relevancy": {
+            "score": 1.0,
+            "matched_output_hint_count": 2,
+            "expected_output_hint_count": 2
+          },
+          "context_precision": {
+            "score": 1.0,
+            "matched_context_count": 1,
+            "actual_context_count": 1
+          },
+          "context_recall": {
+            "score": 1.0,
+            "matched_context_count": 1,
+            "reference_context_count": 1
+          }
+        }
+      },
+      "error": null
+    },
+    {
+      "case_id": "ask_sample_ad_ctr_no_hits",
+      "benchmark": "question_answering",
+      "suite": "ask",
+      "suite_file": "eval/golden/ask_cases.json",
+      "scenario": "ask",
+      "fixture": "sample_vault",
+      "description": "真实 sample_vault 下查询不存在的广告点击率提升数据时，应返回 no_hits，而不是编造量化结果。",
+      "started_at": "2026-04-18T09:18:32.209132+00:00",
+      "duration_ms": 174.69,
+      "outcome": "passed",
+      "expected": {
+        "http_status": 200,
+        "workflow_status": "completed",
+        "approval_required": false,
+        "ask_result": {
+          "mode": "no_hits",
+          "model_fallback_used": false,
+          "min_citation_count": 0,
+          "answer_contains": [
+            "未找到可支撑回答的笔记片段"
+          ]
+        }
+      },
+      "actual": {
+        "http_status": 200,
+        "workflow_status": "completed",
+        "message": "Ask workflow completed without matching evidence.",
+        "approval_required": false,
+        "run_id": "run_a51ee30c385f4772937052581d77fd1d",
+        "thread_id": "thread_fe1be99419dc47bc8a2cedd222c3dd40",
+        "fixture_id": "sample_vault",
+        "fixture_vault_path": "/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/sample_vault",
+        "fixture_db_path": "/var/folders/k1/fyz1kmds28dbvwxxbrrxt4rw0000gn/T/ks_eval_ask_sample_ad_ctr_no_hits_bg2ioe73/knowledge_steward.sqlite3",
+        "trace_path_exists": true,
+        "ask_result": {
+          "mode": "no_hits",
+          "answer": "未找到可支撑回答的笔记片段，当前无法返回带引用的答案。",
+          "citation_count": 0,
+          "retrieved_candidate_count": 0,
+          "retrieval_fallback_used": false,
+          "retrieval_fallback_reason": null,
+          "model_fallback_used": false,
+          "model_fallback_reason": null,
+          "provider_name": null,
+          "model_name": null,
+          "tool_call_attempted": false,
+          "tool_call_used": null,
+          "guardrail_action": null,
+          "citation_paths": [],
+          "citation_retrieval_sources": [],
+          "retrieved_candidate_paths": [],
+          "retrieved_candidate_retrieval_sources": []
+        },
+        "ask_groundedness": {
+          "bucket": "not_generated_answer",
+          "consistent": null,
+          "reason": "ask_result_not_generated_answer",
+          "citation_numbers": [],
+          "cited_candidate_count": 0,
+          "unsupported_terms": [],
+          "answer_text": "未找到可支撑回答的笔记片段，当前无法返回带引用的答案。"
+        },
+        "ingest_result": null,
+        "analysis_result": null,
+        "digest_result": null,
+        "proposal": null,
+        "quality_metrics": {
+          "faithfulness": {
+            "score": 1.0,
+            "reason": "ask_groundedness:not_generated_answer"
+          },
+          "answer_relevancy": {
+            "score": 1.0,
+            "matched_output_hint_count": 1,
+            "expected_output_hint_count": 1
+          },
+          "relevancy": {
+            "score": 1.0,
+            "matched_output_hint_count": 1,
+            "expected_output_hint_count": 1
+          },
+          "context_precision": {
+            "score": null,
+            "matched_context_count": 0,
+            "actual_context_count": 0
+          },
+          "context_recall": {
+            "score": null,
+            "matched_context_count": 0,
+            "reference_context_count": 0
+          }
+        }
+      },
+      "error": null
+    },
+    {
+      "case_id": "ask_sample_filter_fallback_missing_prefix_v2",
+      "benchmark": "question_answering",
+      "suite": "ask",
+      "suite_file": "eval/golden/ask_cases.json",
+      "scenario": "ask",
+      "fixture": "sample_vault",
+      "description": "当路径过滤条件过严时，ask 应稳定触发 metadata filter fallback，而不是直接无结果失败。",
+      "started_at": "2026-04-18T09:18:32.383836+00:00",
+      "duration_ms": 202.2,
+      "outcome": "passed",
+      "expected": {
+        "http_status": 200,
+        "workflow_status": "completed",
+        "message_contains": "retrieval-only fallback",
+        "approval_required": false,
+        "ask_result": {
+          "mode": "retrieval_only",
+          "model_fallback_used": true,
+          "model_fallback_reason": "no_available_chat_provider",
+          "retrieval_fallback_used": true,
+          "retrieval_fallback_reason": "metadata_filters_too_strict",
+          "min_citation_count": 1,
+          "min_retrieved_candidate_count": 1,
+          "answer_contains": [
+            "当前未使用模型生成答案",
+            "检索已退回纯 FTS 结果"
+          ]
+        }
+      },
+      "actual": {
+        "http_status": 200,
+        "workflow_status": "completed",
+        "message": "Ask workflow completed with retrieval-only fallback.",
+        "approval_required": false,
+        "run_id": "run_306f3ede7b54406ea4d013346a812084",
+        "thread_id": "thread_dcc4c342b9db44899d0d099d0396b7e3",
+        "fixture_id": "sample_vault",
+        "fixture_vault_path": "/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/sample_vault",
+        "fixture_db_path": "/var/folders/k1/fyz1kmds28dbvwxxbrrxt4rw0000gn/T/ks_eval_ask_sample_filter_fallback_missing_prefix_v2_rv2r_b6x/knowledge_steward.sqlite3",
+        "trace_path_exists": true,
+        "ask_result": {
+          "mode": "retrieval_only",
+          "answer": "当前未使用模型生成答案，先返回与问题“买家采购分析”最相关的检索证据。\n注意：结构化过滤条件过严，检索已退回纯 FTS 结果。\n[1] 2023-08-08_星期二.md / Day Planner (lines 9-25): # Day Planner\n\n- [x] 赊欠管理pr ✅ 2023-08-08\n\n- [x] [买家采购分析] ✅ 2023-08-08...\n[2] v6.4.0复盘总结.md / 一、周报及任务汇总 (lines 1-57): ...1. 档主相关校验代码优化\n        \n    2. 赊欠列表与分享\n        \n    3. [买家采购分析]\n        \n    4. 货品批量修改\n        \n    5. 盘点、报损、调出相关增加备注...\n[3] 2023-07-31_星期一.md / 四、今日总结 (lines 19-94): ...mac，不通过则校验验证码\n\t* 讨论问题\n\t\t* 提出问题，想好按自己的想法下的解决方案\n\t* [买家采购分析]\n\t\t* customer表中字段最后采购时间\n\n1. 感觉每日记录结构需要调整一下，需要更明确一点\n2. 思考问题分维度...",
+          "citation_count": 3,
+          "retrieved_candidate_count": 3,
+          "retrieval_fallback_used": true,
+          "retrieval_fallback_reason": "metadata_filters_too_strict",
+          "model_fallback_used": true,
+          "model_fallback_reason": "no_available_chat_provider",
+          "provider_name": null,
+          "model_name": null,
+          "tool_call_attempted": false,
+          "tool_call_used": null,
+          "guardrail_action": null,
+          "citation_paths": [
+            "日常/2023-08/2023-08-08_星期二.md",
+            "日常/2023-08/v6.4.0复盘总结.md",
+            "日常/2023-07/2023-07-31_星期一.md"
+          ],
+          "citation_retrieval_sources": [
+            "sqlite_fts",
+            "sqlite_fts",
+            "sqlite_fts"
+          ],
+          "retrieved_candidate_paths": [
+            "日常/2023-08/2023-08-08_星期二.md",
+            "日常/2023-08/v6.4.0复盘总结.md",
+            "日常/2023-07/2023-07-31_星期一.md"
+          ],
+          "retrieved_candidate_retrieval_sources": [
+            "sqlite_fts",
+            "sqlite_fts",
+            "sqlite_fts"
+          ]
+        },
+        "ask_groundedness": {
+          "bucket": "not_generated_answer",
+          "consistent": null,
+          "reason": "ask_result_not_generated_answer",
+          "citation_numbers": [],
+          "cited_candidate_count": 0,
+          "unsupported_terms": [],
+          "answer_text": "当前未使用模型生成答案，先返回与问题“买家采购分析”最相关的检索证据。\n注意：结构化过滤条件过严，检索已退回纯 FTS 结果。\n 2023-08-08_星期二.md / Day Planner (lines 9-25): # Day Planner\n\n- [x] 赊欠管理pr ✅ 2023-08-08\n\n- [x] [买家采购分析] ✅ 2023-08-08...\n v6.4.0复盘总结.md / 一、周报及任务汇总 (lines 1-57): ...1. 档主相关校验代码优化\n        \n    2. 赊欠列表与分享\n        \n    3. [买家采购分析]\n        \n    4. 货品批量修改\n        \n    5. 盘点、报损、调出相关增加备注...\n 2023-07-31_星期一.md / 四、今日总结 (lines 19-94): ...mac，不通过则校验验证码\n\t* 讨论问题\n\t\t* 提出问题，想好按自己的想法下的解决方案\n\t* [买家采购分析]\n\t\t* customer表中字段最后采购时间\n\n1. 感觉每日记录结构需要调整一下，需要更明确一点\n2. 思考问题分维度..."
+        },
+        "ingest_result": null,
+        "analysis_result": null,
+        "digest_result": null,
+        "proposal": null,
+        "quality_metrics": {
+          "faithfulness": {
+            "score": 1.0,
+            "reason": "ask_groundedness:not_generated_answer"
+          },
+          "answer_relevancy": {
+            "score": 1.0,
+            "matched_output_hint_count": 3,
+            "expected_output_hint_count": 3
+          },
+          "relevancy": {
+            "score": 1.0,
+            "matched_output_hint_count": 3,
+            "expected_output_hint_count": 3
+          },
+          "context_precision": {
+            "score": 0.0,
+            "matched_context_count": 0,
+            "actual_context_count": 3
+          },
+          "context_recall": {
+            "score": null,
+            "matched_context_count": 0,
+            "reference_context_count": 0
+          }
+        }
+      },
+      "error": null
+    },
+    {
+      "case_id": "ask_sample_transaction_proxy_lookup",
+      "benchmark": "question_answering",
+      "suite": "ask",
+      "suite_file": "eval/golden/ask_cases.json",
+      "scenario": "ask",
+      "fixture": "sample_vault",
+      "description": "真实 sample_vault 下查询事务失效原因时，应命中 2023-11-06 日报并返回 retrieval_only 证据结果。",
+      "started_at": "2026-04-18T09:18:32.586062+00:00",
+      "duration_ms": 205.66,
+      "outcome": "passed",
+      "expected": {
+        "http_status": 200,
+        "workflow_status": "completed",
+        "message_contains": "retrieval-only fallback",
+        "approval_required": false,
+        "ask_result": {
+          "mode": "retrieval_only",
+          "model_fallback_used": true,
+          "model_fallback_reason": "no_available_chat_provider",
+          "min_citation_count": 1,
+          "min_retrieved_candidate_count": 1,
+          "citation_path_suffixes": [
+            "2023-11-06_星期一.md"
+          ],
+          "answer_contains": [
+            "当前未使用模型生成答案",
+            "[1]"
+          ]
+        }
+      },
+      "actual": {
+        "http_status": 200,
+        "workflow_status": "completed",
+        "message": "Ask workflow completed with retrieval-only fallback.",
+        "approval_required": false,
+        "run_id": "run_d821b1456b474a84a0da7cc418ddd63e",
+        "thread_id": "thread_465c59e982b04647875b405d969ac576",
+        "fixture_id": "sample_vault",
+        "fixture_vault_path": "/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/sample_vault",
+        "fixture_db_path": "/var/folders/k1/fyz1kmds28dbvwxxbrrxt4rw0000gn/T/ks_eval_ask_sample_transaction_proxy_lookup_v0gge4_n/knowledge_steward.sqlite3",
+        "trace_path_exists": true,
+        "ask_result": {
+          "mode": "retrieval_only",
+          "answer": "当前未使用模型生成答案，先返回与问题“类内部调用事务方法会导致事务失效”最相关的检索证据。\n[1] 2023-11-06_星期一.md / Summary (lines 21-34): # Summary\n\n* 要什么东西，提供什么功能\n* 这周四之前完成复盘、总结、和task\n* 正常的码单数据在下单收银之后会被直接删除，但是预订单的码单头部数据会保留\n* [类内部调用事务方法会导致事务失效]\n\t* transactional基于aop，基于动态代理，调用内部类方法使用this对象不走动态代理...",
+          "citation_count": 1,
+          "retrieved_candidate_count": 1,
+          "retrieval_fallback_used": false,
+          "retrieval_fallback_reason": null,
+          "model_fallback_used": true,
+          "model_fallback_reason": "no_available_chat_provider",
+          "provider_name": null,
+          "model_name": null,
+          "tool_call_attempted": false,
+          "tool_call_used": null,
+          "guardrail_action": null,
+          "citation_paths": [
+            "日常/2023-11-06_星期一.md"
+          ],
+          "citation_retrieval_sources": [
+            "sqlite_fts"
+          ],
+          "retrieved_candidate_paths": [
+            "日常/2023-11-06_星期一.md"
+          ],
+          "retrieved_candidate_retrieval_sources": [
+            "sqlite_fts"
+          ]
+        },
+        "ask_groundedness": {
+          "bucket": "not_generated_answer",
+          "consistent": null,
+          "reason": "ask_result_not_generated_answer",
+          "citation_numbers": [],
+          "cited_candidate_count": 0,
+          "unsupported_terms": [],
+          "answer_text": "当前未使用模型生成答案，先返回与问题“类内部调用事务方法会导致事务失效”最相关的检索证据。\n 2023-11-06_星期一.md / Summary (lines 21-34): # Summary\n\n* 要什么东西，提供什么功能\n* 这周四之前完成复盘、总结、和task\n* 正常的码单数据在下单收银之后会被直接删除，但是预订单的码单头部数据会保留\n* [类内部调用事务方法会导致事务失效]\n\t* transactional基于aop，基于动态代理，调用内部类方法使用this对象不走动态代理..."
+        },
+        "ingest_result": null,
+        "analysis_result": null,
+        "digest_result": null,
+        "proposal": null,
+        "quality_metrics": {
+          "faithfulness": {
+            "score": 1.0,
+            "reason": "ask_groundedness:not_generated_answer"
+          },
+          "answer_relevancy": {
+            "score": 1.0,
+            "matched_output_hint_count": 3,
+            "expected_output_hint_count": 3
+          },
+          "relevancy": {
+            "score": 1.0,
+            "matched_output_hint_count": 3,
+            "expected_output_hint_count": 3
+          },
+          "context_precision": {
+            "score": 1.0,
+            "matched_context_count": 1,
+            "actual_context_count": 1
+          },
+          "context_recall": {
+            "score": 1.0,
+            "matched_context_count": 1,
+            "reference_context_count": 1
+          }
+        }
+      },
+      "error": null
+    }
+  ]
+}

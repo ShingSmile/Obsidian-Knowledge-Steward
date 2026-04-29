@@ -2,6 +2,172 @@
 
 > 用途：为跨会话继续“项目面试辅导”提供最小但完整的接力信息。只写当前进度、下一步断点和用户薄弱点，不写冗余过程。
 
+## 2026-04-18 最新断点（简历证据校准版）
+
+- 当前最新状态：
+  - 已完成一次面向简历的“证据校准”，目标不是继续讲架构，而是明确哪些数字现在能写、哪些点必须降级表述
+  - 本轮已直接读取：
+    - 用户简历 PDF
+    - `docs/PROJECT_MASTER_PLAN.md`
+    - `docs/TASK_QUEUE.md`
+    - `docs/SESSION_LOG.md`
+    - `backend/app/indexing/parser.py`
+    - `backend/app/retrieval/hybrid.py`
+    - `backend/app/context/assembly.py`
+    - `backend/app/quality/faithfulness.py`
+    - `backend/app/graphs/ask_graph.py`
+    - `backend/app/services/proposal_validation.py`
+    - `plugin/src/writeback/applyProposalWriteback.ts`
+    - `eval/golden/*.json`
+  - 本轮还重新执行并确认了当前可复述数字：
+    - `./.conda/knowledge-steward/bin/python eval/run_eval.py` -> `23/23` 通过
+    - `backend` 单测 -> `183/183` 通过
+    - `plugin` 测试 -> `20/20` 通过
+- 当前可直接写进简历的硬证据：
+  - `sample_vault` 规模：`205` 篇笔记、`1057` 个 chunk、约 `50` 处 wikilink、`473` 个任务复选框
+  - ask benchmark：`12/12` 通过，`answer_relevancy=1.0`，`faithfulness=0.8125`
+  - governance benchmark：`3/3` 通过，`patch_safety=1.0`，`rationale_faithfulness=1.0`
+  - digest benchmark：`5/5` 通过，`coverage=1.0`
+- 当前必须诚实收缩的点：
+  - 没有真实用户 / 业务结果
+  - 没有 rerank
+  - 没有真实联网 embedding/provider E2E
+  - ask 还没 proposal 化
+- 当前面试 / 简历最该围绕的设计常数：
+  - hybrid RRF `k=60`
+  - ask relevance threshold `0.35`
+  - per-source limit `2`
+  - full-text / summary budget `900 / 280`
+  - max tool rounds `3`
+  - runtime faithfulness threshold `0.67`
+  - canonical patch 类型 `4` 类
+- 用户当前最需要的下一步：
+  - 先接受一个分层判断：当前 tests + golden case 的主要作用是 regression / contract safety，不是成熟度证明
+  - 后续必须把“能跑通”和“比 baseline 更好”拆开做
+  - 把主项目 bullet 改成“可复现工程结果”，不要再写成框架教程翻译腔
+  - 优先保留：
+    - 检索与上下文装配
+    - 图级 ReAct + 恢复
+    - 受控写回
+    - runtime / offline 评测
+  - 对每条 bullet 都补：
+    - 问题背景
+    - 为什么这样选
+    - 关键阈值 / 常数
+    - 数字结果
+- 下一轮最自然的动作：
+  1. 先给 ask 主链路设计一套 resume-grade benchmark，而不是先改 bullet
+  2. 再把 benchmark 输出映射为能写进简历的数字
+  3. 最后重写项目描述，并为每条 bullet 配对应追问回答
+
+## 2026-04-18 最新断点（新会话先看这里）
+
+- 当前最新状态：
+  - 用户已明确接受一个关键判断：当前最紧要的问题不是继续堆新功能，而是把 `Obsidian` 项目的现有能力收敛成一套“小而硬的 benchmark”
+  - 当前离线 eval 虽然已经有 18+ golden case、`question_answering / governance` benchmark 分组、`quality_metrics / metric_overview / benchmark_overview` 聚合，但更偏“contract regression + explainable guardrail baseline”，还不足以支撑简历里的强结果数字
+  - 用户当前卡点不是不会写 bullet，而是缺少一组可对外陈述、可重复复现、能体现 trade-off 的核心指标
+  - 本轮已开始从真实 `sample_vault` 反推 ask benchmark 样本池，已读取并确认可直接出题的代表性笔记包括：
+    - `sample_vault/日常/2023-08/v6.4.0迭代任务.md`
+    - `sample_vault/日常/2023-08/v6.4.0复盘总结.md`
+    - `sample_vault/日常/2023-07/v6.3.0迭代总结.md`
+    - `sample_vault/日常/2023-06/v6.2.5迭代总结.md`
+    - `sample_vault/日常/2023-08/2023-08-08_星期二.md`
+    - `sample_vault/日常/2023-08/2023-08-07_星期一.md`
+    - `sample_vault/日常/2023-07/2023-07-31_星期一.md`
+    - `sample_vault/日常/2023-12-20_星期三.md`
+- 本轮重新确认后的核心结论：
+  - 下一步不应该优先继续做新功能；否则只会继续增加系统复杂度，仍然拿不出能写进简历的硬数字
+  - 最优先应收敛一个只围绕 `ASK_QA` 主链路的 benchmark MVP，而不是同时扩 ask / governance / digest 三条线
+  - benchmark 目标不是追求样本条数，而是先回答 4 个面试级问题：
+    - hybrid retrieval 相比单路检索是否有效
+    - context assembly 是否真的改善上下文质量
+    - runtime faithfulness gate 是否真的降低 overclaim
+    - 引入这些控制层后，代价是多少（耗时 / 降级率 / 可用率）
+  - 只有先拿到这组数字，简历和后续优化才有抓手
+- 用户当前最需要补齐的执行件：
+  - 一套 ask-only benchmark 样本清单，按 `事实问答 / 多跳问答 / metadata filter / tool assist / overclaim / no-hit` 分桶
+  - 一张 ablation 矩阵，最小至少覆盖：
+    - `FTS only`
+    - `vector only`
+    - `hybrid RRF`
+    - `hybrid + context assembly`
+    - `hybrid + context assembly + runtime faithfulness gate`
+  - 一组可写进简历的核心指标：
+    - `Recall@k / NDCG@10`
+    - `Faithfulness`
+    - `Answer Relevancy`
+    - `Context Precision / Context Recall`
+    - `response latency`
+    - `fallback or downgrade rate`
+  - 3 个可复述的真实 bad case：
+    - 误召回
+    - 工具调用失败或循环
+    - faithfulness gate 误杀或漏杀
+  - 一版来自真实语料的 ask benchmark 候选 case 池，先按 6 个 bucket 拆成 12 条，再人工筛掉不自然 query 并补参考证据标注
+- 下一步推荐顺序：
+  1. 先把本轮起草的 12 条候选 ask case 人工筛一遍，删掉不自然 query
+  2. 再给每条 case 补 `reference_context_path_suffixes / expected_facts / allow_retrieval_only / expected_failure_mode`
+  3. 再为每个 bucket 补最小 deterministic fixture / real-sample case
+  4. 然后才落 ablation 开关与结果导出
+  5. 最后进入“跑结果 -> 改进 -> 写简历数字”
+- 为了续聊必须知道的上下文摘要：
+  - 用户已经认同：当前评测体系是最大短板
+  - 用户下一步需要的是“可以直接执行的 benchmark 清单”，不是泛泛而谈的评测方法论
+  - 下一轮最自然的动作是把 ask-only benchmark 拆成：
+    - 样本 bucket
+    - 评测指标
+    - ablation 组合
+    - 命令与结果表模板
+
+## 2026-04-11 最新断点（新会话先看这里）
+
+- 当前最新状态：
+  - 已按最新仓库事实重新接管本项目的面试辅导上下文，重点不是重讲旧版本，而是把已有面试叙事与 2026-04-10 之前落地的代码实现重新对齐
+  - 当前仓库主叙事仍然成立：这不是“Obsidian 问答插件”，而是“面向个人知识库的受控治理 Agent 系统”
+  - 当前三条主 workflow 仍是 `ASK_QA`、`INGEST_STEWARD`、`DAILY_DIGEST`，但范式已经明显分化：
+    - `ASK_QA` 是图级 ReAct + 受控工具调用
+    - `INGEST_STEWARD` / `DAILY_DIGEST` 仍以静态编排为主
+  - 本轮已完成对离线评测体系的重新校准：当前 `eval/run_eval.py` 不是简单脚本，而是“golden case -> fixture 构造 -> 入口执行 -> snapshot 抽取 -> quality metric 计算 -> expected contract 校验 -> benchmark 汇总”的闭环
+- 本轮重新校验过的证据来源：
+  - 文档：`README.md`、`docs/CURRENT_STATE.md`、`docs/PROJECT_MASTER_PLAN.md`、`docs/TASK_QUEUE.md`、`docs/SESSION_LOG.md`
+  - 后端入口与主链路：`backend/app/main.py`、`backend/app/contracts/workflow.py`
+  - ask 主链路：`backend/app/graphs/ask_graph.py`、`backend/app/services/ask.py`、`backend/app/context/assembly.py`、`backend/app/tools/registry.py`、`backend/app/quality/faithfulness.py`
+  - ingest / digest 主链路：`backend/app/graphs/ingest_graph.py`、`backend/app/services/ingest_proposal.py`、`backend/app/graphs/digest_graph.py`、`backend/app/services/digest.py`
+  - 审批恢复与插件控制面：`backend/app/services/resume_workflow.py`、`plugin/src/main.ts`、`plugin/src/views/KnowledgeStewardView.ts`、`plugin/src/writeback/applyProposalWriteback.ts`
+- 本轮重新确认后的核心结论：
+  - 后端统一入口仍是 `POST /workflows/invoke`，由 `backend/app/main.py` 按 action_type 分发到三条 workflow
+  - ask 现在最值得讲的不是“有 RAG”，而是“检索 -> 上下文装配 -> 图级 ReAct -> Structured Tool Calling -> runtime faithfulness gate”的受控问答链
+  - ingest / digest 现在最值得讲的不是“也用了 LangGraph”，而是“高风险链路优先保持静态编排，把模型自由度压在 proposal 之前”
+  - 写回闭环已经不是空壳：插件侧存在真实 `before_hash` 校验、本地写回、rollback 保护；后端存在 `resume_workflow`、audit log、checkpoint completed 落盘
+  - 文档里提到的“初步实现指南”文件当前在仓库中未检索到；后续若被问到 north star，应优先以 `README.md`、`CURRENT_STATE.md` 和代码为准，不要再引用一个当前仓库里找不到的文件
+  - 当前离线评测样本共 23 条，分布在 `ask / governance / digest / resume` 四个 golden suite；其中 ask 又拆成 `ask` 与 `tool_and_guardrail` 两个 scenario
+  - 当前 offline quality metric 是“语义 faithfulness + 启发式 contract/coverage 指标”的混合体系：`faithfulness` 复用共享 claim-level faithfulness core，其它如 `answer_relevancy / context_precision / patch_safety / coverage` 仍主要是启发式或 contract-based
+- 用户当前最适合继续练的方向：
+  - 先做“2 分钟全项目总串讲”的最新版口径
+  - 然后按架构钩子深入：`ASK_QA` 图级 ReAct、上下文装配、受控工具调用、审批恢复协议、受控写回、runtime/offline 评测闭环
+  - 若继续评测主题，最自然的细化顺序是：
+    - `faithfulness` 具体怎么算
+    - `answer_relevancy / context_precision / coverage` 为什么只是启发式
+    - `resume_workflow` 为什么要把 checkpoint 和 audit 一起拉进 eval
+  - 如果用户直接问细节，优先回到真实代码，而不是沿用旧版辅导结论
+- 用户当前最需要避免的表达偏差：
+  - 不要把 ask 的“Structured Tool Calling + 图级循环”讲成开放式多 Agent
+  - 不要把 ingest / digest 也讲成和 ask 一样的 ReAct agent；当前证据只支持“静态 graph + proposal/approval”
+  - 不要把“插件能写回”讲成“系统已经生产级自愈”；当前更准确的表述是“有限 patch、人工审批、可回滚、可审计”
+  - 不要再依赖旧文档里找不到的“初步实现指南”做现状背书
+- 下一步推荐顺序：
+  1. 先给用户一版基于最新代码的项目概览
+  2. 让用户从以下高频面试钩子中选一个继续深挖：
+     - 为什么 ask 用图级 ReAct，而 ingest / digest 不用
+     - 上下文装配层到底做了什么
+     - 为什么写回要走 proposal / approval / resume
+     - runtime faithfulness 和 offline eval 为什么要拆两层
+  3. 深挖时继续遵守“先看代码再说话”的回答规则
+- 为了续聊必须知道的上下文摘要：
+  - 用户已经明确要求：每次回答都要先定位代码，再从实习生视角给加分项、风险项、改进建议和面试话术
+  - 当前会话不是在做新开发，而是在恢复并校准面试辅导上下文
+  - 下一轮最自然的动作不是泛泛介绍架构，而是围绕一个具体模块或一个具体面试问题做源码级拆解
+
 ## 2026-03-29 最新断点（新会话先看这里）
 
 - 当前最新状态：

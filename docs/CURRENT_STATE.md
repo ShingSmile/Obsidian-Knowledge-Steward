@@ -36,6 +36,7 @@
 - `TASK-057` 已在 `SES-20260419-01` 完成：`eval/benchmark/ask_benchmark_cases.json` 已落成 `50` 条正式人工审核 case，bucket 分布满足 `single_hop=20 / multi_hop=10 / metadata_filter=8 / abstain_or_no_hit=6 / tool_allowed=6`，`ask_benchmark_review_backlog.json` 当前为空，dataset `validate` 与三组 benchmark 相关 `unittest` 已通过。
 - `TASK-058` 已在 `SES-20260422-01` 完成：retrieval benchmark runner、local-only preflight 与正式 dataset 接线都已落地，headline 子集固定为 `38` 条 case；当前 retrieval baseline 为 `fts_only Recall@10=0.2368 / NDCG@10=0.2368`、`vector_only Recall@10=0.6842 / NDCG@10=0.4612`、`hybrid_rrf Recall@10=0.7895 / NDCG@10=0.5636`。同时 FTS 已补齐中文自然语言、日期 / 版本号 hint、pre-limit truncation 与 identifier-only query 的检索回归。
 - `TASK-059` 已在 `SES-20260424-02` 完成 v1：真实 provider answer benchmark 入口、固定 `10` 条 smoke subset、三种 answer variant 与 artifact metadata 已落地，并用 `qwen3.6-flash-2026-04-16` 跑通 smoke；当前结果只能证明真实生成链路与指标落盘可用，不能证明装配层或 runtime gate 已带来质量收益。
+- `SES-20260426-01` 已登记新的治理主线 `2026-04-26 skill mechanism`：拆为 `TASK-063` ~ `TASK-067` 共 5 个 medium，目标是把 INGEST_STEWARD / DAILY_DIGEST 链路的硬编码治理 / 复盘逻辑迁移成可枚举、可按需加载的 skill 机制；spec 完整说明见 [docs/superpowers/specs/2026-04-26-skill-mechanism-design.md](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/docs/superpowers/specs/2026-04-26-skill-mechanism-design.md)。本主线在当前默认下一任务链路之后排队，不抢占 `TASK-062` 与 `TASK-031`。
 
 ## 最近完成
 
@@ -65,6 +66,10 @@
   - 主题：为 ask answer benchmark 接入离线 LLM-as-judge 语义正确性评分，保留规则判分作为 deterministic smoke，同时新增 judge correctness 作为分析装配层 / 检索 / runtime gate 改进价值的主质量信号。
 - `TASK-062` 收口后，再回到 `TASK-031`
   - 主题：为“本地写回成功但 `/workflows/resume` 失败”补跨会话恢复入口。
+- 新主线 `2026-04-26 skill mechanism`：在当前默认链之后开始执行
+  - 入口顺序固定为 `TASK-063` → `TASK-064` → `TASK-065` → `TASK-066` → `TASK-067`，每个会话只能绑定其中一个 medium。
+  - 主题：把 INGEST_STEWARD / DAILY_DIGEST 的硬编码治理 / 复盘做法迁移成可枚举、可按需加载的 skill 机制；ask 链路 ReAct 循环抽出为共享 `LLMWithToolsRunner` 复用。
+  - 启动会话先读 [docs/superpowers/specs/2026-04-26-skill-mechanism-design.md](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/docs/superpowers/specs/2026-04-26-skill-mechanism-design.md) 中对应 task 的 section（spec §6 与 §9 已写明每个 task 的“启动会话先读”清单）。
 - 若回溯刚完成的 `TASK-059`
   - 主题：已完成 v1；仅剩 full 50-case 显式运行、token / cost 统计与 LLM-as-judge 语义评分等后续项，不应继续塞回 `TASK-059`。
 - 旧 `TASK-060` 已从 active queue 删除
@@ -108,6 +113,7 @@
 - `TASK-054` 已完成，但仍留有两个 `small` 尾项：Patch Safety 的违规项分类标签还不稳定，digest coverage 的关键事实抽取标注规范也还未收敛。
 - 控制面与副作用面仍有断口：本地写回成功但后端记账失败时，当前还没有跨会话恢复入口，对应 `TASK-031`。
 - scoped ingest 仍会整库重建 `chunk_fts`，一旦 approval 高频触发，成本会持续放大，对应 `TASK-032`。
+- 新主线 `2026-04-26 skill mechanism` 的 5 个 medium 已登记但尚未实现；`TASK-063` 完成前不要让任何会话在 ingest / digest 链路里先实现 skill 节点，否则会与 ask 的 ReAct 代码出现两份执行机制。
 
 ## 默认读取顺序
 
@@ -158,6 +164,18 @@
 - [backend/app/indexing/store.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/app/indexing/store.py)
 - [backend/app/retrieval/sqlite_fts.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/app/retrieval/sqlite_fts.py)
   - [docs/archive/task_queue/TASK_QUEUE_20260323_pre_split.md](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/docs/archive/task_queue/TASK_QUEUE_20260323_pre_split.md)
+
+### 若继续 `2026-04-26 skill mechanism` 主线（`TASK-063` ~ `TASK-067`）
+
+- [docs/superpowers/specs/2026-04-26-skill-mechanism-design.md](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/docs/superpowers/specs/2026-04-26-skill-mechanism-design.md)
+- [backend/app/graphs/ask_graph.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/app/graphs/ask_graph.py)
+- [backend/app/services/ask.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/app/services/ask.py)
+- [backend/app/graphs/ingest_graph.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/app/graphs/ingest_graph.py)
+- [backend/app/graphs/digest_graph.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/app/graphs/digest_graph.py)
+- [backend/app/services/ingest_proposal.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/app/services/ingest_proposal.py)
+- [backend/app/services/digest.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/app/services/digest.py)
+- [backend/app/tools/registry.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/app/tools/registry.py)
+- [backend/app/contracts/workflow.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/app/contracts/workflow.py)
 
 ### 若继续 `TASK-062` 或回溯 `TASK-059` / `TASK-058` 尾项
 

@@ -1,0 +1,907 @@
+{
+  "schema_version": "1.3",
+  "generated_at": "2026-04-18T09:16:44.632404+00:00",
+  "backend_version": "0.1.0",
+  "selected_case_ids": [
+    "ask_sample_v640_section_lookup",
+    "ask_sample_v640_retro_improvement_points",
+    "ask_sample_ad_tracking_december_only",
+    "ask_sample_prestore_compatibility_september_only",
+    "ask_sample_ad_ctr_no_hits",
+    "ask_sample_filter_fallback_missing_prefix_v2",
+    "ask_sample_ad_progress_overview_retrieval_only"
+  ],
+  "summary": {
+    "selected_case_count": 7,
+    "passed_case_count": 2,
+    "failed_case_count": 5,
+    "metric_overview": {
+      "answer_relevancy": {
+        "case_count": 7,
+        "average_score": 0.2857,
+        "min_score": 0.0,
+        "max_score": 1.0
+      },
+      "context_precision": {
+        "case_count": 1,
+        "average_score": 0.0,
+        "min_score": 0.0,
+        "max_score": 0.0
+      },
+      "context_recall": {
+        "case_count": 5,
+        "average_score": 0.0,
+        "min_score": 0.0,
+        "max_score": 0.0
+      },
+      "faithfulness": {
+        "case_count": 7,
+        "average_score": 1.0,
+        "min_score": 1.0,
+        "max_score": 1.0
+      },
+      "relevancy": {
+        "case_count": 7,
+        "average_score": 0.2857,
+        "min_score": 0.0,
+        "max_score": 1.0
+      }
+    },
+    "benchmark_overview": {
+      "question_answering": {
+        "display_name": "Question Answering",
+        "scenario_names": [
+          "ask",
+          "tool_and_guardrail"
+        ],
+        "selected_case_count": 7,
+        "passed_case_count": 2,
+        "failed_case_count": 5,
+        "metric_overview": {
+          "answer_relevancy": {
+            "case_count": 7,
+            "average_score": 0.2857,
+            "min_score": 0.0,
+            "max_score": 1.0
+          },
+          "context_precision": {
+            "case_count": 1,
+            "average_score": 0.0,
+            "min_score": 0.0,
+            "max_score": 0.0
+          },
+          "context_recall": {
+            "case_count": 5,
+            "average_score": 0.0,
+            "min_score": 0.0,
+            "max_score": 0.0
+          },
+          "faithfulness": {
+            "case_count": 7,
+            "average_score": 1.0,
+            "min_score": 1.0,
+            "max_score": 1.0
+          },
+          "relevancy": {
+            "case_count": 7,
+            "average_score": 0.2857,
+            "min_score": 0.0,
+            "max_score": 1.0
+          }
+        },
+        "failure_type_breakdown": {
+          "ask:no_hits": 6,
+          "eval_contract_mismatch": 5,
+          "retrieval_fallback:metadata_filters_too_strict": 3,
+          "model_fallback:no_available_chat_provider": 1
+        },
+        "scenario_overview": {
+          "ask": {
+            "display_name": "Ask QA",
+            "selected_case_count": 7,
+            "passed_case_count": 2,
+            "failed_case_count": 5,
+            "metric_overview": {
+              "answer_relevancy": {
+                "case_count": 7,
+                "average_score": 0.2857,
+                "min_score": 0.0,
+                "max_score": 1.0
+              },
+              "context_precision": {
+                "case_count": 1,
+                "average_score": 0.0,
+                "min_score": 0.0,
+                "max_score": 0.0
+              },
+              "context_recall": {
+                "case_count": 5,
+                "average_score": 0.0,
+                "min_score": 0.0,
+                "max_score": 0.0
+              },
+              "faithfulness": {
+                "case_count": 7,
+                "average_score": 1.0,
+                "min_score": 1.0,
+                "max_score": 1.0
+              },
+              "relevancy": {
+                "case_count": 7,
+                "average_score": 0.2857,
+                "min_score": 0.0,
+                "max_score": 1.0
+              }
+            },
+            "failure_type_breakdown": {
+              "ask:no_hits": 6,
+              "eval_contract_mismatch": 5,
+              "retrieval_fallback:metadata_filters_too_strict": 3,
+              "model_fallback:no_available_chat_provider": 1
+            },
+            "core_metrics": {
+              "generated_answer_rate": 0.0,
+              "retrieval_only_rate": 0.1429,
+              "no_hits_rate": 0.8571,
+              "unsupported_claim_rate": 0.0,
+              "ask_result_mode_breakdown": {
+                "no_hits": 6,
+                "retrieval_only": 1
+              },
+              "groundedness_bucket_breakdown": {
+                "not_generated_answer": 7
+              }
+            }
+          }
+        }
+      },
+      "governance": {
+        "display_name": "Governance",
+        "scenario_names": [
+          "governance",
+          "digest",
+          "resume_workflow"
+        ],
+        "selected_case_count": 0,
+        "passed_case_count": 0,
+        "failed_case_count": 0,
+        "metric_overview": {},
+        "failure_type_breakdown": {},
+        "scenario_overview": {}
+      }
+    }
+  },
+  "cases": [
+    {
+      "case_id": "ask_sample_v640_section_lookup",
+      "benchmark": "question_answering",
+      "suite": "ask",
+      "suite_file": "eval/golden/ask_cases.json",
+      "scenario": "ask",
+      "fixture": "sample_vault",
+      "description": "真实 sample_vault 下查询 v6.4.0 迭代任务中“买家采购分析报表”所在部分时，应命中目标任务文档并返回 retrieval_only 证据结果。",
+      "started_at": "2026-04-18T09:16:43.394735+00:00",
+      "duration_ms": 214.22,
+      "outcome": "failed",
+      "expected": {
+        "http_status": 200,
+        "workflow_status": "completed",
+        "message_contains": "retrieval-only fallback",
+        "approval_required": false,
+        "ask_result": {
+          "mode": "retrieval_only",
+          "model_fallback_used": true,
+          "model_fallback_reason": "no_available_chat_provider",
+          "retrieval_fallback_used": false,
+          "min_citation_count": 1,
+          "min_retrieved_candidate_count": 1,
+          "citation_path_suffixes": [
+            "v6.4.0迭代任务.md"
+          ],
+          "answer_contains": [
+            "当前未使用模型生成答案"
+          ]
+        }
+      },
+      "actual": {
+        "http_status": 200,
+        "workflow_status": "completed",
+        "message": "Ask workflow completed without matching evidence.",
+        "approval_required": false,
+        "run_id": "run_5a6abba2db514de4a32938bd2e23c4e4",
+        "thread_id": "thread_ee7965a613604469b2db61a7c245f2d0",
+        "fixture_id": "sample_vault",
+        "fixture_vault_path": "/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/sample_vault",
+        "fixture_db_path": "/var/folders/k1/fyz1kmds28dbvwxxbrrxt4rw0000gn/T/ks_eval_ask_sample_v640_section_lookup_lshytbrj/knowledge_steward.sqlite3",
+        "trace_path_exists": true,
+        "ask_result": {
+          "mode": "no_hits",
+          "answer": "未找到可支撑回答的笔记片段，当前无法返回带引用的答案。",
+          "citation_count": 0,
+          "retrieved_candidate_count": 0,
+          "retrieval_fallback_used": false,
+          "retrieval_fallback_reason": null,
+          "model_fallback_used": false,
+          "model_fallback_reason": null,
+          "provider_name": null,
+          "model_name": null,
+          "tool_call_attempted": false,
+          "tool_call_used": null,
+          "guardrail_action": null,
+          "citation_paths": [],
+          "citation_retrieval_sources": [],
+          "retrieved_candidate_paths": [],
+          "retrieved_candidate_retrieval_sources": []
+        },
+        "ask_groundedness": {
+          "bucket": "not_generated_answer",
+          "consistent": null,
+          "reason": "ask_result_not_generated_answer",
+          "citation_numbers": [],
+          "cited_candidate_count": 0,
+          "unsupported_terms": [],
+          "answer_text": "未找到可支撑回答的笔记片段，当前无法返回带引用的答案。"
+        },
+        "ingest_result": null,
+        "analysis_result": null,
+        "digest_result": null,
+        "proposal": null,
+        "quality_metrics": {
+          "faithfulness": {
+            "score": 1.0,
+            "reason": "ask_groundedness:not_generated_answer"
+          },
+          "answer_relevancy": {
+            "score": 0.0,
+            "matched_output_hint_count": 0,
+            "expected_output_hint_count": 2
+          },
+          "relevancy": {
+            "score": 0.0,
+            "matched_output_hint_count": 0,
+            "expected_output_hint_count": 2
+          },
+          "context_precision": {
+            "score": null,
+            "matched_context_count": 0,
+            "actual_context_count": 0
+          },
+          "context_recall": {
+            "score": 0.0,
+            "matched_context_count": 0,
+            "reference_context_count": 1
+          }
+        }
+      },
+      "error": "Traceback (most recent call last):\n  File \"/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/eval/run_eval.py\", line 565, in run_case\n    assert_case_matches(case_payload[\"expected\"], actual_snapshot)\n  File \"/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/eval/run_eval.py\", line 1553, in assert_case_matches\n    assert_contains_all(\n  File \"/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/eval/run_eval.py\", line 2101, in assert_contains_all\n    raise EvalAssertionError(\nEvalAssertionError: message_contains mismatch: missing substrings=['retrieval-only fallback'], actual='Ask workflow completed without matching evidence.'\n"
+    },
+    {
+      "case_id": "ask_sample_v640_retro_improvement_points",
+      "benchmark": "question_answering",
+      "suite": "ask",
+      "suite_file": "eval/golden/ask_cases.json",
+      "scenario": "ask",
+      "fixture": "sample_vault",
+      "description": "真实 sample_vault 下查询 v6.4.0 复盘总结中的“其他可提升的”时，应命中复盘文档并返回 retrieval_only 证据结果。",
+      "started_at": "2026-04-18T09:16:43.609509+00:00",
+      "duration_ms": 182.67,
+      "outcome": "failed",
+      "expected": {
+        "http_status": 200,
+        "workflow_status": "completed",
+        "message_contains": "retrieval-only fallback",
+        "approval_required": false,
+        "ask_result": {
+          "mode": "retrieval_only",
+          "model_fallback_used": true,
+          "model_fallback_reason": "no_available_chat_provider",
+          "retrieval_fallback_used": false,
+          "min_citation_count": 1,
+          "min_retrieved_candidate_count": 1,
+          "citation_path_suffixes": [
+            "v6.4.0复盘总结.md"
+          ],
+          "answer_contains": [
+            "当前未使用模型生成答案"
+          ]
+        }
+      },
+      "actual": {
+        "http_status": 200,
+        "workflow_status": "completed",
+        "message": "Ask workflow completed without matching evidence.",
+        "approval_required": false,
+        "run_id": "run_cfcb04d4f20241198bdfc4cb420b394f",
+        "thread_id": "thread_53ede5ee2c604853add8a308a73b04b8",
+        "fixture_id": "sample_vault",
+        "fixture_vault_path": "/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/sample_vault",
+        "fixture_db_path": "/var/folders/k1/fyz1kmds28dbvwxxbrrxt4rw0000gn/T/ks_eval_ask_sample_v640_retro_improvement_points_x7g0s34c/knowledge_steward.sqlite3",
+        "trace_path_exists": true,
+        "ask_result": {
+          "mode": "no_hits",
+          "answer": "未找到可支撑回答的笔记片段，当前无法返回带引用的答案。",
+          "citation_count": 0,
+          "retrieved_candidate_count": 0,
+          "retrieval_fallback_used": false,
+          "retrieval_fallback_reason": null,
+          "model_fallback_used": false,
+          "model_fallback_reason": null,
+          "provider_name": null,
+          "model_name": null,
+          "tool_call_attempted": false,
+          "tool_call_used": null,
+          "guardrail_action": null,
+          "citation_paths": [],
+          "citation_retrieval_sources": [],
+          "retrieved_candidate_paths": [],
+          "retrieved_candidate_retrieval_sources": []
+        },
+        "ask_groundedness": {
+          "bucket": "not_generated_answer",
+          "consistent": null,
+          "reason": "ask_result_not_generated_answer",
+          "citation_numbers": [],
+          "cited_candidate_count": 0,
+          "unsupported_terms": [],
+          "answer_text": "未找到可支撑回答的笔记片段，当前无法返回带引用的答案。"
+        },
+        "ingest_result": null,
+        "analysis_result": null,
+        "digest_result": null,
+        "proposal": null,
+        "quality_metrics": {
+          "faithfulness": {
+            "score": 1.0,
+            "reason": "ask_groundedness:not_generated_answer"
+          },
+          "answer_relevancy": {
+            "score": 0.0,
+            "matched_output_hint_count": 0,
+            "expected_output_hint_count": 2
+          },
+          "relevancy": {
+            "score": 0.0,
+            "matched_output_hint_count": 0,
+            "expected_output_hint_count": 2
+          },
+          "context_precision": {
+            "score": null,
+            "matched_context_count": 0,
+            "actual_context_count": 0
+          },
+          "context_recall": {
+            "score": 0.0,
+            "matched_context_count": 0,
+            "reference_context_count": 1
+          }
+        }
+      },
+      "error": "Traceback (most recent call last):\n  File \"/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/eval/run_eval.py\", line 565, in run_case\n    assert_case_matches(case_payload[\"expected\"], actual_snapshot)\n  File \"/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/eval/run_eval.py\", line 1553, in assert_case_matches\n    assert_contains_all(\n  File \"/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/eval/run_eval.py\", line 2101, in assert_contains_all\n    raise EvalAssertionError(\nEvalAssertionError: message_contains mismatch: missing substrings=['retrieval-only fallback'], actual='Ask workflow completed without matching evidence.'\n"
+    },
+    {
+      "case_id": "ask_sample_ad_tracking_december_only",
+      "benchmark": "question_answering",
+      "suite": "ask",
+      "suite_file": "eval/golden/ask_cases.json",
+      "scenario": "ask",
+      "fixture": "sample_vault",
+      "description": "仅在 2023-12 路径前缀下查询“买家采购分析埋点”时，应命中 2023-12-20 日报并返回 retrieval_only 证据结果。",
+      "started_at": "2026-04-18T09:16:43.792288+00:00",
+      "duration_ms": 172.95,
+      "outcome": "failed",
+      "expected": {
+        "http_status": 200,
+        "workflow_status": "completed",
+        "message_contains": "retrieval-only fallback",
+        "approval_required": false,
+        "ask_result": {
+          "mode": "retrieval_only",
+          "model_fallback_used": true,
+          "model_fallback_reason": "no_available_chat_provider",
+          "retrieval_fallback_used": false,
+          "min_citation_count": 1,
+          "min_retrieved_candidate_count": 1,
+          "citation_path_suffixes": [
+            "2023-12-20_星期三.md"
+          ],
+          "answer_contains": [
+            "当前未使用模型生成答案"
+          ]
+        }
+      },
+      "actual": {
+        "http_status": 200,
+        "workflow_status": "completed",
+        "message": "Ask workflow completed without matching evidence.",
+        "approval_required": false,
+        "run_id": "run_e8e79579ddac4606a02556b9bca673c5",
+        "thread_id": "thread_b5f2cf47fff741a69daab43f74214c0f",
+        "fixture_id": "sample_vault",
+        "fixture_vault_path": "/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/sample_vault",
+        "fixture_db_path": "/var/folders/k1/fyz1kmds28dbvwxxbrrxt4rw0000gn/T/ks_eval_ask_sample_ad_tracking_december_only_qtm_13yl/knowledge_steward.sqlite3",
+        "trace_path_exists": true,
+        "ask_result": {
+          "mode": "no_hits",
+          "answer": "未找到可支撑回答的笔记片段，当前无法返回带引用的答案。",
+          "citation_count": 0,
+          "retrieved_candidate_count": 0,
+          "retrieval_fallback_used": true,
+          "retrieval_fallback_reason": "metadata_filters_too_strict",
+          "model_fallback_used": false,
+          "model_fallback_reason": null,
+          "provider_name": null,
+          "model_name": null,
+          "tool_call_attempted": false,
+          "tool_call_used": null,
+          "guardrail_action": null,
+          "citation_paths": [],
+          "citation_retrieval_sources": [],
+          "retrieved_candidate_paths": [],
+          "retrieved_candidate_retrieval_sources": []
+        },
+        "ask_groundedness": {
+          "bucket": "not_generated_answer",
+          "consistent": null,
+          "reason": "ask_result_not_generated_answer",
+          "citation_numbers": [],
+          "cited_candidate_count": 0,
+          "unsupported_terms": [],
+          "answer_text": "未找到可支撑回答的笔记片段，当前无法返回带引用的答案。"
+        },
+        "ingest_result": null,
+        "analysis_result": null,
+        "digest_result": null,
+        "proposal": null,
+        "quality_metrics": {
+          "faithfulness": {
+            "score": 1.0,
+            "reason": "ask_groundedness:not_generated_answer"
+          },
+          "answer_relevancy": {
+            "score": 0.0,
+            "matched_output_hint_count": 0,
+            "expected_output_hint_count": 2
+          },
+          "relevancy": {
+            "score": 0.0,
+            "matched_output_hint_count": 0,
+            "expected_output_hint_count": 2
+          },
+          "context_precision": {
+            "score": null,
+            "matched_context_count": 0,
+            "actual_context_count": 0
+          },
+          "context_recall": {
+            "score": 0.0,
+            "matched_context_count": 0,
+            "reference_context_count": 1
+          }
+        }
+      },
+      "error": "Traceback (most recent call last):\n  File \"/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/eval/run_eval.py\", line 565, in run_case\n    assert_case_matches(case_payload[\"expected\"], actual_snapshot)\n  File \"/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/eval/run_eval.py\", line 1553, in assert_case_matches\n    assert_contains_all(\n  File \"/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/eval/run_eval.py\", line 2101, in assert_contains_all\n    raise EvalAssertionError(\nEvalAssertionError: message_contains mismatch: missing substrings=['retrieval-only fallback'], actual='Ask workflow completed without matching evidence.'\n"
+    },
+    {
+      "case_id": "ask_sample_prestore_compatibility_september_only",
+      "benchmark": "question_answering",
+      "suite": "ask",
+      "suite_file": "eval/golden/ask_cases.json",
+      "scenario": "ask",
+      "fixture": "sample_vault",
+      "description": "仅在 2023-09 路径前缀下查询同时讨论“预存”和“新老版本兼容”的笔记时，应命中 2023-09-07 日报并返回 retrieval_only 证据结果。",
+      "started_at": "2026-04-18T09:16:43.965338+00:00",
+      "duration_ms": 171.63,
+      "outcome": "failed",
+      "expected": {
+        "http_status": 200,
+        "workflow_status": "completed",
+        "message_contains": "retrieval-only fallback",
+        "approval_required": false,
+        "ask_result": {
+          "mode": "retrieval_only",
+          "model_fallback_used": true,
+          "model_fallback_reason": "no_available_chat_provider",
+          "retrieval_fallback_used": false,
+          "min_citation_count": 1,
+          "min_retrieved_candidate_count": 1,
+          "citation_path_suffixes": [
+            "2023-09-07_星期四.md"
+          ],
+          "answer_contains": [
+            "当前未使用模型生成答案"
+          ]
+        }
+      },
+      "actual": {
+        "http_status": 200,
+        "workflow_status": "completed",
+        "message": "Ask workflow completed without matching evidence.",
+        "approval_required": false,
+        "run_id": "run_d9b5491ce67747218f6daa9c0815752f",
+        "thread_id": "thread_7e9d985518a84efeb7381db929f73634",
+        "fixture_id": "sample_vault",
+        "fixture_vault_path": "/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/sample_vault",
+        "fixture_db_path": "/var/folders/k1/fyz1kmds28dbvwxxbrrxt4rw0000gn/T/ks_eval_ask_sample_prestore_compatibility_september_only_xrndcxr0/knowledge_steward.sqlite3",
+        "trace_path_exists": true,
+        "ask_result": {
+          "mode": "no_hits",
+          "answer": "未找到可支撑回答的笔记片段，当前无法返回带引用的答案。",
+          "citation_count": 0,
+          "retrieved_candidate_count": 0,
+          "retrieval_fallback_used": true,
+          "retrieval_fallback_reason": "metadata_filters_too_strict",
+          "model_fallback_used": false,
+          "model_fallback_reason": null,
+          "provider_name": null,
+          "model_name": null,
+          "tool_call_attempted": false,
+          "tool_call_used": null,
+          "guardrail_action": null,
+          "citation_paths": [],
+          "citation_retrieval_sources": [],
+          "retrieved_candidate_paths": [],
+          "retrieved_candidate_retrieval_sources": []
+        },
+        "ask_groundedness": {
+          "bucket": "not_generated_answer",
+          "consistent": null,
+          "reason": "ask_result_not_generated_answer",
+          "citation_numbers": [],
+          "cited_candidate_count": 0,
+          "unsupported_terms": [],
+          "answer_text": "未找到可支撑回答的笔记片段，当前无法返回带引用的答案。"
+        },
+        "ingest_result": null,
+        "analysis_result": null,
+        "digest_result": null,
+        "proposal": null,
+        "quality_metrics": {
+          "faithfulness": {
+            "score": 1.0,
+            "reason": "ask_groundedness:not_generated_answer"
+          },
+          "answer_relevancy": {
+            "score": 0.0,
+            "matched_output_hint_count": 0,
+            "expected_output_hint_count": 2
+          },
+          "relevancy": {
+            "score": 0.0,
+            "matched_output_hint_count": 0,
+            "expected_output_hint_count": 2
+          },
+          "context_precision": {
+            "score": null,
+            "matched_context_count": 0,
+            "actual_context_count": 0
+          },
+          "context_recall": {
+            "score": 0.0,
+            "matched_context_count": 0,
+            "reference_context_count": 1
+          }
+        }
+      },
+      "error": "Traceback (most recent call last):\n  File \"/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/eval/run_eval.py\", line 565, in run_case\n    assert_case_matches(case_payload[\"expected\"], actual_snapshot)\n  File \"/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/eval/run_eval.py\", line 1553, in assert_case_matches\n    assert_contains_all(\n  File \"/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/eval/run_eval.py\", line 2101, in assert_contains_all\n    raise EvalAssertionError(\nEvalAssertionError: message_contains mismatch: missing substrings=['retrieval-only fallback'], actual='Ask workflow completed without matching evidence.'\n"
+    },
+    {
+      "case_id": "ask_sample_ad_ctr_no_hits",
+      "benchmark": "question_answering",
+      "suite": "ask",
+      "suite_file": "eval/golden/ask_cases.json",
+      "scenario": "ask",
+      "fixture": "sample_vault",
+      "description": "真实 sample_vault 下查询不存在的广告点击率提升数据时，应返回 no_hits，而不是编造量化结果。",
+      "started_at": "2026-04-18T09:16:44.137067+00:00",
+      "duration_ms": 163.62,
+      "outcome": "passed",
+      "expected": {
+        "http_status": 200,
+        "workflow_status": "completed",
+        "approval_required": false,
+        "ask_result": {
+          "mode": "no_hits",
+          "model_fallback_used": false,
+          "min_citation_count": 0,
+          "answer_contains": [
+            "未找到可支撑回答的笔记片段"
+          ]
+        }
+      },
+      "actual": {
+        "http_status": 200,
+        "workflow_status": "completed",
+        "message": "Ask workflow completed without matching evidence.",
+        "approval_required": false,
+        "run_id": "run_36f0ba3340174e4ca3d7b41d182d6bf9",
+        "thread_id": "thread_9f37321d66424def84b24aa48a0f447b",
+        "fixture_id": "sample_vault",
+        "fixture_vault_path": "/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/sample_vault",
+        "fixture_db_path": "/var/folders/k1/fyz1kmds28dbvwxxbrrxt4rw0000gn/T/ks_eval_ask_sample_ad_ctr_no_hits_6jfxmgh2/knowledge_steward.sqlite3",
+        "trace_path_exists": true,
+        "ask_result": {
+          "mode": "no_hits",
+          "answer": "未找到可支撑回答的笔记片段，当前无法返回带引用的答案。",
+          "citation_count": 0,
+          "retrieved_candidate_count": 0,
+          "retrieval_fallback_used": false,
+          "retrieval_fallback_reason": null,
+          "model_fallback_used": false,
+          "model_fallback_reason": null,
+          "provider_name": null,
+          "model_name": null,
+          "tool_call_attempted": false,
+          "tool_call_used": null,
+          "guardrail_action": null,
+          "citation_paths": [],
+          "citation_retrieval_sources": [],
+          "retrieved_candidate_paths": [],
+          "retrieved_candidate_retrieval_sources": []
+        },
+        "ask_groundedness": {
+          "bucket": "not_generated_answer",
+          "consistent": null,
+          "reason": "ask_result_not_generated_answer",
+          "citation_numbers": [],
+          "cited_candidate_count": 0,
+          "unsupported_terms": [],
+          "answer_text": "未找到可支撑回答的笔记片段，当前无法返回带引用的答案。"
+        },
+        "ingest_result": null,
+        "analysis_result": null,
+        "digest_result": null,
+        "proposal": null,
+        "quality_metrics": {
+          "faithfulness": {
+            "score": 1.0,
+            "reason": "ask_groundedness:not_generated_answer"
+          },
+          "answer_relevancy": {
+            "score": 1.0,
+            "matched_output_hint_count": 1,
+            "expected_output_hint_count": 1
+          },
+          "relevancy": {
+            "score": 1.0,
+            "matched_output_hint_count": 1,
+            "expected_output_hint_count": 1
+          },
+          "context_precision": {
+            "score": null,
+            "matched_context_count": 0,
+            "actual_context_count": 0
+          },
+          "context_recall": {
+            "score": null,
+            "matched_context_count": 0,
+            "reference_context_count": 0
+          }
+        }
+      },
+      "error": null
+    },
+    {
+      "case_id": "ask_sample_filter_fallback_missing_prefix_v2",
+      "benchmark": "question_answering",
+      "suite": "ask",
+      "suite_file": "eval/golden/ask_cases.json",
+      "scenario": "ask",
+      "fixture": "sample_vault",
+      "description": "当路径过滤条件过严时，ask 应稳定触发 metadata filter fallback，而不是直接无结果失败。",
+      "started_at": "2026-04-18T09:16:44.300695+00:00",
+      "duration_ms": 166.99,
+      "outcome": "passed",
+      "expected": {
+        "http_status": 200,
+        "workflow_status": "completed",
+        "message_contains": "retrieval-only fallback",
+        "approval_required": false,
+        "ask_result": {
+          "mode": "retrieval_only",
+          "model_fallback_used": true,
+          "model_fallback_reason": "no_available_chat_provider",
+          "retrieval_fallback_used": true,
+          "retrieval_fallback_reason": "metadata_filters_too_strict",
+          "min_citation_count": 1,
+          "min_retrieved_candidate_count": 1,
+          "answer_contains": [
+            "当前未使用模型生成答案",
+            "检索已退回纯 FTS 结果"
+          ]
+        }
+      },
+      "actual": {
+        "http_status": 200,
+        "workflow_status": "completed",
+        "message": "Ask workflow completed with retrieval-only fallback.",
+        "approval_required": false,
+        "run_id": "run_8ba8f733689e4a5f8caf90dee826a27e",
+        "thread_id": "thread_4562911cd39f4cf7bce5a812b95b16e3",
+        "fixture_id": "sample_vault",
+        "fixture_vault_path": "/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/sample_vault",
+        "fixture_db_path": "/var/folders/k1/fyz1kmds28dbvwxxbrrxt4rw0000gn/T/ks_eval_ask_sample_filter_fallback_missing_prefix_v2_vsj7aodl/knowledge_steward.sqlite3",
+        "trace_path_exists": true,
+        "ask_result": {
+          "mode": "retrieval_only",
+          "answer": "当前未使用模型生成答案，先返回与问题“买家采购分析”最相关的检索证据。\n注意：结构化过滤条件过严，检索已退回纯 FTS 结果。\n[1] 2023-08-08_星期二.md / Day Planner (lines 9-25): # Day Planner\n\n- [x] 赊欠管理pr ✅ 2023-08-08\n\n- [x] [买家采购分析] ✅ 2023-08-08...\n[2] v6.4.0复盘总结.md / 一、周报及任务汇总 (lines 1-57): ...1. 档主相关校验代码优化\n        \n    2. 赊欠列表与分享\n        \n    3. [买家采购分析]\n        \n    4. 货品批量修改\n        \n    5. 盘点、报损、调出相关增加备注...\n[3] 2023-07-31_星期一.md / 四、今日总结 (lines 19-94): ...mac，不通过则校验验证码\n\t* 讨论问题\n\t\t* 提出问题，想好按自己的想法下的解决方案\n\t* [买家采购分析]\n\t\t* customer表中字段最后采购时间\n\n1. 感觉每日记录结构需要调整一下，需要更明确一点\n2. 思考问题分维度...",
+          "citation_count": 3,
+          "retrieved_candidate_count": 3,
+          "retrieval_fallback_used": true,
+          "retrieval_fallback_reason": "metadata_filters_too_strict",
+          "model_fallback_used": true,
+          "model_fallback_reason": "no_available_chat_provider",
+          "provider_name": null,
+          "model_name": null,
+          "tool_call_attempted": false,
+          "tool_call_used": null,
+          "guardrail_action": null,
+          "citation_paths": [
+            "日常/2023-08/2023-08-08_星期二.md",
+            "日常/2023-08/v6.4.0复盘总结.md",
+            "日常/2023-07/2023-07-31_星期一.md"
+          ],
+          "citation_retrieval_sources": [
+            "sqlite_fts",
+            "sqlite_fts",
+            "sqlite_fts"
+          ],
+          "retrieved_candidate_paths": [
+            "日常/2023-08/2023-08-08_星期二.md",
+            "日常/2023-08/v6.4.0复盘总结.md",
+            "日常/2023-07/2023-07-31_星期一.md"
+          ],
+          "retrieved_candidate_retrieval_sources": [
+            "sqlite_fts",
+            "sqlite_fts",
+            "sqlite_fts"
+          ]
+        },
+        "ask_groundedness": {
+          "bucket": "not_generated_answer",
+          "consistent": null,
+          "reason": "ask_result_not_generated_answer",
+          "citation_numbers": [],
+          "cited_candidate_count": 0,
+          "unsupported_terms": [],
+          "answer_text": "当前未使用模型生成答案，先返回与问题“买家采购分析”最相关的检索证据。\n注意：结构化过滤条件过严，检索已退回纯 FTS 结果。\n 2023-08-08_星期二.md / Day Planner (lines 9-25): # Day Planner\n\n- [x] 赊欠管理pr ✅ 2023-08-08\n\n- [x] [买家采购分析] ✅ 2023-08-08...\n v6.4.0复盘总结.md / 一、周报及任务汇总 (lines 1-57): ...1. 档主相关校验代码优化\n        \n    2. 赊欠列表与分享\n        \n    3. [买家采购分析]\n        \n    4. 货品批量修改\n        \n    5. 盘点、报损、调出相关增加备注...\n 2023-07-31_星期一.md / 四、今日总结 (lines 19-94): ...mac，不通过则校验验证码\n\t* 讨论问题\n\t\t* 提出问题，想好按自己的想法下的解决方案\n\t* [买家采购分析]\n\t\t* customer表中字段最后采购时间\n\n1. 感觉每日记录结构需要调整一下，需要更明确一点\n2. 思考问题分维度..."
+        },
+        "ingest_result": null,
+        "analysis_result": null,
+        "digest_result": null,
+        "proposal": null,
+        "quality_metrics": {
+          "faithfulness": {
+            "score": 1.0,
+            "reason": "ask_groundedness:not_generated_answer"
+          },
+          "answer_relevancy": {
+            "score": 1.0,
+            "matched_output_hint_count": 3,
+            "expected_output_hint_count": 3
+          },
+          "relevancy": {
+            "score": 1.0,
+            "matched_output_hint_count": 3,
+            "expected_output_hint_count": 3
+          },
+          "context_precision": {
+            "score": 0.0,
+            "matched_context_count": 0,
+            "actual_context_count": 3
+          },
+          "context_recall": {
+            "score": null,
+            "matched_context_count": 0,
+            "reference_context_count": 0
+          }
+        }
+      },
+      "error": null
+    },
+    {
+      "case_id": "ask_sample_ad_progress_overview_retrieval_only",
+      "benchmark": "question_answering",
+      "suite": "ask",
+      "suite_file": "eval/golden/ask_cases.json",
+      "scenario": "ask",
+      "fixture": "sample_vault",
+      "description": "真实 sample_vault 下查询广告从方案调整到上线的推进过程时，应至少命中 2024-01-22 与 2024-01-23 两篇证据并返回 retrieval_only 结果。",
+      "started_at": "2026-04-18T09:16:44.467687+00:00",
+      "duration_ms": 164.63,
+      "outcome": "failed",
+      "expected": {
+        "http_status": 200,
+        "workflow_status": "completed",
+        "message_contains": "retrieval-only fallback",
+        "approval_required": false,
+        "ask_result": {
+          "mode": "retrieval_only",
+          "model_fallback_used": true,
+          "model_fallback_reason": "no_available_chat_provider",
+          "min_citation_count": 2,
+          "min_retrieved_candidate_count": 2,
+          "citation_path_suffixes": [
+            "2024-01-22_星期一.md",
+            "2024-01-23_星期二.md"
+          ],
+          "answer_contains": [
+            "当前未使用模型生成答案",
+            "[1]",
+            "[2]"
+          ]
+        }
+      },
+      "actual": {
+        "http_status": 200,
+        "workflow_status": "completed",
+        "message": "Ask workflow completed without matching evidence.",
+        "approval_required": false,
+        "run_id": "run_35d79069f8be494790e8d11d6cccf4b5",
+        "thread_id": "thread_7d9028e4b80547ca9cd9ea9deb7125b4",
+        "fixture_id": "sample_vault",
+        "fixture_vault_path": "/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/sample_vault",
+        "fixture_db_path": "/var/folders/k1/fyz1kmds28dbvwxxbrrxt4rw0000gn/T/ks_eval_ask_sample_ad_progress_overview_retrieval_only_bwk_d_ek/knowledge_steward.sqlite3",
+        "trace_path_exists": true,
+        "ask_result": {
+          "mode": "no_hits",
+          "answer": "未找到可支撑回答的笔记片段，当前无法返回带引用的答案。",
+          "citation_count": 0,
+          "retrieved_candidate_count": 0,
+          "retrieval_fallback_used": false,
+          "retrieval_fallback_reason": null,
+          "model_fallback_used": false,
+          "model_fallback_reason": null,
+          "provider_name": null,
+          "model_name": null,
+          "tool_call_attempted": false,
+          "tool_call_used": null,
+          "guardrail_action": null,
+          "citation_paths": [],
+          "citation_retrieval_sources": [],
+          "retrieved_candidate_paths": [],
+          "retrieved_candidate_retrieval_sources": []
+        },
+        "ask_groundedness": {
+          "bucket": "not_generated_answer",
+          "consistent": null,
+          "reason": "ask_result_not_generated_answer",
+          "citation_numbers": [],
+          "cited_candidate_count": 0,
+          "unsupported_terms": [],
+          "answer_text": "未找到可支撑回答的笔记片段，当前无法返回带引用的答案。"
+        },
+        "ingest_result": null,
+        "analysis_result": null,
+        "digest_result": null,
+        "proposal": null,
+        "quality_metrics": {
+          "faithfulness": {
+            "score": 1.0,
+            "reason": "ask_groundedness:not_generated_answer"
+          },
+          "answer_relevancy": {
+            "score": 0.0,
+            "matched_output_hint_count": 0,
+            "expected_output_hint_count": 4
+          },
+          "relevancy": {
+            "score": 0.0,
+            "matched_output_hint_count": 0,
+            "expected_output_hint_count": 4
+          },
+          "context_precision": {
+            "score": null,
+            "matched_context_count": 0,
+            "actual_context_count": 0
+          },
+          "context_recall": {
+            "score": 0.0,
+            "matched_context_count": 0,
+            "reference_context_count": 2
+          }
+        }
+      },
+      "error": "Traceback (most recent call last):\n  File \"/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/eval/run_eval.py\", line 565, in run_case\n    assert_case_matches(case_payload[\"expected\"], actual_snapshot)\n  File \"/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/eval/run_eval.py\", line 1553, in assert_case_matches\n    assert_contains_all(\n  File \"/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/eval/run_eval.py\", line 2101, in assert_contains_all\n    raise EvalAssertionError(\nEvalAssertionError: message_contains mismatch: missing substrings=['retrieval-only fallback'], actual='Ask workflow completed without matching evidence.'\n"
+    }
+  ]
+}

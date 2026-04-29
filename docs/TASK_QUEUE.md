@@ -336,3 +336,192 @@
   - `small: 为 \`python -m app.indexing.ingest\` 增加 scoped 参数，便于脱离 API 复现增量 ingest`
   - `small: 为 scoped ingest 记录最小 FTS 刷新耗时，便于后续判断是否还需更细粒度优化`
 - `notes`: `TASK-026` 虽然让 scoped ingest 真正可用了，但当前 `backend/app/indexing/ingest.py` 仍在任何 scoped note 更新后整库执行 `rebuild_chunk_fts_index(connection)`。在 scoped ingest 即将被写回链路复用的前提下，这已经不是单纯的“成本评估”问题，而是决定 scoped ingest 是否值得持续作为主路径使用的结构性问题。2026-03-17 在 `TASK-034` 中重新审视《初步实现指南》后，本任务被后移：当前 interview-first P0 先补向量检索、hybrid retrieval 和 eval baseline，更细的 FTS 增量同步留到之后处理。
+
+### TASK-063
+
+- `task_id`: `TASK-063`
+- `session_id`:
+- `title`: 抽取 `LLMWithToolsRunner` 通用 ReAct 层并切换 ask 链路使用 runner
+- `category`: `Backend`
+- `priority`: `P1`
+- `status`: `planned`
+- `scope`: `medium`
+- `goal`: 把 [backend/app/graphs/ask_graph.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/app/graphs/ask_graph.py) 与 [backend/app/services/ask.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/app/services/ask.py) 中既有的 ReAct 循环代码等价迁移为独立的 `LLMWithToolsRunner` 通用层，作为后续 skill 机制（`TASK-064` ~ `TASK-067`）的执行底座。本任务不改 ask 对外行为，不改 prompt，不改 contract；只把执行机制抽出来，让 skill_apply 和 ask 可以共享一份 ReAct 实现。
+- `out_of_scope`:
+  - 不引入 skill 概念或 skill 数据结构
+  - 不修改 ask 对外 schema 或 prompt
+  - 不引入 streaming
+  - 不顺手重构既有 guardrail / faithfulness 链路
+- `acceptance_criteria`:
+  - 新增 `backend/app/runtime/llm_with_tools_runner.py`（或等价位置），承载 `LLMWithToolsRunner`
+  - ask 链路切回到使用 runner 的实现，`tests.test_ask_workflow` 全套不回归
+  - runner 提供独立单元测试，覆盖至少 4 个分支：normal exit、no tool call、tool error fallback、max rounds reached
+  - runner 暴露的 trace hook 必须支持 caller 注入额外元数据（为下游 skill_apply 的 `skill_name / skill_version / decisions` 字段预留入口）
+- `depends_on`:
+  - `TASK-049`
+  - `TASK-046`
+- `related_files`:
+  - `backend/app/graphs/ask_graph.py`
+  - `backend/app/services/ask.py`
+  - `backend/app/runtime/llm_with_tools_runner.py`
+  - `backend/tests/test_ask_workflow.py`
+  - `docs/superpowers/specs/2026-04-26-skill-mechanism-design.md`
+- `derived_tasks`:
+- `notes`: 这是 `2026-04-26 skill mechanism design` 的第 1 步，不抽 runner 后续 4 个任务都得自己复制一份 ReAct 代码，迁移阻力会扩散。spec 完整说明见 [docs/superpowers/specs/2026-04-26-skill-mechanism-design.md](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/docs/superpowers/specs/2026-04-26-skill-mechanism-design.md) §5.3 与 §6.TASK-063；新会话先按 `project-session-governor` 流程读 governance 文档，再读 spec 中本 task 的 section。
+
+### TASK-064
+
+- `task_id`: `TASK-064`
+- `session_id`:
+- `title`: 引入 skill 数据结构、内置 demo skill 与 ingest `skill_apply` 节点骨架
+- `category`: `Backend`
+- `priority`: `P1`
+- `status`: `planned`
+- `scope`: `medium`
+- `goal`: 在 `TASK-063` 抽出的 runner 之上，建立 skill 机制最小骨架：定义 `SkillSpec` 数据结构与 builtin skill loader / registry，新增 1 条无工具的 demo skill `frontmatter_completeness`，并在 [backend/app/graphs/ingest_graph.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/app/graphs/ingest_graph.py) 增加 `skill_apply` 节点把 demo skill 跑通，同时让 runner trace 输出 `skill_name / skill_version / selected_skills / per_skill_status`。本任务只做最小闭环，不放开工具调用，不迁移既有 governance 规则。
+- `out_of_scope`:
+  - 不引入 governance summary / dedup / LLM 二次筛
+  - 不迁移既有 INGEST_STEWARD 硬编码 finding（在 `TASK-067` 完成）
+  - 不放开 skill 的 tool 调用（`SkillSpec.allowed_tools` 在本任务内强制为空，runner 拒绝任何 tool 调用并落 trace）
+  - 不实现 skill selector LLM；调用方显式传入 skill name 列表
+  - 不实现用户自定义 skill 加载入口
+- `acceptance_criteria`:
+  - 新增 `backend/app/skills/` 模块，至少包含 `skill_spec.py` / `loader.py` / `registry.py`
+  - `backend/app/skills/builtin/frontmatter_completeness/skill.md` 含完整 frontmatter（按 spec §5.1 字段）与 instruction body
+  - 在 ingest 链路新增 `skill_apply` 节点，调用 runner 执行 demo skill，并写入 `frontmatter_missing` 类型 `GovernanceFinding`
+  - runner 的 trace 必须包含 `skill_name / skill_version / selected_skills / per_skill_status`
+  - 单元测试覆盖：skill loader、registry lookup、skill_apply 节点的成功 / 失败 / fail-soft 分支
+  - ingest 链路既有测试不回归
+- `depends_on`:
+  - `TASK-063`
+- `related_files`:
+  - `backend/app/skills/skill_spec.py`
+  - `backend/app/skills/loader.py`
+  - `backend/app/skills/registry.py`
+  - `backend/app/skills/builtin/frontmatter_completeness/skill.md`
+  - `backend/app/graphs/ingest_graph.py`
+  - `backend/app/contracts/workflow.py`
+  - `backend/app/services/ingest_proposal.py`
+  - `backend/tests/test_ingest_workflow.py`
+  - `docs/superpowers/specs/2026-04-26-skill-mechanism-design.md`
+- `derived_tasks`:
+- `notes`: 这是 `2026-04-26 skill mechanism design` 的第 2 步。trace 字段（来自原拟 `TASK-068` 的 trace 部分）已并入本任务，避免单独留 small。spec 完整说明见 [docs/superpowers/specs/2026-04-26-skill-mechanism-design.md](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/docs/superpowers/specs/2026-04-26-skill-mechanism-design.md) §5.1 / §5.3 与 §6.TASK-064。
+
+### TASK-065
+
+- `task_id`: `TASK-065`
+- `session_id`:
+- `title`: 落地 v1 全量：3 条无工具 governance / review skill + governance_summary / digest_summary 节点
+- `category`: `Backend`
+- `priority`: `P1`
+- `status`: `planned`
+- `scope`: `medium`
+- `goal`: 在 `TASK-064` 的骨架之上完成 v1 完整闭环：新增 3 条无工具内置 skill（`structural_governance` / `content_leftover_tasks` / `weekly_review_summary`），在 ingest 链路加 `governance_summary` 节点、digest 链路加 `digest_summary` 节点，按 spec §5.4 实现「dedup → LLM 二次筛 → raw_findings + governance_report_markdown 双产出」，并保证 LLM summary 失败时 fail-soft 不阻塞 proposal 流程。
+- `out_of_scope`:
+  - 不放开 skill 的 tool 调用（`TASK-066` 完成）
+  - 不迁移既有 INGEST_STEWARD 硬编码 finding（`TASK-067` 完成）
+  - 不重构 digest 整体形态；本任务只插入 summary 节点
+  - 不在插件层做 UI 集成
+  - 不引入外部 LLM judge / scorer
+- `acceptance_criteria`:
+  - 新增 `backend/app/skills/builtin/structural_governance/skill.md`、`content_leftover_tasks/skill.md`、`weekly_review_summary/skill.md`，每条 skill 都有最小快照测试
+  - ingest 链路新增 `governance_summary` 节点，输出 `raw_findings: list[GovernanceFinding]`、`governance_report_markdown: str`、`summary_status: ok|failed|skipped`
+  - digest 链路新增 `digest_summary` 节点，复用 governance summary 实现（仅工作流标签不同）
+  - LLM summary 失败、超时或 JSON 解析失败时 fail-soft，保留 raw findings 并标 `summary_status=failed`
+  - `structural_governance` 仅基于显式存在 link 字段判断出入链缺失，不做相关性推断
+  - proposal builder 仍只消费 raw findings 的 keep 集合，HITL 链路不被绕过
+  - 单元测试覆盖：3 条 skill 的最小快照 + summary 节点的 ok / failed / skipped 三个分支
+  - ingest / digest 链路既有测试不回归
+- `depends_on`:
+  - `TASK-064`
+- `related_files`:
+  - `backend/app/skills/builtin/structural_governance/skill.md`
+  - `backend/app/skills/builtin/content_leftover_tasks/skill.md`
+  - `backend/app/skills/builtin/weekly_review_summary/skill.md`
+  - `backend/app/graphs/ingest_graph.py`
+  - `backend/app/graphs/digest_graph.py`
+  - `backend/app/services/ingest_proposal.py`
+  - `backend/app/services/digest.py`
+  - `backend/app/contracts/workflow.py`
+  - `backend/tests/test_ingest_workflow.py`
+  - `backend/tests/test_digest_workflow.py`
+  - `docs/superpowers/specs/2026-04-26-skill-mechanism-design.md`
+- `derived_tasks`:
+- `notes`: 这是 `2026-04-26 skill mechanism design` 的第 3 步，本任务结束后 v1 闭环完成。spec 完整说明见 [docs/superpowers/specs/2026-04-26-skill-mechanism-design.md](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/docs/superpowers/specs/2026-04-26-skill-mechanism-design.md) §5.4 与 §6.TASK-065。
+
+### TASK-066
+
+- `task_id`: `TASK-066`
+- `session_id`:
+- `title`: 放开 skill 的工具调用，落地 1 条 tool-using skill `related_notes_linker`
+- `category`: `Backend`
+- `priority`: `P1`
+- `status`: `planned`
+- `scope`: `medium`
+- `goal`: 把 skill 从「LLM-only」升级为「LLM + 受限工具」，按 `SkillSpec.allowed_tools` 落地工具白名单，复用 ask 既有的 `search_notes` / `load_note_excerpt`，并新增一个 `search_related_notes` 工具（基于 hybrid retrieval，输入是笔记内容片段），让 `related_notes_linker` 能基于检索结果产出带 evidence 的 `missing_inbound_link` finding。
+- `out_of_scope`:
+  - 不引入用户自定义 skill 加载入口
+  - 不引入 skill selector LLM；调用方仍显式传入 skill name 列表
+  - 不修改既有 ask 工具的 schema
+  - 不重构 hybrid retrieval 的对外接口
+- `acceptance_criteria`:
+  - `SkillSpec.allowed_tools` 在 runner 调用前被解析为 scoped tool registry view，**不**修改全局 `TOOL_REGISTRY`
+  - 越权工具调用被 runner 拒绝并落 trace
+  - 新增 `search_related_notes` 工具按 ask 既有 ToolSpec 风格定义，read_only 为 True
+  - 新增 `backend/app/skills/builtin/related_notes_linker/skill.md`，allowed_tools 至少包含 `search_notes` / `load_note_excerpt` / `search_related_notes`
+  - `related_notes_linker` 在 sample_vault 上能产出至少 1 条 `missing_inbound_link` finding，并附带 evidence chunk 引用
+  - `governance_summary` 增加对带 evidence_chunk 的 finding 的 markdown 锚点展示规范
+  - 单元测试覆盖：scoped registry 拒绝越权工具、tool-using skill 在 max_rounds 内正常收敛、finding payload 结构、`search_related_notes` 工具
+  - backend 测试不回归
+- `depends_on`:
+  - `TASK-065`
+- `related_files`:
+  - `backend/app/skills/registry.py`
+  - `backend/app/skills/builtin/related_notes_linker/skill.md`
+  - `backend/app/tools/registry.py`
+  - `backend/app/tools/ask_tools.py`
+  - `backend/app/retrieval/hybrid.py`
+  - `backend/app/runtime/llm_with_tools_runner.py`
+  - `backend/app/graphs/ingest_graph.py`
+  - `backend/tests/test_ingest_workflow.py`
+  - `backend/tests/test_ask_tools.py`
+  - `docs/superpowers/specs/2026-04-26-skill-mechanism-design.md`
+- `derived_tasks`:
+- `notes`: 这是 `2026-04-26 skill mechanism design` 的第 4 步。spec 完整说明见 [docs/superpowers/specs/2026-04-26-skill-mechanism-design.md](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/docs/superpowers/specs/2026-04-26-skill-mechanism-design.md) §5.3 与 §6.TASK-066。
+
+### TASK-067
+
+- `task_id`: `TASK-067`
+- `session_id`:
+- `title`: 迁移 INGEST_STEWARD 现有硬编码 governance 到 skill 体系并补 governance skill benchmark
+- `category`: `Backend`
+- `priority`: `P1`
+- `status`: `planned`
+- `scope`: `medium`
+- `goal`: 把 [backend/app/services/ingest_proposal.py](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/backend/app/services/ingest_proposal.py) 中现有的硬编码 governance finding（缺 frontmatter / 缺标题 / 缺出入链 / 遗留任务等）等价迁移到 `structural_governance` + `content_leftover_tasks` + `related_notes_linker` 三条 skill；同时新增 `governance_skill_benchmark_cases.json`（5 ~ 10 条 case）作为 governance skill 的最小回归数据集，确保 skill 化之后行为不退化。
+- `out_of_scope`:
+  - 不顺手重写 proposal validator
+  - 不顺手扩 benchmark runner 的指标维度（仅落 dataset，不强制接 CI）
+  - 不删除旧函数对外签名（保留为薄壳委托给 skill，待回归稳定后再做单独 deprecation 任务）
+- `acceptance_criteria`:
+  - 旧硬编码 governance 路径的所有既有 backend 测试通过（行为等价）
+  - 新增 `eval/benchmark/governance_skill_benchmark_cases.json`，含 5 ~ 10 条 case，覆盖每条 skill 至少一条正例 + 一条反例
+  - 新增 schema 校验测试，确保 benchmark dataset 结构稳定
+  - ingest / digest 端到端冒烟在 sample_vault 上稳定输出 `raw_findings` + `governance_report_markdown`
+  - `docs/PROJECT_MASTER_PLAN.md` 中关于 INGEST_STEWARD governance 来源的描述被更新
+- `depends_on`:
+  - `TASK-066`
+- `related_files`:
+  - `backend/app/services/ingest_proposal.py`
+  - `backend/app/skills/builtin/structural_governance/skill.md`
+  - `backend/app/skills/builtin/content_leftover_tasks/skill.md`
+  - `backend/app/skills/builtin/related_notes_linker/skill.md`
+  - `backend/app/graphs/ingest_graph.py`
+  - `eval/benchmark/governance_skill_benchmark_cases.json`
+  - `backend/tests/test_ingest_proposal.py`
+  - `backend/tests/test_governance_skill_benchmark.py`
+  - `docs/PROJECT_MASTER_PLAN.md`
+  - `docs/superpowers/specs/2026-04-26-skill-mechanism-design.md`
+- `derived_tasks`:
+  - `small: 待 governance skill 在真实 vault 上稳定运行后，单独开任务做旧 ingest_proposal 函数的 deprecation 与签名清理`
+- `notes`: 这是 `2026-04-26 skill mechanism design` 的第 5 步，也是 v2 完成后的收口任务。benchmark dataset 字段（来自原拟 `TASK-068` 的 eval 部分）已并入本任务。spec 完整说明见 [docs/superpowers/specs/2026-04-26-skill-mechanism-design.md](/Users/qi/PycharmProjects/Obsidian-Knowledge-Steward/docs/superpowers/specs/2026-04-26-skill-mechanism-design.md) §6.TASK-067。

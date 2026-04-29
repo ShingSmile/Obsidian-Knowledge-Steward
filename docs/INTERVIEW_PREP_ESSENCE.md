@@ -2,6 +2,165 @@
 
 > 用途：只保留后续面试复习最有用的结论。当前版本先沉淀 Step 1，后续继续增量维护。
 
+## 2026-04-18 简历证据校准：这次能写什么，不能写什么
+
+### 0. 先纠偏：当前 eval 更像 regression，不是 resume-grade benchmark
+
+- 当前 `eval/run_eval.py` 的主要价值是：
+  - 跑真实 workflow 入口
+  - 固化 contract
+  - 验证 fallback / guardrail / proposal / resume 不回退
+- 它现在还不能单独证明：
+  - 某个技术选型比 baseline 更好
+  - 某个模块把真实质量提升了多少
+  - 当前系统已经具备接近生产的成熟度
+- 原因很具体：
+  - 当前总 case 只有 `23` 条
+  - ask / governance / digest 中不少 case 依赖 `provider_mode=none` 或 `mocked_cloud`
+  - `answer_relevancy / context_precision / coverage / patch_safety` 里有相当部分仍是 hint / path / contract-based 指标
+  - 还没有 retrieval baseline、ablation、human calibration、真实 query 分布
+
+### 1. 当前可以稳定对外复述的硬证据
+
+- 当前真实语料规模：`sample_vault` 已验证 `205` 篇 Markdown 笔记、`1057` 个 chunk、约 `50` 处 wikilink、`473` 个任务复选框
+- 当前离线评测：`eval/run_eval.py` 全量 `23/23` 通过
+- 当前测试：
+  - backend 单测 `183/183` 通过
+  - plugin 测试 `20/20` 通过
+- 当前 ask benchmark 可复述数字：
+  - `question_answering` 共 `12` 条 case，`12/12` 通过
+  - `answer_relevancy` 平均 `1.0`
+  - `faithfulness` 平均 `0.8125`
+  - `context_recall` 平均 `1.0`
+  - `context_precision` 平均 `0.5`
+- 当前 governance benchmark 可复述数字：
+  - `3/3` 通过
+  - `patch_safety` 平均 `1.0`
+  - `rationale_faithfulness` 平均 `1.0`
+- 当前 digest benchmark 可复述数字：
+  - `5/5` 通过
+  - `coverage` 平均 `1.0`
+  - `faithfulness` 平均 `0.4615`
+
+### 2. 当前可以讲清楚的设计常数
+
+- 混合检索当前是 `FTS + 向量` 两路召回，RRF 融合常数 `k=60`
+- ask 上下文装配当前是四阶段：
+  - 相关性阈值 `top_score * 0.35`
+  - 单源最多 `2` 个 chunk
+  - 前 `2` 个 chunk 最多各保留 `900` 字符
+  - 其余 chunk 最多各保留 `280` 字符
+- ask 图级 ReAct 默认最大工具轮次 `3`
+- runtime faithfulness gate 当前阈值是 `0.67`
+- 当前插件执行面支持的 canonical patch 类型是 `4` 类：
+  - `merge_frontmatter`
+  - `insert_under_heading`
+  - `replace_section`
+  - `add_wikilink`
+
+### 3. 当前绝对不能硬吹的点
+
+- 不能说有真实用户、DAU、留存或线上业务结果
+- 不能说做了 rerank；当前代码与主文档都明确 `rerank` 仍未实现
+- 不能说 embedding/provider 做过真实联网 E2E；当前验证仍以 deterministic fixture / mock 为主
+- 不能说 ask 已 fully proposal 化；当前主文档明确 ask proposal 还没接上
+- 不能把旧文档里的“设计设想”混成现状；简历与面试一律以代码、最新 eval、最新测试为准
+
+### 4. 简历改写原则
+
+- 先把“框架名词”改成“问题 -> 取舍 -> 机制 -> 数字”
+- 数字优先写可复现工程结果，不要伪装成业务结果
+- 当前最稳的简历数字来源是：
+  - 语料规模
+  - 测试规模
+  - eval case 数
+  - 指标分数
+  - 降级 / fallback / guardrail 覆盖路径
+- 如果某条 bullet 没有数字、没有 trade-off、没有你自己的设计选择，就宁可删掉
+
+### 5. 评测补强必须分三层做
+
+- `Regression / Contract`
+  - 目标：证明系统没回退
+  - 当前已有：tests、golden case、resume / writeback / guardrail 回归
+  - 用途：开发安全网，不是简历主卖点
+- `Benchmark / Ablation`
+  - 目标：证明某个技术选型带来可量化收益
+  - 必须补：baseline、统一数据集、固定指标、延迟 / 成本、ablation 组合
+  - 这是后续简历数字的主来源
+- `Human Eval / Demo Evidence`
+  - 目标：证明系统结果对真实使用者有意义
+  - 必须补：人工标注、bad case、误杀 / 漏杀、审阅通过率
+  - 这是把“工程项目”往“真实产品雏形”推的关键
+
+### 6. 下一阶段最优先的执行顺序
+
+- 第一阶段只收 ask 主链路，不同时扩 governance / digest
+- 先建 retrieval eval：
+  - 产出 `golden query -> relevant note/chunk` 标注
+  - 对比 `FTS only / vector only / hybrid RRF`
+  - 指标至少看 `Recall@k / MRR / NDCG@10 / latency`
+- 再建 answer eval：
+  - 对同一批 query 固定 prompt 与 provider
+  - 对比 `hybrid`、`hybrid + assembly`、`hybrid + assembly + runtime gate`
+  - 指标至少看 `faithfulness / answer correctness / downgrade rate / response latency`
+- 最后补 governance eval：
+  - proposal 准确率
+  - patch 审核通过率
+  - before_hash 冲突率
+  - rollback / resume 成功率
+
+## 2026-04-18 短期补强：先做一套小而硬的 benchmark
+
+### 1. 当前最紧要的问题
+
+- 不是继续堆功能
+- 不是先润色简历
+- 而是先把 `Obsidian` 项目收敛成一套能稳定复现、能做 ablation、能产出数字的 ask-only benchmark
+
+### 2. 为什么必须先做 benchmark
+
+- 当前仓库已有 eval，更像“回归与 contract 校验”，还不够支撑简历里的强结果数字
+- 没有 baseline 和 ablation，就没法证明：
+  - hybrid retrieval 比单路检索更好
+  - context assembly 不是自我感动
+  - runtime faithfulness gate 真的减少了 overclaim
+  - 上述控制层带来的延迟成本是否可接受
+
+### 3. 第一阶段 benchmark 只收敛 ask 主链路
+
+- 不要一上来同时覆盖 ask / governance / digest
+- 第一阶段只回答 4 个问题：
+  - 检索是否变好
+  - 生成是否更可信
+  - 上下文是否更干净
+  - 代价是否可接受
+
+### 4. 第一阶段最小 ablation 矩阵
+
+- `FTS only`
+- `vector only`
+- `hybrid RRF`
+- `hybrid + context assembly`
+- `hybrid + context assembly + runtime faithfulness gate`
+
+### 5. 第一阶段最值得写进简历的指标
+
+- `Recall@k`
+- `NDCG@10`
+- `Faithfulness`
+- `Answer Relevancy`
+- `Context Precision`
+- `Context Recall`
+- `response latency`
+- `fallback / downgrade rate`
+
+### 6. 面试时可直接说的判断
+
+- 我没有继续先堆功能，而是先把 ask 主链路收敛成一套小而硬的 benchmark
+- 这样后续每次优化都能回答“比什么强、强多少、代价是什么”
+- 这比单纯说“做了 LangGraph / RAG / Agent”更像工程项目，而不是功能堆砌
+
 ## 2026-03-29 简历版高阶项目叙事
 
 ### 1. 项目一句话主线
